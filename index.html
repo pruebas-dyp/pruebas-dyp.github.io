@@ -1,0 +1,120 @@
+﻿<!DOCTYPE html>
+<html lang="es-CL" data-tema="oscuro">
+<head>
+<meta charset="utf-8">
+<!-- `viewport-fit=cover` para que el sistema use la pantalla completa en un
+     teléfono con muesca; el CSS devuelve el margen con `env(safe-area-inset-*)`
+     donde hace falta. Sin esto quedan dos franjas negras a los costados. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- Este modelo se publica para que el cliente lo pruebe desde su telefono, no
+     para que aparezca en buscadores. Se comparte por link, no se indexa. -->
+<meta name="robots" content="noindex, nofollow">
+<title>Automotora DyP · Control de Taller</title>
+<link rel="stylesheet" href="css/estilos.css?v=202608212335">
+<script>
+  // Se aplica antes de pintar para que no haya un destello del tema anterior.
+  try {
+    var t = localStorage.getItem('dyp-tema');
+    if (t === 'claro' || t === 'oscuro') document.documentElement.dataset.tema = t;
+  } catch (e) { /* file:// sin almacenamiento: queda el tema por defecto */ }
+</script>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- Barra de menú -->
+  <div class="barra-menu">
+    <!-- El botón de módulos. Sólo se ve bajo los 860 px, que es donde la barra
+         lateral no cabe y pasa a ser un cajón. Sin él, en un celular no había
+         NINGUNA forma de cambiar de módulo: la barra simplemente desaparecía. -->
+    <button class="btn-nav" id="btn-nav" type="button" aria-controls="sidebar"
+      aria-expanded="false" aria-label="Abrir el menú de módulos">
+      <span class="rayas" aria-hidden="true"></span>
+    </button>
+    <span class="prod" id="prod"></span>
+    <span class="mnu">Archivo</span>
+    <span class="mnu">Edición</span>
+    <span class="mnu">Ver</span>
+    <span class="mnu">Reportes</span>
+    <span class="der">
+      <span class="usr" id="usr"></span>
+      <button id="btn-tema" type="button">Tema oscuro</button>
+    </span>
+  </div>
+
+  <div class="marco">
+
+    <!-- Navegador de módulos -->
+    <!-- El tirador del borde derecho angosta la barra; el botón de abajo la
+         deja en iconos. Las dos cosas son para lo mismo: que la tabla de la
+         torre —17 columnas— entre completa, como entra en el sistema actual,
+         que no tiene barra lateral. -->
+    <aside class="sidebar" id="sidebar">
+      <div class="tit">Módulos</div>
+      <nav class="nav" id="nav"></nav>
+      <button class="plegar" id="btn-plegar" type="button"
+        title="Contraer la barra a iconos" aria-label="Contraer la barra lateral"></button>
+      <div class="tirador" id="tirador-lateral" role="separator" aria-orientation="vertical"
+        title="Arrastrar para angostar la barra"></div>
+    </aside>
+
+    <!-- El velo del cajón. Oscurece lo de atrás y, sobre todo, da dónde tocar
+         para cerrar: en un celular el gesto natural es tocar al lado, no buscar
+         una cruz. -->
+    <div class="velo-nav" id="velo-nav" hidden></div>
+
+    <main class="principal">
+
+      <header class="cab-modulo">
+        <div class="ruta" id="ruta"></div>
+        <h1 id="titulo"></h1>
+        <p class="bajada" id="bajada"></p>
+        <div class="tabs" id="tabs"></div>
+      </header>
+
+      <div class="herramientas" id="herramientas"></div>
+
+      <div class="contenido" id="contenido"></div>
+
+    </main>
+  </div>
+
+  <!-- Barra de estado -->
+  <div class="barra-estado" id="estado-barra"></div>
+
+</div>
+
+<!-- Orden obligatorio: las reglas no dependen de nadie, la semilla depende de
+     las reglas (arma los números de OR), el repositorio depende de las dos, y
+     las vistas dependen del repositorio. `app.js` va último porque al cargar
+     ya pinta, y para eso necesita que las vistas estén definidas. -->
+<script src="js/iconos.js?v=202608212335"></script>
+<script src="js/reglas.js?v=202608212335"></script>
+<script src="js/semilla.js?v=202608212335"></script>
+<script src="js/modelo.js?v=202608212335"></script>
+<script src="js/media.js?v=202608212335"></script>
+<script src="js/pruebas.js?v=202608212335"></script>
+<script src="js/vistas/silueta.js?v=202608212335"></script>
+<script src="js/vistas/fotos.js?v=202608212335"></script>
+<script src="js/vistas/recepcion.js?v=202608212335"></script>
+<script src="js/vistas/recepcion-editar.js?v=202608212335"></script>
+<script src="js/vistas/torre.js?v=202608212335"></script>
+<script src="js/vistas/taller.js?v=202608212335"></script>
+<script src="js/vistas/mitrabajo.js?v=202608212335"></script>
+<script src="js/vistas/ingreso.js?v=202608212335"></script>
+<script src="js/vistas/etapas.js?v=202608212335"></script>
+<script src="js/vistas/impresos.js?v=202608212335"></script>
+<script src="js/vistas/ficha.js?v=202608212335"></script>
+<script src="js/vistas/presupuesto.js?v=202608212335"></script>
+<script src="js/vistas/bodega.js?v=202608212335"></script>
+<script src="js/vistas/entrega.js?v=202608212335"></script>
+<script src="js/vistas/historico.js?v=202608212335"></script>
+<script src="js/vistas/reporteria.js?v=202608212335"></script>
+<script src="js/vistas/expediente.js?v=202608212335"></script>
+<script src="js/vistas/personal.js?v=202608212335"></script>
+<script src="js/vistas/documentos.js?v=202608212335"></script>
+<script src="js/vistas/configuracion.js?v=202608212335"></script>
+<script src="js/app.js?v=202608212335"></script>
+</body>
+</html>
