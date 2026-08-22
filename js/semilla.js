@@ -37,10 +37,11 @@ const Semilla = (function () {
   const FUERA_DE_TALLER        = 10;   // reglas §C.6  — y son distintas de las 41
   const SIN_ETAPA              = 53;   // reglas §C.7  — "Pendiente" / "Sin Asignar"
   const TRABAJADORES           = 89;   // medido en el sistema real; la demo siembra 5
-  /* 19 desde el 17-08-2026: los seis puestos del taller, el evaluador, y las
-     doce cuentas que entregó Andrés Guzmán —los usuarios de la web de hoy— más
-     la de Arttmize para la puesta en marcha. */
-  const EQUIPO_DEMO            = 19;
+  /* 13 desde el 22-08-2026: exactamente las cuentas que entregó Andrés Guzmán
+     —los usuarios de la web de hoy— y ninguna más. Salieron las seis que
+     habíamos inventado nosotros para poder mostrar el sistema: los cuatro
+     puestos del taller, el evaluador y la de Arttmize. */
+  const EQUIPO_DEMO            = 13;
   const TOTAL_HISTORICO        = 120;  // ~3 entregas diarias (§C.21)
   const ULTIMA_OT              = 23488;// reglas §C.13 — al 12-08-2026
 
@@ -82,8 +83,10 @@ const Semilla = (function () {
      gráfico plano, y un gráfico plano se ve inventado — que es exactamente lo
      que pasó con las duraciones de etapa y con el ranking de marcas. */
   const RECHAZO_PERSONA = {
-    'pe-t-3': 14, 'pe-t-4': 9, 'pe-t-5': 4, 'pe-t-2': 3,
-    'pe-t-13': 17, 'pe-t-14': 6, 'pe-t-15': 11, 'pe-t-16': 2, 'pe-t-17': 8
+    'pe-t-5': 9,     // Nicole Hernández
+    'pe-t-13': 4,    // Andrés Guzmán
+    'pe-t-11': 14,   // Cristopher Zúñiga
+    'pe-t-12': 6     // Nicolás Zúñiga
   };
 
   /* Días entre que el operario declara terminado y el jefe da el visto bueno.
@@ -91,7 +94,7 @@ const Semilla = (function () {
      todas fueran iguales el indicador no distinguiría nada. */
   const ESPERA_VISTO = [0, 0, 0.4, 1, 0, 2, 0.7, 3, 0.2, 1.5, 0, 0.9];
 
-  const FORMA_DATOS = 8;   // 8: el visto bueno llega despues del termino, no en el mismo segundo
+  const FORMA_DATOS = 9;   // 9: solo las trece cuentas de la lista de Andres
   // TEMPARIO_HORA ($10.000, reglas §C.15) se eliminó el 13-08-2026 junto con
   // el tempario entero. La cifra queda medida en `reglas`, no en el sistema.
 
@@ -205,95 +208,91 @@ const Semilla = (function () {
   const MODULOS_TODOS = ['recepcion', 'torre', 'taller', 'presupuesto', 'bodega',
     'documentos', 'historico', 'personal', 'consolidado', 'configuracion'];
 
+  /* ══ EL EQUIPO ═══════════════════════════════════════════
+     🔷 LAS TRECE CUENTAS DE ANDRÉS, Y NINGUNA MÁS (22-08-2026).
+
+     Marco: *"solamente déjame estos accesos, los otros bórramelos — que son
+     los que me dijo Andrés"*. Se fueron seis cuentas que habíamos inventado
+     nosotros para poder mostrar el sistema: «Jefe de taller», «Desabolladura»,
+     «Pintura», «Bodega», «Evaluador» y la de Arttmize para la puesta en marcha.
+
+     ⚠️ **LO QUE ESTO DEJA A LA VISTA, Y NO ES UN DEFECTO DEL MODELO:** de las
+     nueve etapas del taller, cuatro —Desabolladura, Preparación, Pintura y
+     Terminación— **no las puede hacer ninguna cuenta de esta lista**. Es lo
+     que dice la lista: quien pinta y quien desabolla **no tiene cuenta en el
+     sistema**. Hoy da igual, porque el sistema actual no registra quién hizo
+     qué; con el ciclo de asignación (C-43) deja de dar igual, porque el jefe
+     asignaría a nadie. Está medido con una cifra de control y sale rotulado en
+     la pantalla de asignar. **No se inventó que alguien de la lista pinta.**
+
+     Qué es de ELLOS y qué es NUESTRO:
+
+       · Los MÓDULOS de cada persona son de ellos, textuales.
+       · El ROL —lo que se puede HACER dentro de cada módulo— es propuesta
+         NUESTRA. Su sistema no lo tiene: allá el que entra a una pantalla puede
+         todo lo que la pantalla ofrece. Hay que confirmarlo cargo por cargo.
+       · Nombre y cargo son reales, porque son las cuentas del sistema. RUT,
+         teléfono y dirección son inventados.
+
+     🔴 Y EL `id` VA ESCRITO, no sale de la posición. Antes era `pe-t-` + el
+     lugar en esta lista, así que borrar una cuenta del medio le cambiaba el id
+     a todas las de abajo y rompía los datos sembrados que las nombran. Escrito,
+     una cuenta se puede sacar sin tocar a las demás. */
   const EQUIPO = [
     /* La cuenta «Recepcionista» de la lista de Andrés: es el puesto, no una
        persona, y así la tienen ellos. */
-    { nombre: 'Recepción',      rol: 'ro-1', etapas: [],
+    { id: 'pe-t-1', nombre: 'Recepción', rol: 'ro-1', etapas: [],
       cargo: 'Recepción y entrega',
       modulos: ['torre', 'historico', 'recepcion', 'taller'] },
-    { nombre: 'Jefe de taller', rol: 'ro-2', etapas: ['et-1', 'et-5', 'et-8', 'et-9'],
-      cargo: 'Jefatura de taller', usuario: 'jefe' },
-    { nombre: 'Desabolladura',  rol: 'ro-3', etapas: ['et-1', 'et-2', 'et-5'],
-      cargo: 'Operario · Desabolladura' },
-    { nombre: 'Pintura',        rol: 'ro-3', etapas: ['et-3', 'et-4', 'et-7'],
-      cargo: 'Operario · Preparación y pintura' },
-    { nombre: 'Bodega',         rol: 'ro-4', etapas: ['et-6', 'et-8'],
-      cargo: 'Bodega y mecánica' },
-    // El administrador también entra con usuario y clave: no hay una puerta
-    // trasera sin credenciales, que es como se cuela el "entro yo nomás".
-    { nombre: 'Gabriel', apellidos: 'Díaz', rol: 'ro-5', etapas: [],
+    { id: 'pe-t-2', nombre: 'Gabriel', apellidos: 'Díaz', rol: 'ro-5', etapas: [],
       cargo: 'Gerente General', usuario: 'gabriel.diaz', modulos: MODULOS_TODOS },
-    /* El evaluador va AL FINAL, y no es un detalle de estilo: los ids de las
-       personas se generan por posición (`pe-t-N`), así que meterlo en medio
-       corría a todos los de abajo — `pe-t-6` dejaba de ser el administrador y
-       media docena de pruebas se caían con "el rol Evaluador no puede hacer
-       esto". Lo nuevo se agrega al final. */
-    { nombre: 'Evaluador',      rol: 'ro-8', etapas: [],
-      cargo: 'Evaluación y presupuestos' },
-
-    /* ═══════════════════════════════════════════════════════════════════
-       🔷 LOS USUARIOS DE VERDAD (17-08-2026)
-
-       Andrés Guzmán —jefe de recepción— entregó la lista de quién usa la web
-       hoy y a qué módulo entra cada uno. Está tal cual la mandó.
-
-       Qué es de ELLOS y qué es NUESTRO, para no confundirlo en la
-       demostración:
-
-         · Los MÓDULOS de cada persona son de ellos, textuales. No se inventó
-           ninguno ni se sacó ninguno.
-         · El ROL —lo que se puede HACER dentro de cada módulo— es propuesta
-           NUESTRA. Su sistema no lo tiene: allá el que entra a una pantalla
-           puede todo lo que la pantalla ofrece. Hay que confirmarlo con
-           ellos cargo por cargo.
-         · Nombre y cargo son reales, porque son las cuentas del sistema.
-           RUT, teléfono y dirección son inventados, igual que para todos.
-
-       Los dos operarios —desabolladura y pintura— no están en la lista, y con
-       razón: hoy no usan la web. En este sistema sí tienen pantalla, así que
-       quedan SIN lista de módulos, que es lo mismo que decir "lo que su rol
-       permita". Ver `modulos` en el motor. */
-    { nombre: 'Alejandra', apellidos: 'Díaz', rol: 'ro-5', etapas: [],
+    { id: 'pe-t-3', nombre: 'Alejandra', apellidos: 'Díaz', rol: 'ro-5', etapas: [],
       cargo: 'Gerente de Administración y Finanzas', usuario: 'alejandra.diaz',
       modulos: ['torre', 'historico', 'personal', 'presupuesto', 'documentos', 'bodega'] },
-    { nombre: 'Nancy', apellidos: 'Carvajal', rol: 'ro-8', etapas: [],
+    { id: 'pe-t-4', nombre: 'Nancy', apellidos: 'Carvajal', rol: 'ro-8', etapas: [],
       cargo: 'Administración', usuario: 'nancy.carvajal',
       modulos: ['torre', 'historico', 'personal', 'presupuesto', 'documentos'] },
-    { nombre: 'Nicole', apellidos: 'Hernández', rol: 'ro-2', etapas: ['et-1', 'et-5', 'et-8', 'et-9'],
+    /* Nicole es la única jefatura de taller que queda en la lista, así que es
+       ella quien da el visto bueno. Andrés también puede: los dos con `ro-2`. */
+    { id: 'pe-t-5', nombre: 'Nicole', apellidos: 'Hernández', rol: 'ro-2',
+      etapas: ['et-1', 'et-5', 'et-8', 'et-9'],
       cargo: 'Jefatura', usuario: 'nicole.hernandez',
       modulos: ['torre', 'historico', 'recepcion', 'taller', 'personal', 'presupuesto',
                 'documentos', 'bodega'] },
-    { nombre: 'Iván', apellidos: 'Villalobos', rol: 'ro-1', etapas: [],
+    { id: 'pe-t-6', nombre: 'Iván', apellidos: 'Villalobos', rol: 'ro-1', etapas: [],
       cargo: 'Recepción', usuario: 'ivan.villalobos',
       modulos: ['torre', 'historico', 'recepcion', 'taller', 'presupuesto'] },
-    { nombre: 'Esteban', apellidos: 'Calvo', rol: 'ro-1', etapas: [],
+    { id: 'pe-t-7', nombre: 'Esteban', apellidos: 'Calvo', rol: 'ro-1', etapas: [],
       cargo: 'Recepción', usuario: 'esteban.calvo',
       modulos: ['torre', 'historico', 'recepcion', 'taller', 'presupuesto'] },
-    { nombre: 'Sheila', apellidos: 'Marín', rol: 'ro-8', etapas: [],
+    { id: 'pe-t-8', nombre: 'Sheila', apellidos: 'Marín', rol: 'ro-8', etapas: [],
       cargo: 'Administración', usuario: 'sheila.marin',
       modulos: ['torre', 'historico', 'personal', 'presupuesto', 'documentos'] },
-    { nombre: 'Sandra', apellidos: 'Hernández', rol: 'ro-8', etapas: [],
+    { id: 'pe-t-9', nombre: 'Sandra', apellidos: 'Hernández', rol: 'ro-8', etapas: [],
       cargo: 'Administración', usuario: 'sandra.hernandez',
       modulos: ['torre', 'historico', 'presupuesto', 'documentos'] },
-    { nombre: 'Cristian', apellidos: 'Vidal', rol: 'ro-1', etapas: [],
+    { id: 'pe-t-10', nombre: 'Cristian', apellidos: 'Vidal', rol: 'ro-1', etapas: [],
       cargo: 'Recepción', usuario: 'cristian.vidal',
       modulos: ['torre', 'historico', 'recepcion', 'taller', 'presupuesto'] },
-    { nombre: 'Cristopher', apellidos: 'Zúñiga', rol: 'ro-4', etapas: ['et-6', 'et-8'],
+    { id: 'pe-t-11', nombre: 'Cristopher', apellidos: 'Zúñiga', rol: 'ro-4',
+      etapas: ['et-6', 'et-8'],
       cargo: 'Bodega', usuario: 'cristopher.zuniga',
       modulos: ['torre', 'historico', 'documentos', 'bodega'] },
-    { nombre: 'Nicolás', apellidos: 'Zúñiga', rol: 'ro-4', etapas: ['et-6', 'et-8'],
+    { id: 'pe-t-12', nombre: 'Nicolás', apellidos: 'Zúñiga', rol: 'ro-4',
+      etapas: ['et-6', 'et-8'],
       cargo: 'Bodega', usuario: 'nicolas.zuniga',
       modulos: ['torre', 'historico', 'documentos', 'bodega'] },
-    { nombre: 'Andrés', apellidos: 'Guzmán', rol: 'ro-2', etapas: ['et-1', 'et-5', 'et-8', 'et-9'],
+    { id: 'pe-t-13', nombre: 'Andrés', apellidos: 'Guzmán', rol: 'ro-2',
+      etapas: ['et-1', 'et-5', 'et-8', 'et-9'],
       cargo: 'Jefe de Recepción', usuario: 'andres.guzman',
-      modulos: ['torre', 'historico', 'recepcion', 'taller', 'presupuesto', 'consolidado'] },
-
-    /* La cuenta de Arttmize, para acompañar la puesta en marcha. Va con
-       acceso total y declarada como lo que es: no es del taller. */
-    { nombre: 'Administrador', apellidos: 'Arttmize', rol: 'ro-5', etapas: [],
-      cargo: 'Arttmize SpA · puesta en marcha', usuario: 'administrador',
-      modulos: MODULOS_TODOS }
+      modulos: ['torre', 'historico', 'recepcion', 'taller', 'presupuesto', 'consolidado'] }
   ];
+
+  /* Quién reparte y quién da el visto bueno en los datos de demostración.
+     Escritos acá con nombre y no como `pe-t-N` sueltos más abajo: son las dos
+     puntas del ciclo de asignación y se leen mejor juntas. */
+  const JEFA_TALLER = 'pe-t-5';    // Nicole Hernández — Jefatura
+  const MESON       = 'pe-t-1';    // la cuenta de Recepción
 
   /* La lista de cuentas que mira el SELLO. */
   const EQUIPO_SELLO = EQUIPO;
@@ -798,7 +797,11 @@ const Semilla = (function () {
       .replace(/[óòö]/g, 'o').replace(/[úùü]/g, 'u').replace(/[^a-z]/g, '');
 
     EQUIPO.forEach((x, i) => {
-      const id = 'pe-t-' + (i + 1);
+      /* 🔴 EL ID VIENE ESCRITO EN LA FICHA. Antes era la posición en la lista,
+         y por eso sacar una cuenta del medio le cambiaba el id a todas las de
+         abajo: los datos sembrados que nombran a una persona quedaban
+         apuntando a otra. */
+      const id = x.id;
       const corto = x.usuario || sinTildes(x.nombre);
       persona.push({
         id, tipo: 'trabajador', ficha: 1001 + i, rut: rutFalso(i + 1),
@@ -1167,7 +1170,7 @@ const Semilla = (function () {
            que no es lo que hace bodega. Una de cada cuatro queda SIN
            responsable: son las que hay que asignar, y sin ellas la pantalla
            del jefe no tendría nada pendiente que mostrar. */
-        responsable_id: idx % 4 === 0 ? null : ['pe-t-1', 'pe-t-2'][idx % 2],
+        responsable_id: idx % 4 === 0 ? null : [MESON, JEFA_TALLER][idx % 2],
         observaciones_ingreso: '', demo: true
       });
 
@@ -1352,7 +1355,7 @@ const Semilla = (function () {
             persona_id: suelta ? null : resp, observacion: '',
             // Reparte el jefe de taller; una de cada cuatro las reparte
             // recepción, que es la otra cuenta con el permiso de asignar.
-            asignada_por: (idx + e.orden) % 4 === 0 ? 'pe-t-1' : 'pe-t-2',
+            asignada_por: (idx + e.orden) % 4 === 0 ? MESON : JEFA_TALLER,
             /* Una etapa cerrada paso por las dos manos: la término el operario
                y la valido el jefe. En la demostracion la validacion va un rato
                despues del termino, que es lo que pasa de verdad: el jefe la
@@ -1376,10 +1379,10 @@ const Semilla = (function () {
               : (esperandoVisto ? fechaTramo(Math.max(0, fin / 2)) : null),
             terminada_por: cerrada ? resp : (esperandoVisto ? resp : null),
             validada_at: cerrada ? cuando : null,
-            validada_por: cerrada ? 'pe-t-2' : null,
+            validada_por: cerrada ? JEFA_TALLER : null,
             devuelta_at: devuelta ? fechaTramo(Math.max(0, fin / 2))
               : (devueltaVieja ? fechaTramo(Math.max(0, (t.desde + t.hasta) / 2)) : null),
-            devuelta_por: (devuelta || devueltaVieja) ? 'pe-t-2' : null,
+            devuelta_por: (devuelta || devueltaVieja) ? JEFA_TALLER : null,
             devuelta_motivo: (devuelta || devueltaVieja)
               ? MOTIVOS_DEVOLUCION[(idx + e.orden) % MOTIVOS_DEVOLUCION.length] : null,
             devoluciones: (devuelta || devueltaVieja) ? 1 : 0

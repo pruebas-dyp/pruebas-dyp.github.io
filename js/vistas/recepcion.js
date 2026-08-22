@@ -646,10 +646,47 @@ function recSelect(clave, rotulo, filas, opciones) {
    teclear tres letras. Se escribe, la lista se va achicando sola, y si el
    valor no existe aparece el botón para agregarlo al catálogo sin salir de la
    recepción. El id se resuelve por nombre; mientras no calce, queda vacío. */
+/* ¿Pantalla de dedo? El `datalist` de más abajo funciona en un computador, pero
+   en Android y en iOS **casi no se despliega**: sólo sugiere mientras se
+   escribe, así que el recepcionista toca «Marca», no pasa nada, y concluye que
+   está roto. Reportado desde el celular el 22-08-2026.
+
+   En esas pantallas se pinta un `select` nativo, que abre la rueda del sistema
+   operativo y se maneja con el pulgar. En escritorio se conserva el
+   autocompletado, que ahí sí sirve y además deja escribir para filtrar. */
+function recTactil() {
+  try {
+    return window.matchMedia('(pointer: coarse)').matches ||
+           window.matchMedia('(max-width: 860px)').matches;
+  } catch (e) { return false; }   // navegador sin matchMedia: queda el de siempre
+}
+
 function recCombo(clave, rotulo, filas, tabla, opciones) {
   const o = opciones || {};
   const r = rec();
   const sel = filas.find((f) => String(f.id) === String(r.campos[clave]));
+
+  /* La versión de dedo. Va antes que todo lo demás porque no comparte nada con
+     el autocompletado: acá el valor del control es el ID de la fila, no su
+     nombre escrito, así que no hay «texto que no calza con el catálogo» ni
+     botón de crear. Quien tenga que agregar una marca lo hace en Configuración,
+     que además es lo que pidió el cliente el 15-08-2026. */
+  if (recTactil()) {
+    const obligaT = REC_OBLIGATORIOS.some(([c]) => c === clave);
+    const vacio = o.apagado ? (o.marcador || 'Primero la marca') : 'Elige ' + rotulo.toLowerCase();
+    return '<div class="campo' + (recMarcado(clave) ? ' falta' : '') + '"><label>' + esc(rotulo) +
+      (obligaT ? ' <span style="color:var(--rojo)">*</span>' : '') + '</label>' +
+      '<select data-combo="' + clave + '" data-tabla="' + esc(tabla) + '"' +
+        (o.apagado ? ' disabled' : '') + '>' +
+        '<option value="">' + esc(vacio) + '</option>' +
+        filas.map((f) => '<option value="' + esc(f.id) + '"' +
+          (String(f.id) === String(r.campos[clave]) ? ' selected' : '') + '>' +
+          esc(f.nombre) + '</option>').join('') +
+      '</select>' +
+      '<span class="ayuda">' + esc(o.ayuda || (sel ? '✓ ' + sel.nombre : '')) + '</span></div>';
+  }
+
+
   const escrito = r.textos[clave] != null ? r.textos[clave] : (sel ? sel.nombre : '');
   const limpio = String(escrito).trim();
   const calza = filas.find((f) => String(f.nombre).toLowerCase() === limpio.toLowerCase());
@@ -933,8 +970,16 @@ function recDanos() {
     <div class="ed-dibujo">
       <div class="lienzo">${svgSilueta()}</div>
       <div class="ed-barra">
-        <span class="ayuda">Raya sobre el auto con el dedo o el mouse. Cada trazo es un daño.</span>
-        <span style="display:flex;gap:6px">
+        <span class="ayuda">${recTactil()
+          ? 'Un dedo raya · dos dedos acercan. Cada trazo es un daño.'
+          : 'Raya sobre el auto con el dedo o el mouse. Cada trazo es un daño.'}</span>
+        <span style="display:flex;gap:6px;flex-wrap:wrap">
+          ${/* 🔴 El interruptor de modo (22-08-2026). En el celular el dedo tenía
+               un solo significado —rayar— y no había forma de desplazar la
+               página desde encima del dibujo sin dejar una marca. Acá el
+               recepcionista dice qué está haciendo, y mientras esté en «Mover»
+               el lienzo no acepta ni un trazo. */''}
+          <button class="btn secundario" id="dano-modo" aria-pressed="false">Mover y acercar</button>
           <button class="btn secundario" id="dano-deshacer">Deshacer el último</button>
           <button class="btn secundario" id="dano-borrar">Borrar todo</button>
         </span>
@@ -1422,21 +1467,43 @@ function pRecepcion() {
     ? Modelo.catalogo('modelo').filter((m) => m.marca_id === r.campos.marca_id)
     : Modelo.catalogo(tabla);
 
-  document.querySelectorAll('[data-combo]').forEach((el) => el.addEventListener('input', () => {
-    const clave = el.dataset.combo;
-    const antes = r.campos[clave];
-    r.textos[clave] = el.value;
-    const t = el.value.trim().toLowerCase();
-    const fila = filasDe(el.dataset.tabla).find((f) => String(f.nombre).toLowerCase() === t);
-    r.campos[clave] = fila ? fila.id : '';
-    recDesmarcar(el, clave);
-    // Cambiar de marca invalida el modelo elegido.
-    if (clave === 'marca_id' && r.campos.marca_id !== antes) {
-      r.campos.modelo_id = ''; r.textos.modelo_id = '';
-    }
-    guardarBorrador();
-    if (!!fila !== !!antes || clave === 'marca_id') { render(); recEnfocar(clave, el.value.length); }
-  }));
+  /* El mismo `data-combo` viaja en dos controles distintos —el autocompletado
+     del computador y el `select` del celular—, así que acá se bifurca igual que
+     en los bloques de orden: un `select` avisa con `change` y su valor ya es el
+     ID; un `input` avisa con `input` y hay que buscar el nombre en el catálogo. */
+  document.querySelectorAll('[data-combo]').forEach((el) => {
+    const esSelect = el.tagName === 'SELECT';
+    el.addEventListener(esSelect ? 'change' : 'input', () => {
+      const clave = el.dataset.combo;
+      const antes = r.campos[clave];
+
+      if (esSelect) {
+        r.campos[clave] = el.value;
+        // El texto escrito deja de tener sentido cuando se elige de una lista.
+        r.textos[clave] = '';
+      } else {
+        r.textos[clave] = el.value;
+        const t = el.value.trim().toLowerCase();
+        const fila = filasDe(el.dataset.tabla).find((f) => String(f.nombre).toLowerCase() === t);
+        r.campos[clave] = fila ? fila.id : '';
+      }
+      recDesmarcar(el, clave);
+      // Cambiar de marca invalida el modelo elegido.
+      if (clave === 'marca_id' && r.campos.marca_id !== antes) {
+        r.campos.modelo_id = ''; r.textos.modelo_id = '';
+      }
+      guardarBorrador();
+
+      /* El `select` repinta siempre: el de Modelo depende de la marca y hay que
+         rearmar sus opciones. Y no se devuelve el foco con `recEnfocar`, que es
+         para poner el cursor dentro de un texto: en una lista desplegable no
+         hay cursor y forzar el foco vuelve a abrir la rueda del sistema. */
+      if (esSelect) return render();
+      const fila = filasDe(el.dataset.tabla).find(
+        (f) => String(f.nombre).toLowerCase() === el.value.trim().toLowerCase());
+      if (!!fila !== !!antes || clave === 'marca_id') { render(); recEnfocar(clave, el.value.length); }
+    });
+  });
 
   document.querySelectorAll('[data-combo-crear]').forEach((b) => b.addEventListener('click', () => {
     const clave = b.dataset.comboCrear;
@@ -1492,13 +1559,33 @@ function pRecepcion() {
     const zonas = Modelo.zonasDano();
     let trazo = null, vivo = null;
 
+    /* Dedos apoyados en este momento. Con dos o más el gesto es un acercamiento,
+       no un rayón: se descarta el trazo empezado en vez de dejar una marca
+       torcida cada vez que alguien hace pinza sobre el auto. */
+    const dedos = new Set();
+    const lienzo = svg.closest('.lienzo');
+    const modoMover = () => !!(lienzo && lienzo.classList.contains('mover'));
+
     const punto = (ev) => {
       const caja = svg.getBoundingClientRect();
       return { x: Number(((ev.clientX - caja.left) / caja.width).toFixed(4)),
                y: Number(((ev.clientY - caja.top) / caja.height).toFixed(4)) };
     };
 
+    /* Saca de la pantalla el trazo a medio hacer y olvida que existía. No toca
+       `r.danos`: el daño se guarda recién al soltar, así que acá no hay nada
+       que deshacer, sólo un dibujo que borrar. */
+    const descartar = () => {
+      if (vivo && vivo.parentNode) vivo.parentNode.removeChild(vivo);
+      trazo = null; vivo = null;
+    };
+
     svg.addEventListener('pointerdown', (ev) => {
+      if (ev.pointerType === 'touch') dedos.add(ev.pointerId);
+      // En modo mover el lienzo no dibuja, y tampoco se traga el gesto: sin
+      // `preventDefault` el navegador puede desplazar y acercar con libertad.
+      if (modoMover()) return;
+      if (dedos.size > 1) return descartar();   // segundo dedo = está acercando
       ev.preventDefault();
       try { svg.setPointerCapture(ev.pointerId); } catch (e) { /* no siempre se puede */ }
       trazo = { puntos: [punto(ev)] };
@@ -1509,6 +1596,8 @@ function pRecepcion() {
 
     svg.addEventListener('pointermove', (ev) => {
       if (!trazo) return;
+      // Un dedo que aparece a mitad del trazo también es una pinza.
+      if (dedos.size > 1) return descartar();
       trazo.puntos.push(punto(ev));
       vivo.setAttribute('d', siluetaTrazoD(trazo.puntos));
     });
@@ -1536,9 +1625,31 @@ function pRecepcion() {
       });
       guardarBorrador(); pintarDanos();
     };
-    svg.addEventListener('pointerup', soltar);
-    svg.addEventListener('pointerleave', soltar);
-    svg.addEventListener('pointercancel', soltar);
+    /* El dedo que se levanta deja de contar para la pinza. Se hace acá y no
+       dentro de `soltar` porque `soltar` también se llama sin evento. */
+    const levantar = (ev) => { if (ev && ev.pointerId != null) dedos.delete(ev.pointerId); soltar(); };
+    svg.addEventListener('pointerup', levantar);
+    svg.addEventListener('pointerleave', levantar);
+    svg.addEventListener('pointercancel', (ev) => {
+      if (ev && ev.pointerId != null) dedos.delete(ev.pointerId);
+      descartar();     // el navegador se llevó el gesto: no era un daño
+    });
+
+    /* El interruptor de modo. Cambia una clase y nada más: quién puede dibujar
+       lo decide el CSS con `touch-action`, que es lo único que el navegador
+       respeta de verdad para soltar o retener el gesto táctil. */
+    const btnModo = document.getElementById('dano-modo');
+    if (btnModo && lienzo) btnModo.addEventListener('click', () => {
+      descartar();
+      const mover = !lienzo.classList.contains('mover');
+      lienzo.classList.toggle('mover', mover);
+      btnModo.textContent = mover ? 'Volver a marcar' : 'Mover y acercar';
+      btnModo.setAttribute('aria-pressed', mover ? 'true' : 'false');
+      btnModo.classList.toggle('activo', mover);
+      avisar({ ok: true, motivo: '' }, mover
+        ? 'Modo mover: desplaza y acerca con los dedos. El auto no se raya.'
+        : 'Modo marcar: cada trazo sobre el auto es un daño.');
+    });
 
     pintarDanos();
   }

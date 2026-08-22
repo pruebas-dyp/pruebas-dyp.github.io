@@ -361,16 +361,46 @@ const Pruebas = (function () {
          Se corre entrando como el pintor, que no tiene ese permiso. */
       (function () {
         const rolPrevio = Modelo.rolActual().id;
-        const operario = Modelo.sesionesPosibles().find((p) => p.rol_id === 'ro-3');
+        /* 🔴 SE BUSCA POR LO QUE LE FALTA, no por el rol. Estaba escrito
+           `rol_id === 'ro-3'` —el operario— y el 22-08-2026 esa cuenta se
+           borró junto con las otras cinco que no estaban en la lista de
+           Andrés: la prueba se cayó con «no puedo leer id de undefined», que
+           no dice nada de lo que estaba probando. Preguntar por el permiso que
+           falta sobrevive a que cambie la nómina. */
+        const sinPermiso = Modelo.sesionesPosibles().find((p) => {
+          Modelo.fijar_persona_actual(p.id);
+          return !Modelo.puede('presupuesto.crear') && !Modelo.puede('configuracion');
+        });
+        Modelo.fijar_persona_actual(null);
+        if (!sinPermiso) {
+          push({ nombre: '🔴 El permiso lo rechaza el motor, no solo el botón',
+            intento: 'Buscar una cuenta sin presupuesto.crear ni configuracion',
+            esperado: 'Que exista al menos una, para poder probar con ella',
+            paso: false,
+            detalle: 'Ninguna de las ' + Modelo.sesionesPosibles().length +
+              ' cuentas carece de esos dos permisos: no hay con quien probar.' });
+          Modelo.fijar_rol_actual(rolPrevio);
+          return;
+        }
+        const operario = sinPermiso;
+        /* Se prueba VALORIZAR, no abrir. Son dos permisos distintos a propósito
+           —«abrir la OR es del recepcionista; ponerle los montos, de quien sabe
+           cuánto cuesta reparar»— y probar con `crear_presupuesto` daba verde
+           falso: la cuenta de Recepción sí puede abrirla. */
+        Modelo.fijar_persona_actual(null);
+        const o = Modelo.torre().find((x) => x.presupuestos.length) || Modelo.torre()[0];
+        const presu = (o.presupuestos || [])[0];
         Modelo.fijar_persona_actual(operario.id);
-        const o = Modelo.torre().find((x) => !x.presupuestos.length) || Modelo.torre()[0];
-        const r = Modelo.crear_presupuesto(o.id, { id_reparacion: 90001, lineas: [] });
+        const r = presu
+          ? Modelo.agregar_linea_presupuesto(presu.id,
+              { descripcion: 'Prueba de permiso', proceso: 'reparar', horas: 1 })
+          : { ok: true, motivo: '' };
         const conf = Modelo.guardar_catalogo('compania', { nombre: 'Coladura', codigo: 'COL' });
         Modelo.fijar_persona_actual(null);
         Modelo.fijar_rol_actual(rolPrevio);
         push({
           nombre: '🔴 El permiso lo rechaza el motor, no solo el botón',
-          intento: 'Entrando con la cuenta ' + operario.nombre + ' (operario), crear un presupuesto y tocar un catálogo',
+          intento: 'Entrando con la cuenta ' + operario.nombre + ' —que no tiene esos permisos—, crear un presupuesto y tocar un catálogo',
           esperado: 'Rechazo en las dos, nombrando el permiso que falta',
           paso: !r.ok && !conf.ok && /permiso/i.test(r.motivo || ''),
           detalle: r.motivo || 'Lo dejó crear: el permiso es decorativo.'
@@ -402,8 +432,40 @@ const Pruebas = (function () {
          Esta prueba mide las dos cosas: cuántos ve, y que la orden de otro no
          se abra ni por el id. */
       (function () {
-        const operario = Modelo.sesionesPosibles().find((p) => p.rol_id === 'ro-3');
-        const otro = Modelo.sesionesPosibles().find((p) => p.rol_id === 'ro-3' && p.id !== operario.id);
+        /* 🔴 LA PRUEBA SE FABRICA SUS PROPIOS OPERARIOS (22-08-2026).
+
+           Antes buscaba dos cuentas con el rol `ro-3` entre las sembradas. El
+           22-08-2026 se borraron las seis cuentas que no estaban en la lista de
+           Andrés —«Desabolladura» y «Pintura» entre ellas— y con eso desapareció
+           la ÚNICA cuenta con alcance `asignado`: la prueba se cayó sin llegar a
+           probar nada.
+
+           El alcance es del MOTOR y su correccion no depende de a quien se le
+           haya dado una cuenta. Asi que se siembran dos operarios acá dentro
+           —la caja de arena descarta todo al terminar— y el control se sigue
+           midiendo aunque el taller no le dé cuenta a nadie del piso.
+
+           ⚠️ Y hay que decirlo aparte: con la nomina de hoy, NINGUNA cuenta
+           real usa el alcance `asignado`. El control existe y funciona; no hay
+           a quien aplicarselo hasta que los operarios tengan cuenta. */
+        const fabricar = (n) => {
+          const id = 'pe-prueba-' + n;
+          db.persona.push({ id, tipo: 'trabajador', ficha: 9000 + n, rut: '11.111.11' + n + '-1',
+            usuario: 'operario' + n + '@prueba.cl', clave: 'x', clave_inicial: false,
+            nombres: 'Operario', apellidos: 'de prueba ' + n, cargo: 'Operario',
+            correo: 'operario' + n + '@prueba.cl', telefono: '', direccion: '', comuna: '',
+            modulos: null, activo: true, demo: true });
+          db.persona_rol.push({ persona_id: id, rol_id: 'ro-3' });
+          ['et-2', 'et-3', 'et-4'].forEach((e) =>
+            db.persona_etapa.push({ persona_id: id, etapa_id: e }));
+          return db.persona.find((x) => x.id === id);
+        };
+        const operario = fabricar(1), otro = fabricar(2);
+        /* Y se les da una etapa a cada uno, porque sin nada asignado el alcance
+           `asignado` no distingue nada: los dos verían cero. */
+        db.ot_etapa.filter((x) => !x.salio_at).slice(0, 6).forEach((x, k) => {
+          x.persona_id = k % 2 ? otro.id : operario.id;
+        });
         Modelo.fijar_persona_actual(null);
         const total = Modelo.torre().length;
         const ajena = otro ? (Modelo.miTrabajo(otro.id).mias[0] || {}) : {};
@@ -416,7 +478,7 @@ const Pruebas = (function () {
 
         push({
           nombre: '🔴 El operario ve solo sus vehículos, no el taller entero',
-          intento: 'Entrar con ' + operario.nombre + ' y pedir la torre, el histórico y la OT ' +
+          intento: 'Entrar con una cuenta de alcance «asignado» y pedir la torre, el histórico y la OT ' +
                    (ajena.numeroOT || '—') + ', que es de otro',
           esperado: 'Ve solo lo asignado, el histórico vacío y la orden ajena no se abre',
           paso: suyas < total && suyas > 0 && historico === 0 && abreAjena === null,
@@ -939,7 +1001,16 @@ const Pruebas = (function () {
         const o = abiertaCualquiera();
         const motivos = db.motivo_detencion || [];
 
-        const operario = db.persona.find((p) => (p.correo || '').indexOf('pintura@') === 0);
+        /* 🔴 Se busca por el PERMISO QUE FALTA y no por el correo de una
+           cuenta concreta. Decía `pintura@` y esa cuenta se borró el 22-08-2026
+           por no estar en la lista de Andrés: `find` devolvía `undefined`, la
+           sesión caía al rol de antes —que sí podía— y la prueba pasaba a decir
+           que el operario «lo dejó pasar». Un guardián que se cae en verde es
+           peor que no tenerlo. */
+        const operario = db.persona.filter((p) => p.activo).find((p) => {
+          Modelo.fijar_persona_actual(p.id);
+          return !Modelo.puede('detencion.gestionar');
+        });
         Modelo.fijar_persona_actual(operario ? operario.id : null);
         // Recibe el CÓDIGO del motivo, no su id ni un objeto.
         const codigo = motivos.length ? motivos[0].codigo : null;
@@ -1345,9 +1416,7 @@ const Pruebas = (function () {
           'cristopher.zuniga@dyp.cl': ['torre', 'historico', 'documentos', 'bodega'],
           'nicolas.zuniga@dyp.cl':    ['torre', 'historico', 'documentos', 'bodega'],
           'andres.guzman@dyp.cl':     ['torre', 'historico', 'recepcion', 'taller', 'presupuesto', 'consolidado'],
-          'recepcion@dyp.cl':         ['torre', 'historico', 'recepcion', 'taller'],
-          // La cuenta de Arttmize para la puesta en marcha: acceso total.
-          'administrador@dyp.cl':     ['torre', 'historico', 'recepcion', 'taller', 'personal', 'presupuesto', 'documentos', 'bodega', 'consolidado', 'configuracion']
+          'recepcion@dyp.cl':         ['torre', 'historico', 'recepcion', 'taller']
         };
 
         const malas = [];
@@ -1493,6 +1562,20 @@ const Pruebas = (function () {
         });
       })();
 
+      /* Quién da el visto bueno en las pruebas del ciclo. Se busca por el
+         PERMISO y no por un id escrito a mano: el 22-08-2026 la cuenta «Jefe
+         de taller» se borró —no estaba en la lista de Andrés— y tres pruebas
+         quedaron apuntando a una persona que ya no existe. */
+      const JEFA = (function () {
+        const previo = (Modelo.personaActual() || {}).id || null;
+        const q = Modelo.sesionesPosibles().find((p) => {
+          Modelo.fijar_persona_actual(p.id);
+          return Modelo.puede('etapa.validar') && !Modelo.rolActual().total;
+        });
+        Modelo.fijar_persona_actual(previo);
+        return q ? q.id : null;
+      })();
+
       /* ── Terminar NO es cerrar ────────────────────────────────────────
          🔴 LA REGLA NUEVA DEL 22-08-2026, y la mas facil de romper sin darse
          cuenta: alcanza con que alguien vuelva a poner `salio_at` dentro de
@@ -1517,7 +1600,7 @@ const Pruebas = (function () {
         }
         db.ot_etapa.push({ id: 'oe-val', ot_id: o.id, etapa_id: etapa.id,
           asignada_at: HOY, salio_at: null, persona_id: oper.id, observacion: '',
-          asignada_por: 'pe-t-2', terminada_at: null, terminada_por: null,
+          asignada_por: JEFA, terminada_at: null, terminada_por: null,
           validada_at: null, validada_por: null });
 
         // El operario dice que termino. No puede validar.
@@ -1554,7 +1637,7 @@ const Pruebas = (function () {
         db.ot_etapa = db.ot_etapa.filter((x) => x.id !== 'oe-dev');
         db.ot_etapa.push({ id: 'oe-dev', ot_id: o.id, etapa_id: etapa.id,
           asignada_at: HOY, salio_at: null, persona_id: null, observacion: '',
-          asignada_por: 'pe-t-2', terminada_at: HOY, terminada_por: null,
+          asignada_por: JEFA, terminada_at: HOY, terminada_por: null,
           validada_at: null, validada_por: null });
         const r = Modelo.devolver_etapa(o.id, 'desabolladura', '');
         const conMotivo = Modelo.devolver_etapa(o.id, 'desabolladura', 'Falta lijar el borde');
@@ -1617,13 +1700,13 @@ const Pruebas = (function () {
       (function () {
         const o = abiertaCualquiera();
         const etapa = db.etapa.find((e) => e.codigo === 'pintura');
-        const quien = db.persona.find((p) => p.usuario === 'pintura@dyp.cl');
+        const quien = db.persona.find((p) => p.usuario === 'cristopher.zuniga@dyp.cl');
         db.ot_etapa = db.ot_etapa.filter((x) => x.id !== 'oe-devmot');
         db.ot_etapa.push({ id: 'oe-devmot', ot_id: o.id, etapa_id: etapa.id,
           asignada_at: HOY, salio_at: null, persona_id: quien ? quien.id : null,
-          observacion: '', asignada_por: 'pe-t-2', terminada_at: HOY,
+          observacion: '', asignada_por: JEFA, terminada_at: HOY,
           terminada_por: quien ? quien.id : null, validada_at: null, validada_por: null });
-        Modelo.fijar_persona_actual('pe-t-2');
+        Modelo.fijar_persona_actual(JEFA);
         const RAZON = 'El tono no calza con la puerta de al lado';
         const r = Modelo.devolver_etapa(o.id, 'pintura', RAZON);
         let laVe = false, conMotivo = false;
@@ -1668,8 +1751,8 @@ const Pruebas = (function () {
         const donde = (typeof window !== 'undefined') ? window : globalThis;
         const hayMenu = typeof donde.modulosDelMenu === 'function';
         const cuentas = [
-          ['Jefe de taller', db.persona.find((p) => p.usuario === 'jefe@dyp.cl')],
-          ['Gabriel Diaz',   db.persona.find((p) => p.usuario === 'gabriel.diaz@dyp.cl')]
+          ['Nicole Hernandez', db.persona.find((p) => p.usuario === 'nicole.hernandez@dyp.cl')],
+          ['Gabriel Diaz',     db.persona.find((p) => p.usuario === 'gabriel.diaz@dyp.cl')]
         ];
         const sinPuerta = [];
         let revisadas = 0;
@@ -1852,6 +1935,19 @@ const Pruebas = (function () {
       ['Etapas devueltas sin decir por qué',
         db.ot_etapa.filter((x) => x.devuelta_at &&
           String(x.devuelta_motivo || '').trim().length < 5).length, 0],
+
+      /* 🔴 LAS ETAPAS QUE NADIE PUEDE HACER (22-08-2026).
+
+         Al dejar sólo las trece cuentas de la lista de Andrés se fueron las
+         que habíamos inventado para el piso —«Desabolladura», «Pintura»—, y
+         con ellas quedaron CUATRO de las nueve etapas sin ninguna cuenta que
+         las tenga habilitadas. No es un defecto del modelo: es lo que dice la
+         nómina, porque quien pinta y quien desabolla no tiene cuenta en el
+         sistema. Se cuenta para que sea un número y no una impresión, y para
+         que el día que el taller cree esas cuentas se vea bajar. */
+      ['Etapas del taller que ninguna cuenta puede hacer',
+        db.etapa.filter((e) =>
+          !db.persona_etapa.some((h) => h.etapa_id === e.id)).length, 4],
 
       /* 🔴 QUE LA TASA DE DEVOLUCIONES NO SALGA PLANA. Es la cuarta vez
          que aparece la misma trampa: un dato sembrado repartido con un `%`

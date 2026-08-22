@@ -141,6 +141,23 @@ function vAsignarEtapas(o) {
       <p class="pie-nota" style="margin:0 0 9px">Marca las que aplican y elige quién las hace.
         Entre paréntesis, cuántas etapas tiene cada uno abiertas ahora — no es un tope, es
         para repartir sabiendo.</p>
+      ${(function () {
+        /* 🔴 LAS ETAPAS QUE NADIE PUEDE HACER, DICHAS DE UNA VEZ (22-08-2026).
+           Con la nómina que entregó Andrés —los usuarios de la web de hoy—
+           cuatro de las nueve etapas no las tiene habilitada ninguna cuenta:
+           quien pinta y quien desabolla no tiene cuenta en el sistema. Hoy da
+           igual porque el sistema actual no registra quién hizo qué; con el
+           visto bueno del jefe deja de dar igual, porque estaría asignando a
+           nadie. Se dice acá, que es donde se nota, y no en un documento. */
+        const huerfanas = seleccionable.filter((e) => !gentePara(e.codigo).length);
+        if (!huerfanas.length) return '';
+        return '<div class="aviso-etapas">' + ico('alerta', 'g') +
+          '<div><strong>' + huerfanas.length + ' de estas etapas no las puede hacer ninguna cuenta: ' +
+          esc(huerfanas.map((e) => e.nombre).join(', ')) + '.</strong> ' +
+          'Se pueden asignar igual y quedan sin encargado, pero entonces el sistema no va a poder ' +
+          'decir quién las hizo. Se habilita en <em>Personal</em>, en la ficha de cada persona — ' +
+          'y si quien hace ese trabajo todavía no tiene cuenta, hay que creársela.</div></div>';
+      })()}
       <div class="tareas">${seleccionable.map((e) => {
         const gente = gentePara(e.codigo);
         return `

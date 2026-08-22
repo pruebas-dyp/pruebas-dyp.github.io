@@ -512,6 +512,16 @@ function dialogoDemostracion() {
   dialogo('Datos de demostración', '<p class="pie-nota" style="margin:0 0 10px">' +
     'Los datos de esta pantalla son inventados y están rotulados como tales. ' +
     'Para volver a dejarlos como venían: <strong>Archivo → Reiniciar a datos de demostración</strong>.</p>' +
+    /* La pregunta que se hizo desde un celular el 22-08-2026: se creó una orden
+       en el teléfono y no apareció en el computador. Va acá, en el cuadro que
+       explica qué es esta demostración, y no como una alerta: no es una falla
+       que haya que arreglar, es lo que el modelo borrador es. */
+    '<p class="pie-nota" style="margin:0 0 12px">' +
+    '<strong>Y lo que se carga acá queda en este equipo.</strong> El modelo borrador no tiene ' +
+    'servidor ni base de datos: guarda todo en el almacenamiento de este navegador. Una orden ' +
+    'creada en el teléfono <strong>no aparece</strong> en el computador, y al revés tampoco — cada ' +
+    'dispositivo abre su propia copia de los datos de demostración. Que la información se vea en ' +
+    'todas partes a la vez es justamente lo que trae el sistema definitivo con su base de datos.</p>' +
     '<div class="ir-lista">' + HERRAMIENTAS_DEMO.map((x) =>
       '<button type="button" class="ir-item" data-demo="' + esc(x.accion) + '">' + ico(x.icono) +
       '<span class="nom">' + esc(x.texto) +
@@ -826,8 +836,18 @@ function pintarBarraEstado(extra) {
     ? '<span class="celda modificado" title="El estado se movió de los datos de demostración. ' +
       'Archivo → Reiniciar a datos de demostración.">' + ico('alerta') + 'Datos modificados</span>'
     : '';
+  /* 🔴 «Conectado» significaba sólo que el servidor de archivos responde, y con
+     la lucecita verde al lado cualquiera entiende que hay un sistema central
+     detrás. No lo hay: el modelo borrador guarda TODO en el almacenamiento de
+     este navegador. El 22-08-2026 se creó una orden desde un celular y no
+     apareció en el computador — con razón, son dos copias distintas, pero el
+     sistema no lo decía en ninguna parte. Ahora lo dice donde se mira. */
   document.getElementById('estado-barra').innerHTML =
-    '<span class="celda"><span class="luz"></span>Conectado</span>' +
+    '<span class="celda" title="El modelo borrador no tiene servidor ni base de datos: ' +
+      'lo que se carga acá queda guardado en ESTE navegador y en ESTE equipo. Abierto en otro ' +
+      'teléfono o computador se ven los datos de demostración, no lo que cargaste aquí. ' +
+      'Eso lo resuelve el sistema definitivo, con su base de datos.">' +
+      ico('base') + 'Datos en este equipo</span>' +
     '<span class="celda">' + ico('usuario') + esc(quienMira()) + '</span>' +
     '<span class="celda">Automotora DyP</span>' +
     '<span class="celda" title="Sello de la publicación que estás viendo. Si no es el ' +

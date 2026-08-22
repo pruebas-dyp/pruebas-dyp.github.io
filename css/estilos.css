@@ -727,7 +727,16 @@ fieldset.bloque legend {
 .lienzo { background: var(--superficie-3); border: 1px solid var(--borde); border-radius: 3px; padding: 10px; }
 /* `touch-action:none` es lo que permite rayar con el dedo en una tablet sin que
    la página se mueva debajo. Sin esto el trazo sale cortado. */
-.lienzo svg { width: 100%; height: auto; display: block; margin: 0 auto; touch-action: none; cursor: crosshair; }
+/* 🔴 `pinch-zoom` y no `none` (22-08-2026). Con `none` el navegador no acerca
+   NUNCA sobre el dibujo, y en un celular el auto se ve del porte de una estampilla:
+   el recepcionista no puede acercarse a marcar el tapabarro. Con `pinch-zoom`,
+   DOS dedos acercan y UN dedo sigue rayando, que es como funciona cualquier
+   aplicación de dibujo. El pan de un dedo se mantiene bloqueado a propósito:
+   si no, el trazo arrastraría la página. Para mover la página está el modo
+   `.mover` de abajo. */
+.lienzo svg { width: 100%; height: auto; display: block; margin: 0 auto; touch-action: pinch-zoom; cursor: crosshair; }
+/* Modo mover: el dedo navega y no dibuja. */
+.lienzo.mover svg { touch-action: auto; cursor: grab; }
 /* El dibujo del auto: líneas, sin relleno. Es un croquis, no un icono. */
 .auto { fill: none; stroke: var(--zona-stroke); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
 .vista-rotulo { font-size: 11px; fill: var(--gris-2); pointer-events: none; font-family: "Segoe UI", sans-serif;
@@ -1441,6 +1450,17 @@ body.sin-desplazar { overflow: hidden; }
    metro de distancia —borde rojo y el motivo escrito adentro— porque antes le
    reaparecía al encargado idéntica a cualquier otra y nadie le decía que su
    trabajo había sido rechazado. */
+/* El aviso de las etapas que nadie puede hacer, arriba de la lista de asignar.
+   Ámbar y no rojo: no es un error del sistema, es un dato de la nómina. */
+.aviso-etapas {
+  display: flex; gap: 9px; align-items: flex-start;
+  margin: 0 0 11px; padding: 9px 11px; border-radius: 6px;
+  background: var(--ambar-bg); border: 1px solid var(--ambar-borde);
+  font-size: 12px; line-height: 1.5; color: var(--texto);
+}
+.aviso-etapas .ico { color: var(--ambar); flex: 0 0 auto; margin-top: 1px; }
+.aviso-etapas strong { color: var(--ambar-texto); }
+
 .tarea.devuelta { border-color: var(--rojo-borde); background: var(--rojo-bg); }
 .motivo-devuelta {
   margin-top: 7px; padding: 7px 9px; border-radius: 5px;

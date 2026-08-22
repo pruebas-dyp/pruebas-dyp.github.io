@@ -797,6 +797,24 @@ function repAgregados(lista, meta) {
       .sort((a, b) => a.v - b.v);       // el mas rapido primero
   })();
 
+  /* 🔴 CUANTAS ETAPAS NO SE LE PUEDEN ATRIBUIR A NADIE.
+
+     Es el numero que le falta al panel de arriba para no mentir: si mas de la
+     mitad del trabajo no tiene encargado, un ranking de «quien demora menos»
+     entre los pocos que si lo tienen se lee como si fuera el taller entero.
+     Con la nomina de hoy pasa exactamente eso: quien pinta y quien desabolla
+     no tiene cuenta, asi que sus etapas cierran sin nombre. */
+  const sinEncargado = (() => {
+    let sin = 0, con = 0;
+    lista.forEach((o) => {
+      (o.etapasAsignadas || []).forEach((e) => {
+        if (!e.finalizada) return;
+        if (e.terminadaPor) con++; else sin++;
+      });
+    });
+    return { sin, con, total: sin + con };
+  })();
+
   /* Los dos tramos en que el auto está quieto y nadie lo está trabajando.
 
      🔴 EL REPARTO SE MIDE HASTA LA PRIMERA ETAPA, no hasta cada una. Acá se
@@ -834,7 +852,7 @@ function repAgregados(lista, meta) {
 
   return {
     dimDe, meses, top, ventaPorCompania, porEtapa, composicion, relojes, distribucion, compromiso,
-    porPersona, tramos,
+    porPersona, tramos, sinEncargado,
     venta, dentro, delta, hayMesEnCurso, notaMesEnCurso, mesesCerrados: cerrados.length,
     mesEnCursoCorto: repMesCorto(mesEnCurso), diaDelMes: HOY.getDate(), diasDelMes,
     sumaDias, sumaTotales, sumaFuera: sumaTotales - sumaDias, n: lista.length,
@@ -1169,6 +1187,13 @@ function vReporteria() {
                 (Math.round(g.porPersona[0].v * 10) / 10).toString().replace('.', ',') + ' d' : '' },
             { que: 'Quién entra', exp: 'sólo con 3 etapas cerradas o más',
               num: g.porPersona.length + ' de ' + Modelo.base().persona.filter((p) => p.tipo === 'trabajador').length + ' del equipo' },
+            /* Va ANTES de los promedios a propósito: es la advertencia de
+               cuánto del taller no está en el ranking de arriba. */
+            { que: 'Sin encargado', exp: 'etapas cerradas que no se le pueden atribuir a nadie',
+              num: g.sinEncargado.total
+                ? g.sinEncargado.sin + ' de ' + g.sinEncargado.total + ' = ' +
+                  Math.round((g.sinEncargado.sin * 100) / g.sinEncargado.total) + '% del trabajo'
+                : 'sin etapas cerradas' },
             { que: 'Reparto', exp: 'del ingreso del auto a que le asignen la PRIMERA etapa',
               num: (Math.round(g.tramos.reparto * 10) / 10).toString().replace('.', ',') + ' d · mide al que asigna' },
             { que: 'Revisión', exp: 'del término al visto bueno',
