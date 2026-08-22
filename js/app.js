@@ -505,8 +505,25 @@ const HERRAMIENTAS_DEMO = [
   { texto: 'Volver la fecha a hoy', icono: 'refrescar', accion: 'fecha-hoy',
     pie: 'Deja el calendario donde estaba' },
   { texto: 'Acerca del sistema', icono: 'info', accion: 'acerca',
-    pie: 'Qué es esto y qué no es' }
+    pie: 'Qué es esto y qué no es' },
+  /* El interruptor de la sala. Se pone al final y no arriba a propósito: no es
+     una función del taller, es una comodidad para mostrar el sistema en dos
+     pantallas a la vez. El rótulo dice en qué estado va a quedar, no en cuál
+     está: un botón que dice «Sala compartida» cuando ya está encendida obliga
+     a adivinar qué pasa al apretarlo. */
+  { texto: 'sala', icono: 'base', accion: 'sala', pie: 'sala' }
 ];
+
+/* El rótulo del interruptor se arma al abrir el cuadro, porque depende de cómo
+   esté la sala en ese momento. */
+function rotuloSala() {
+  const s = (typeof Sala !== 'undefined') ? Sala.estado() : { encendida: false };
+  return s.encendida
+    ? { texto: 'Apagar la sala compartida',
+        pie: 'Vuelve a dejar los datos guardados sólo en este equipo' }
+    : { texto: 'Encender la sala compartida',
+        pie: 'El celular y el computador pasan a ver el mismo estado' };
+}
 
 function dialogoDemostracion() {
   dialogo('Datos de demostración', '<p class="pie-nota" style="margin:0 0 10px">' +
@@ -522,11 +539,13 @@ function dialogoDemostracion() {
     'creada en el teléfono <strong>no aparece</strong> en el computador, y al revés tampoco — cada ' +
     'dispositivo abre su propia copia de los datos de demostración. Que la información se vea en ' +
     'todas partes a la vez es justamente lo que trae el sistema definitivo con su base de datos.</p>' +
-    '<div class="ir-lista">' + HERRAMIENTAS_DEMO.map((x) =>
-      '<button type="button" class="ir-item" data-demo="' + esc(x.accion) + '">' + ico(x.icono) +
-      '<span class="nom">' + esc(x.texto) +
-      '<span class="gru" style="display:block;font-weight:400">' + esc(x.pie) + '</span></span>' +
-      '</button>').join('') +
+    '<div class="ir-lista">' + HERRAMIENTAS_DEMO.map((x) => {
+      // El de la sala se rotula en el momento, según cómo esté.
+      const r = x.accion === 'sala' ? rotuloSala() : x;
+      return '<button type="button" class="ir-item" data-demo="' + esc(x.accion) + '">' + ico(x.icono) +
+      '<span class="nom">' + esc(r.texto) +
+      '<span class="gru" style="display:block;font-weight:400">' + esc(r.pie) + '</span></span>' +
+      '</button>'; }).join('') +
     '</div>');
 
   dialogo.ultimo.querySelectorAll('[data-demo]').forEach((b) =>
@@ -842,12 +861,24 @@ function pintarBarraEstado(extra) {
      este navegador. El 22-08-2026 se creó una orden desde un celular y no
      apareció en el computador — con razón, son dos copias distintas, pero el
      sistema no lo decía en ninguna parte. Ahora lo dice donde se mira. */
+  /* La sala compartida decide qué dice esta celda. Apagada, el borrador es lo
+     que siempre fue: cada equipo con su copia. Encendida, el celular y el
+     computador miran el mismo estado. Si se cae internet lo dice, en vez de
+     seguir mostrando un verde que no significa nada. */
+  const sala = (typeof Sala !== 'undefined') ? Sala.estado()
+             : { encendida: false, error: null, rotulo: 'Datos en este equipo' };
+  const tituloSala = !sala.encendida
+    ? 'La sala compartida está apagada: lo que se carga acá queda en ESTE equipo. ' +
+      'Se enciende en Archivo → Datos de demostración.'
+    : sala.error
+      ? 'La sala está encendida pero ahora mismo no hay conexión (' + sala.error + '). ' +
+        'El sistema sigue funcionando con los datos de este equipo y vuelve a intentar solo.'
+      : 'Sala compartida: el celular y el computador ven el mismo estado. ' +
+        'SOLO datos de demostración — acá no van datos de personas reales.';
   document.getElementById('estado-barra').innerHTML =
-    '<span class="celda" title="El modelo borrador no tiene servidor ni base de datos: ' +
-      'lo que se carga acá queda guardado en ESTE navegador y en ESTE equipo. Abierto en otro ' +
-      'teléfono o computador se ven los datos de demostración, no lo que cargaste aquí. ' +
-      'Eso lo resuelve el sistema definitivo, con su base de datos.">' +
-      ico('base') + 'Datos en este equipo</span>' +
+    '<span class="celda' + (sala.encendida && !sala.error ? ' sala-viva' : '') +
+      '" title="' + esc(tituloSala) + '">' +
+      ico('base') + esc(sala.rotulo) + '</span>' +
     '<span class="celda">' + ico('usuario') + esc(quienMira()) + '</span>' +
     '<span class="celda">Automotora DyP</span>' +
     '<span class="celda" title="Sello de la publicación que estás viendo. Si no es el ' +
@@ -951,6 +982,24 @@ function ejecutarAccion(accion) {
   if (accion === 'reporteria') {
     historicoEstado().vista = 'reporteria';
     return ir('historico');
+  }
+
+  /* Encender o apagar la sala compartida. Al encenderla se trae lo que ya hay
+     allá —la sala manda sobre el equipo—, así que se avisa con todas las
+     letras: si alguien tenía media recepción cargada acá y en la sala hay otra
+     cosa, es mejor que lo sepa antes y no después. */
+  if (accion === 'sala') {
+    if (typeof Sala === 'undefined') return avisar({ ok: false, motivo: 'La sala no está disponible.' });
+    const s = Sala.estado();
+    if (!s.encendida &&
+        !confirm('Al encender la sala compartida, este equipo pasa a mostrar el estado que ya está ' +
+                 'en la sala.\n\nSi acá tenías datos cargados y en la sala hay otros, los de la sala ' +
+                 'mandan.\n\n¿Encender?')) return;
+    const ahora = Sala.alternar();
+    render();
+    return avisar({ ok: true, motivo: '' }, ahora
+      ? 'Sala compartida encendida. El celular y el computador ven el mismo estado — sólo datos de demostración.'
+      : 'Sala apagada. Los datos vuelven a quedar sólo en este equipo.');
   }
 
   if (accion === 'acerca') {
@@ -3118,3 +3167,9 @@ function montarCajonModulos() {
 }
 
 montarCajonModulos();
+
+/* La sala compartida se enciende al final, cuando el modelo y las pantallas ya
+   están en pie: al arrancar puede traer el estado de la sala y repintar, y para
+   eso `render` tiene que existir. Si no hay internet, falla en silencio y el
+   sistema queda como siempre estuvo, con los datos de este equipo. */
+if (typeof Sala !== 'undefined') Sala.iniciar();

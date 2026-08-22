@@ -1853,3 +1853,10 @@ table.grid.anidada td { font-size: 12px; }
    dice antes de que alguien lo descubra probando. */
 table.grid td.abre-ot { cursor: alias; }
 table.grid td.abre-ot:hover { text-decoration: underline; }
+
+/* La celda de la sala compartida cuando está viva. Verde apagado, no un
+   semáforo: es información de estado, no una alarma. Si la sala está caída la
+   celda queda como cualquier otra y el texto lo dice, que es más honesto que
+   pintar de rojo algo que se arregla solo en el latido siguiente. */
+.barra-estado .celda.sala-viva { color: var(--verde, #15803d); font-weight: 600; }
+.barra-estado .celda.sala-viva svg { color: inherit; }
