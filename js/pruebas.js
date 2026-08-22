@@ -1416,7 +1416,11 @@ const Pruebas = (function () {
           'cristopher.zuniga@dyp.cl': ['torre', 'historico', 'documentos', 'bodega'],
           'nicolas.zuniga@dyp.cl':    ['torre', 'historico', 'documentos', 'bodega'],
           'andres.guzman@dyp.cl':     ['torre', 'historico', 'recepcion', 'taller', 'presupuesto', 'consolidado'],
-          'recepcion@dyp.cl':         ['torre', 'historico', 'recepcion', 'taller']
+          'recepcion@dyp.cl':         ['torre', 'historico', 'recepcion', 'taller'],
+          /* La cuenta de Arttmize para la puesta en marcha: acceso total. No es
+             del taller y por eso no figura en la lista de Andrés — se borró por
+             error el 22-08-2026 al dejar «solo las de la lista» y volvió. */
+          'administrador@dyp.cl':     ['torre', 'historico', 'recepcion', 'taller', 'personal', 'presupuesto', 'documentos', 'bodega', 'consolidado', 'configuracion']
         };
 
         const malas = [];

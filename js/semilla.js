@@ -37,11 +37,12 @@ const Semilla = (function () {
   const FUERA_DE_TALLER        = 10;   // reglas §C.6  — y son distintas de las 41
   const SIN_ETAPA              = 53;   // reglas §C.7  — "Pendiente" / "Sin Asignar"
   const TRABAJADORES           = 89;   // medido en el sistema real; la demo siembra 5
-  /* 13 desde el 22-08-2026: exactamente las cuentas que entregó Andrés Guzmán
-     —los usuarios de la web de hoy— y ninguna más. Salieron las seis que
-     habíamos inventado nosotros para poder mostrar el sistema: los cuatro
-     puestos del taller, el evaluador y la de Arttmize. */
-  const EQUIPO_DEMO            = 13;
+  /* 14 desde el 22-08-2026: las 13 cuentas que entregó Andrés Guzmán —los
+     usuarios de la web de hoy— más la de Arttmize para la puesta en marcha,
+     que no es del taller. Salieron las cinco que habíamos inventado nosotros
+     para poder mostrar el sistema: los cuatro puestos del taller y el
+     evaluador. */
+  const EQUIPO_DEMO            = 14;
   const TOTAL_HISTORICO        = 120;  // ~3 entregas diarias (§C.21)
   const ULTIMA_OT              = 23488;// reglas §C.13 — al 12-08-2026
 
@@ -94,7 +95,7 @@ const Semilla = (function () {
      todas fueran iguales el indicador no distinguiría nada. */
   const ESPERA_VISTO = [0, 0, 0.4, 1, 0, 2, 0.7, 3, 0.2, 1.5, 0, 0.9];
 
-  const FORMA_DATOS = 9;   // 9: solo las trece cuentas de la lista de Andres
+  const FORMA_DATOS = 10;  // 10: vuelve la cuenta de Arttmize para la puesta en marcha
   // TEMPARIO_HORA ($10.000, reglas §C.15) se eliminó el 13-08-2026 junto con
   // el tempario entero. La cifra queda medida en `reglas`, no en el sistema.
 
@@ -285,7 +286,20 @@ const Semilla = (function () {
     { id: 'pe-t-13', nombre: 'Andrés', apellidos: 'Guzmán', rol: 'ro-2',
       etapas: ['et-1', 'et-5', 'et-8', 'et-9'],
       cargo: 'Jefe de Recepción', usuario: 'andres.guzman',
-      modulos: ['torre', 'historico', 'recepcion', 'taller', 'presupuesto', 'consolidado'] }
+      modulos: ['torre', 'historico', 'recepcion', 'taller', 'presupuesto', 'consolidado'] },
+
+    /* ── Y la nuestra, que no es del taller ──────────────────────────────
+       🔴 SE BORRÓ POR ERROR EL 22-08-2026 Y VOLVIÓ EL MISMO DÍA. Marco pidió
+       dejar sólo las cuentas de la lista de Andrés; ésta NO está en esa lista
+       por la razón contraria a las otras cinco: no es que la hayamos inventado
+       para la demostración, es que **no es del cliente**. Es la cuenta con la
+       que Arttmize acompaña la puesta en marcha, y sin ella no hay quien entre
+       a arreglar nada el día que algo falle.
+
+       Va declarada como lo que es —el cargo lo dice— y con acceso total. */
+    { id: 'pe-t-14', nombre: 'Administrador', apellidos: 'Arttmize', rol: 'ro-5', etapas: [],
+      cargo: 'Arttmize SpA · puesta en marcha', usuario: 'administrador',
+      modulos: MODULOS_TODOS }
   ];
 
   /* Quién reparte y quién da el visto bueno en los datos de demostración.
