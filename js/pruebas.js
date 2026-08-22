@@ -1568,6 +1568,132 @@ const Pruebas = (function () {
         });
       })();
 
+      /* 🔴 REBOTAR NO ES QUEDARSE (22-08-2026).
+
+         `ir()` revisaba el permiso y avisaba «no tienes acceso» — y despues
+         repintaba igual la pantalla rechazada. El rebote solo cambiaba de
+         vista si la actual no era un modulo CONOCIDO, y al arrancar con la
+         sesion guardada `ui.vista` vale 'torre', que si lo es. Resultado
+         medido en el navegador: el operario de desabolladura abrio el sistema
+         en la Torre de control, con nombres de clientes y compañia a la vista,
+         despues de que el sistema le dijera que no podia entrar.
+
+         Se mira sin navegador: para cada cuenta, que el modulo de aterrizaje
+         sea uno que esa cuenta alcance. */
+      (function () {
+        const donde = (typeof window !== 'undefined') ? window : globalThis;
+        const hay = typeof donde.primerModuloPermitido === 'function' &&
+                    typeof donde.entraAlModulo === 'function';
+        const malas = [];
+        let revisadas = 0;
+        if (hay) {
+          db.persona.filter((p) => p.activo).forEach((p) => {
+            Modelo.fijar_persona_actual(p.id);
+            revisadas++;
+            const destino = donde.primerModuloPermitido();
+            if (!donde.entraAlModulo(destino)) {
+              malas.push([p.nombres, p.apellidos].filter(Boolean).join(' ') + ' → ' + destino);
+            }
+          });
+        }
+        push({
+          nombre: '🔴 Nadie aterriza en una pantalla que su cuenta no alcanza',
+          intento: 'Recorrer las ' + revisadas + ' cuentas activas y preguntar en que modulo abre cada una',
+          esperado: 'Todas caen en un modulo que su propia cuenta puede abrir',
+          paso: hay && revisadas > 0 && !malas.length,
+          detalle: !hay ? 'No existe primerModuloPermitido(): app.js no cargo'
+            : (malas.length ? 'Aterrizan donde no pueden entrar: ' + malas.slice(0, 4).join(', ')
+              : 'Las ' + revisadas + ' cuentas abren en una pantalla suya')
+        });
+      })();
+
+      /* 🔴 LA DEVOLUCION TIENE QUE LLEGARLE AL QUE REHACE (22-08-2026).
+
+         El motivo se guardaba solo en la bitacora de la orden. Al encargado la
+         tarjeta le reaparecia identica a una asignacion nueva —mismo rotulo,
+         misma fecha— sin una palabra de que su trabajo habia sido rechazado.
+         Un rechazo que no llega no es un rechazo: es la etapa dando vueltas.
+         Se mira donde la persona mira: su propia pantalla. */
+      (function () {
+        const o = abiertaCualquiera();
+        const etapa = db.etapa.find((e) => e.codigo === 'pintura');
+        const quien = db.persona.find((p) => p.usuario === 'pintura@dyp.cl');
+        db.ot_etapa = db.ot_etapa.filter((x) => x.id !== 'oe-devmot');
+        db.ot_etapa.push({ id: 'oe-devmot', ot_id: o.id, etapa_id: etapa.id,
+          asignada_at: HOY, salio_at: null, persona_id: quien ? quien.id : null,
+          observacion: '', asignada_por: 'pe-t-2', terminada_at: HOY,
+          terminada_por: quien ? quien.id : null, validada_at: null, validada_por: null });
+        Modelo.fijar_persona_actual('pe-t-2');
+        const RAZON = 'El tono no calza con la puerta de al lado';
+        const r = Modelo.devolver_etapa(o.id, 'pintura', RAZON);
+        let laVe = false, conMotivo = false;
+        if (quien) {
+          Modelo.fijar_persona_actual(quien.id);
+          const suya = Modelo.miTrabajo(quien.id).mias
+            .find((x) => x.ot_id === o.id && x.etapaCodigo === 'pintura');
+          laVe = !!(suya && suya.devueltaPendiente);
+          conMotivo = !!(suya && suya.devueltaMotivo === RAZON);
+        }
+        push({
+          nombre: '🔴 La etapa devuelta le llega al encargado con el motivo',
+          intento: 'El jefe devuelve una etapa y se mira la pantalla del que tiene que rehacerla',
+          esperado: 'La ve marcada como devuelta y con el motivo escrito, sin abrir la orden',
+          paso: r.ok && laVe && conMotivo,
+          detalle: !r.ok ? 'No dejo devolver: ' + r.motivo
+            : (!laVe ? 'Le vuelve a aparecer sin ninguna marca de que se la devolvieron'
+              : (!conMotivo ? 'Se marca como devuelta pero sin el motivo: no sabe que rehacer'
+                : 'La ve marcada y con el motivo'))
+        });
+      })();
+
+      /* 🔴 LA PUERTA DEL QUE VALIDA (22-08-2026).
+
+         El ciclo entero se construyo, se probo con 47 pruebas en verde y se
+         publico — y en el navegador NO habia por donde llegar a la bandeja
+         donde el jefe valida. El motor validaba, la pantalla se dibujaba, y
+         el menu no la ofrecia: la vista vivia dentro de «Mi trabajo», que
+         esta fuera del menu a proposito desde que Marco pidio dejar solo los
+         diez modulos del sistema actual. El jefe aterriza en la Torre.
+
+         Y para las cuentas del cliente hay una segunda tapa: las trece traen
+         escrita su lista de modulos, esa lista se armo mirando las 39
+         pantallas del sistema ACTUAL, y por construccion no puede nombrar una
+         pantalla que ese sistema no tiene.
+
+         Esta prueba mira las DOS cuentas que validan y por caminos distintos:
+         el jefe de taller —cuenta de puesto, sin lista— y Gabriel Diaz —con
+         los diez modulos escritos—. Y pregunta por el MENU, no por el
+         permiso: el permiso ya daba que si mientras la puerta no existia. */
+      (function () {
+        const donde = (typeof window !== 'undefined') ? window : globalThis;
+        const hayMenu = typeof donde.modulosDelMenu === 'function';
+        const cuentas = [
+          ['Jefe de taller', db.persona.find((p) => p.usuario === 'jefe@dyp.cl')],
+          ['Gabriel Diaz',   db.persona.find((p) => p.usuario === 'gabriel.diaz@dyp.cl')]
+        ];
+        const sinPuerta = [];
+        let revisadas = 0;
+        cuentas.forEach(([rotulo, p]) => {
+          if (!p || !hayMenu) return;
+          Modelo.fijar_persona_actual(p.id);
+          if (!Modelo.puede('etapa.validar')) return;
+          revisadas++;
+          if (donde.modulosDelMenu().indexOf('porvalidar') < 0) {
+            sinPuerta.push(rotulo + (Modelo.modulosDe(p.id) ? ' (su lista heredada la tapa)' : ''));
+          }
+        });
+        push({
+          nombre: '🔴 El que valida tiene en el menu la bandeja donde valida',
+          intento: 'Entrar con el jefe de taller y con el administrador y mirar que modulos ofrece el menu',
+          esperado: 'Los dos ven «Por validar»: uno sin lista de modulos y el otro con la lista del cliente',
+          paso: hayMenu && revisadas === 2 && !sinPuerta.length,
+          detalle: !hayMenu ? 'No existe modulosDelMenu(): app.js no cargo'
+            : (revisadas !== 2 ? 'Se esperaban 2 cuentas que validan y se encontraron ' + revisadas
+              : (sinPuerta.length ? 'Pueden validar y el menu no se la ofrece: ' + sinPuerta.join(', ')
+                : 'Las dos cuentas que validan tienen la puerta en el menu'))
+        });
+      })();
+
       restaurarSesion();
       return res;
     });
@@ -1710,8 +1836,8 @@ const Pruebas = (function () {
         (function () {
           const debe = ['pantallaIngreso', 'vTorre', 'vTaller', 'vPresupuesto', 'vBodega',
             'vDocumentos', 'vHistorico', 'vConsolidado', 'vPersonal', 'vConfiguracion',
-            'vRecepcion', 'vEntrega', 'vMiTrabajo', 'vReporteria', 'vExpediente',
-            'vRepuestos', 'vDetenidos', 'mostrarImpreso', 'svgSilueta'];
+            'vRecepcion', 'vEntrega', 'vMiTrabajo', 'vPorValidar', 'vReporteria',
+            'vExpediente', 'vRepuestos', 'vDetenidos', 'mostrarImpreso', 'svgSilueta'];
           /* Se pregunta por `window`, no evaluando el nombre: una `function`
              de nivel superior en un script clásico SÍ queda colgada de
              `window` —a diferencia de un `const`, que no—, así que alcanza
@@ -1719,6 +1845,48 @@ const Pruebas = (function () {
           const donde = (typeof window !== 'undefined') ? window : globalThis;
           return debe.filter((n) => typeof donde[n] !== 'function').length;
         })(), 0],
+
+      /* Una devolución sin motivo deja al encargado mirando la misma etapa sin
+         saber qué rehacer. La regla lo exige al devolver; esta cifra vigila que
+         tampoco entre así por los datos de demostración. */
+      ['Etapas devueltas sin decir por qué',
+        db.ot_etapa.filter((x) => x.devuelta_at &&
+          String(x.devuelta_motivo || '').trim().length < 5).length, 0],
+
+      /* 🔴 QUE LA TASA DE DEVOLUCIONES NO SALGA PLANA. Es la cuarta vez
+         que aparece la misma trampa: un dato sembrado repartido con un `%`
+         parejo da una distribución perfectamente uniforme, y una distribución
+         uniforme se ve INVENTADA — que es peor que no tener el gráfico. Pasó
+         con las duraciones de etapa, con el ranking de marcas y con los
+         nombres de clientes. Acá se mide: entre el que más y el que menos le
+         devuelven tiene que haber al menos cinco puntos de diferencia. */
+      /* 🔴 EL TRAMO DE REVISION NO PUEDE SER CERO EN TODAS. Estaban
+         `terminada_at` y `validada_at` puestos en el mismo instante, asi que
+         «del termino al visto bueno» —el numero que mide al que revisa— daba
+         0 d exacto en las mil y pico etapas cerradas, y el panel lo mostraba
+         como si fuera una medicion. Un cero perfecto es la marca de que nadie
+         midio nada. */
+      ['Etapas cerradas donde el visto bueno llegó despues del término',
+        (function () {
+          const cerradas = db.ot_etapa.filter((x) => x.salio_at && x.terminada_at && x.validada_at);
+          if (!cerradas.length) return 'sin etapas cerradas';
+          const conEspera = cerradas.filter((x) =>
+            new Date(x.validada_at) - new Date(x.terminada_at) > 0).length;
+          return conEspera > cerradas.length * 0.3 ? 'la mayoria espera' : 'todas en el mismo segundo';
+        })(), 'la mayoria espera'],
+
+      ['Puntos de diferencia entre el que más y el que menos le devuelven',
+        (function () {
+          const m = new Map();
+          db.ot_etapa.forEach((x) => {
+            if (!x.terminada_por) return;
+            const c = m.get(x.terminada_por) || { n: 0, dev: 0 };
+            c.n++; c.dev += (x.devoluciones || 0); m.set(x.terminada_por, c);
+          });
+          const tasas = [...m.values()].filter((c) => c.n >= 3).map((c) => (c.dev * 100) / c.n);
+          if (tasas.length < 2) return 0;
+          return Math.round(Math.max.apply(null, tasas) - Math.min.apply(null, tasas)) >= 5 ? 'con relieve' : 'plana';
+        })(), 'con relieve'],
 
       ['Repuestos nacidos de una línea que no es «cambio»',
         (function () {

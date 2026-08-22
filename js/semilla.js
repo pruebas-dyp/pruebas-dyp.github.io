@@ -67,7 +67,31 @@ const Semilla = (function () {
      los navegadores que tengan la base anterior vuelven a sembrar solos. Sin
      esto, el reparto nuevo de las etapas no habría llegado a nadie que ya
      tuviera el sistema abierto, que es exactamente el problema del 18-08. */
-  const FORMA_DATOS = 5;   // 5: etapas terminadas esperando validacion
+  /* Motivos reales de una devolucion en un taller de desabolladura y pintura.
+     Salen del levantamiento, no de la imaginacion: es lo que se rehace. */
+  const MOTIVOS_DEVOLUCION = [
+    'Quedó una piel de naranja en el costado derecho, hay que pulir de nuevo',
+    'El tono no calza con la puerta de al lado, revisar la mezcla',
+    'Falta lijar el borde del parachoques antes de entregar',
+    'Quedaron dos tornillos sin apretar en el guardabarros',
+    'La masilla se marca contra la luz, hay que emparejar'
+  ];
+
+  /* Cuántas de cada 100 etapas le devuelven a cada persona. Repartido a mano y
+     con distancia entre unos y otros: una tasa igual para todos dibuja un
+     gráfico plano, y un gráfico plano se ve inventado — que es exactamente lo
+     que pasó con las duraciones de etapa y con el ranking de marcas. */
+  const RECHAZO_PERSONA = {
+    'pe-t-3': 14, 'pe-t-4': 9, 'pe-t-5': 4, 'pe-t-2': 3,
+    'pe-t-13': 17, 'pe-t-14': 6, 'pe-t-15': 11, 'pe-t-16': 2, 'pe-t-17': 8
+  };
+
+  /* Días entre que el operario declara terminado y el jefe da el visto bueno.
+     Desparejo a propósito: el promedio es lo que mide al que revisa, y si
+     todas fueran iguales el indicador no distinguiría nada. */
+  const ESPERA_VISTO = [0, 0, 0.4, 1, 0, 2, 0.7, 3, 0.2, 1.5, 0, 0.9];
+
+  const FORMA_DATOS = 8;   // 8: el visto bueno llega despues del termino, no en el mismo segundo
   // TEMPARIO_HORA ($10.000, reglas §C.15) se eliminó el 13-08-2026 junto con
   // el tempario entero. La cifra queda medida en `reglas`, no en el sistema.
 
@@ -1293,6 +1317,24 @@ const Semilla = (function () {
              la demostracion — y peor: no se ve el caso que justifica todo el
              mecanismo, que es un auto listo hace dias que nadie reviso. */
           const esperandoVisto = !cerrada && !suelta && idx % 4 === 1;
+          /* 🔶 Y ALGUNAS FUERON DEVUELTAS. Es el otro lado del visto
+             bueno y el que hace que el mecanismo se entienda: el jefe puede
+             rechazar, y el encargado tiene que enterarse de por que. Sin una
+             sembrada, la tarjeta roja con el motivo no se ve nunca en la
+             demostracion y el caso queda contado solo de palabra. */
+          const devuelta = !cerrada && !suelta && !esperandoVisto && idx % 9 === 4;
+          /* 🔴 Y LAS CERRADAS TAMBIEN SE DEVOLVIERON EN SU MOMENTO, o el
+             indicador de calidad de la Reporteria sale en cero para todos.
+
+             Ojo con como se reparte: si la tasa fuera la misma para todos, el
+             grafico saldria perfectamente plano y se ve INVENTADO. Ya paso tres
+             veces en este proyecto —duraciones de etapa, ranking de marcas,
+             nombres de clientes— asi que la tasa depende de QUIEN hizo la etapa
+             y de la etapa: pintura y desabolladura se devuelven mas que un
+             desarme, y hay gente a la que le devuelven mas que a otra. */
+          const rechazo = resp ? (RECHAZO_PERSONA[resp] || 7) : 0;
+          const devueltaVieja = cerrada && resp &&
+            ((idx * 7 + e.orden * 3) % 100) < rechazo * (e.orden === 2 || e.orden === 4 ? 2 : 1);
           /* 🔶 QUIEN ASIGNO, CUANDO, QUIEN TERMINO Y QUIEN VALIDO (22-08-2026).
 
              NO hay fecha comprometida ni horario: Marco lo corrigio explicito
@@ -1319,11 +1361,28 @@ const Semilla = (function () {
                etapa tiene dias de trabajo Y dias esperando revision. Poniendolo
                en `fin` -donde arranca la etapa abierta- las tarjetas salian
                todas con "0 dias en la etapa", que se ve como un dato roto. */
-            terminada_at: cerrada ? cuando
+            /* 🔴 EL TERMINO VA ANTES QUE EL VISTO BUENO, Y NO EN EL MISMO
+               SEGUNDO. Estaban los dos en `cuando`, asi que el tramo
+               «del termino al visto bueno» —el numero que mide al que revisa—
+               daba exactamente 0 d en las 1.001 etapas cerradas. Un cero
+               perfecto no es un dato: es la marca de que nadie lo midio.
+
+               La espera se reparte de 0 a 3 dias y no es pareja: hay etapas
+               que el jefe firma el mismo dia y otras que se quedan tres dias
+               esperando, que es lo que pasa de verdad cuando esta en el piso.
+               Nunca antes de la asignacion: `Math.min` contra `t.desde`. */
+            terminada_at: cerrada
+              ? fechaTramo(Math.min(t.desde, t.hasta + ESPERA_VISTO[(idx * 3 + e.orden) % ESPERA_VISTO.length]))
               : (esperandoVisto ? fechaTramo(Math.max(0, fin / 2)) : null),
             terminada_por: cerrada ? resp : (esperandoVisto ? resp : null),
             validada_at: cerrada ? cuando : null,
-            validada_por: cerrada ? 'pe-t-2' : null
+            validada_por: cerrada ? 'pe-t-2' : null,
+            devuelta_at: devuelta ? fechaTramo(Math.max(0, fin / 2))
+              : (devueltaVieja ? fechaTramo(Math.max(0, (t.desde + t.hasta) / 2)) : null),
+            devuelta_por: (devuelta || devueltaVieja) ? 'pe-t-2' : null,
+            devuelta_motivo: (devuelta || devueltaVieja)
+              ? MOTIVOS_DEVOLUCION[(idx + e.orden) % MOTIVOS_DEVOLUCION.length] : null,
+            devoluciones: (devuelta || devueltaVieja) ? 1 : 0
           });
           if (cerrada) evento.push({ id: 'ev-' + (++seqEv), ot_id,
             fecha: cuando, tipo: 'etapa',

@@ -38,7 +38,20 @@
    Dos salidas, y las dos a la vista: aceptar o devolver. Un revisor que solo
    puede aceptar no esta revisando, esta firmando. */
 function vPorValidar() {
-  if (!Modelo.puede('etapa.validar')) return '';
+  /* Módulo propio desde el 22-08-2026. Se llega por el menú —sólo lo ve quien
+     valida— y también por `#vista=porvalidar`. Si alguien llega acá sin el
+     permiso NO se le muestra una pantalla en blanco: se le dice de quién es
+     esta pantalla. Una pantalla vacía sin explicación se lee como que el
+     sistema se rompió. */
+  if (!Modelo.puede('etapa.validar')) {
+    return `
+    <div class="panel">
+      <div class="cab"><div><h2>${ico('check', 'g')}Terminadas esperando visto bueno</h2>
+        <div class="desc">Esta pantalla es de quien revisa el trabajo terminado —la jefatura
+          de taller—. Tu cuenta no tiene ese permiso, así que no hay nada que aceptar
+          desde acá</div></div></div>
+    </div>`;
+  }
   const filas = Modelo.porValidar();
   if (!filas.length) {
     return `
@@ -78,6 +91,8 @@ function vPorValidar() {
                 ? '<span>' + x.diasDeLaEtapa + (x.diasDeLaEtapa === 1 ? ' día' : ' días') + ' en la etapa</span>'
                 : ''}
               ${x.asignadaPor ? '<span>La asignó ' + esc(x.asignadaPor) + '</span>' : ''}
+              ${x.devoluciones ? '<span class="et roja">ya se devolvió ' +
+                (x.devoluciones === 1 ? 'una vez' : x.devoluciones + ' veces') + '</span>' : ''}
             </div>
             <div class="tarea-botones">
               <button class="btn" data-mt-validar="${esc(x.ot_id)}|${esc(x.etapaCodigo)}">Aceptar</button>
@@ -114,14 +129,30 @@ function vPorValidar() {
    manos de lo que todavia no le asignaron. */
 function tarjetaTrabajo(x, mia, reparteElJefe) {
   const esperando = !!x.esperandoValidacion;
-  return '<article class="tarea' + (esperando ? ' esperando' : '') + '">' +
-    '<div class="franja" style="background:' + esc(x.color || 'var(--acento)') + '"></div>' +
+  /* 🔴 UNA ETAPA DEVUELTA NO SE VE COMO UNA NUEVA. Cuando el jefe la
+     rechazaba, al encargado le reaparecia la misma tarjeta —mismo rotulo,
+     misma fecha de asignacion— sin una palabra de que su trabajo habia sido
+     rechazado ni de que rehacer. El motivo quedaba en la bitacora de la orden,
+     que nadie abre. Va acá, arriba y con el nombre de quien la devolvio. */
+  const devuelta = mia && x.devueltaPendiente;
+  return '<article class="tarea' + (esperando ? ' esperando' : '') +
+    (devuelta ? ' devuelta' : '') + '">' +
+    '<div class="franja" style="background:' + esc(devuelta ? 'var(--rojo, #c0392b)' : (x.color || 'var(--acento)')) + '"></div>' +
     '<div class="tarea-cuerpo">' +
       '<div class="tarea-alto">' +
         '<span class="etapa"><i class="punto" style="background:' + esc(x.color) + '"></i>' +
           esc(x.etapa) + '</span>' +
         (esperando ? '<span class="plazo espera">esperando visto bueno</span>' : '') +
+        (devuelta ? '<span class="plazo tarde">te la devolvieron</span>' : '') +
       '</div>' +
+      (devuelta
+        ? '<div class="motivo-devuelta">' +
+            '<strong>' + esc(x.devueltaPor || 'El jefe de taller') + '</strong> la devolvió' +
+            (x.devueltaAt ? ' el ' + fFecha(x.devueltaAt) : '') + ': ' +
+            '<em>' + esc(x.devueltaMotivo || 'sin motivo registrado') + '</em>' +
+            (x.devoluciones > 1 ? ' <span class="et roja">' + x.devoluciones + '.ª vez</span>' : '') +
+          '</div>'
+        : '') +
       '<div class="tarea-auto">' +
         '<span class="patente">' + esc(x.patente) + '</span>' +
         '<span class="veh">' + esc([x.marca, x.modelo].filter(Boolean).join(' ') || '') + '</span>' +
@@ -205,7 +236,7 @@ function vMiTrabajo() {
      no pintan ni desabollan. Para ellas los dos paneles de etapas están vacíos
      siempre, no solo hoy, y un panel que nunca va a tener nada es ruido.
      Se dibujan únicamente si la cuenta sabe hacer algo con las manos. */
-  const conEtapas = Modelo.base().persona_etapa.some((h) => h.persona_id === yo.id);
+  const conEtapas = Modelo.tieneEtapas(yo.id);
 
   /* La tira de arriba: lo primero que la persona tiene que saber al abrir el
      telefono es cuanto tiene y cuanto ya entrego. */
@@ -224,8 +255,13 @@ function vMiTrabajo() {
       <span class="cifra">${t.aCargo.length}</span><span class="rot">a mi cargo</span></div>
   </div>` : '';
 
+  /* La bandeja del que valida NO se dibuja acá. Tiene módulo propio —«Por
+     validar»— desde el 22-08-2026, porque el jefe de taller no aterriza en
+     esta pantalla y se quedaba sin puerta para llegar a lo único que sólo él
+     puede hacer. Y porque dibujarla en dos lugares es exactamente el error
+     que se repite en este proyecto: dos pantallas mostrando lo mismo, una de
+     las dos siempre queda vieja. */
   return `
-  ${vPorValidar()}
   ${t.aCargo.length ? `
   <div class="panel">
     <div class="cab"><div><h2>${ico('auto', 'g')}Vehículos a mi cargo</h2>
@@ -311,6 +347,39 @@ function vMiTrabajo() {
   </div></div></div>` : ''}`;
 }
 
+/* ══ LOS BOTONES DE LA REVISIÓN ════════════════════════════════════════
+   Están en dos pantallas —«Por validar», que es la bandeja del jefe, y «Mi
+   trabajo» de quien además valida— así que se cablean UNA vez y las dos la
+   llaman. Escribirlo dos veces es cómo se llega a que un botón funcione en
+   una pantalla y en la otra no. */
+function engancharRevision() {
+  const par = (b, attr) => b.dataset[attr].split('|');
+
+  document.querySelectorAll('[data-mt-validar]').forEach((b) => b.addEventListener('click', () => {
+    const [ot, etapa] = par(b, 'mtValidar');
+    ejecutar(() => Modelo.validar_etapa(ot, etapa),
+      'Aceptada. La orden ya avanzó en la torre.');
+  }));
+
+  document.querySelectorAll('[data-mt-devolver]').forEach((b) => b.addEventListener('click', () => {
+    const [ot, etapa] = par(b, 'mtDevolver');
+    /* El motivo se PIDE, no es opcional: una devolucion sin motivo deja al
+       encargado mirando la misma etapa otra vez sin saber que rehacer. La
+       regla lo exige igual; esto es para no hacerle dar el viaje en vano. */
+    const razon = prompt('¿Por qué se devuelve? El encargado tiene que saber qué rehacer.');
+    if (razon === null) return;
+    ejecutar(() => Modelo.devolver_etapa(ot, etapa, razon),
+      'Devuelta al encargado con el motivo.');
+  }));
+
+  document.querySelectorAll('[data-mt-abrir]').forEach((b) => b.addEventListener('click', () =>
+    abrirFicha(b.dataset.mtAbrir)));
+}
+
+/* La pantalla «Por validar» no tiene nada más que los botones de la revisión:
+   no hay etapas propias que tomar ni fotos que subir. */
+function pPorValidar() { engancharRevision(); }
+
 function pMiTrabajo() {
   const yo = Modelo.personaActual();
   if (!yo) return;
@@ -340,26 +409,7 @@ function pMiTrabajo() {
         : 'Quedó terminada, esperando el visto bueno del jefe de taller.');
   }));
 
-  /* ── Las dos salidas de la revisión ── */
-  document.querySelectorAll('[data-mt-validar]').forEach((b) => b.addEventListener('click', () => {
-    const [ot, etapa] = par(b, 'mtValidar');
-    ejecutar(() => Modelo.validar_etapa(ot, etapa),
-      'Aceptada. La orden ya avanzó en la torre.');
-  }));
-
-  document.querySelectorAll('[data-mt-devolver]').forEach((b) => b.addEventListener('click', () => {
-    const [ot, etapa] = par(b, 'mtDevolver');
-    /* El motivo se PIDE, no es opcional: una devolucion sin motivo deja al
-       encargado mirando la misma etapa otra vez sin saber que rehacer. La
-       regla lo exige igual; esto es para no hacerle dar el viaje en vano. */
-    const razon = prompt('¿Por qué se devuelve? El encargado tiene que saber qué rehacer.');
-    if (razon === null) return;
-    ejecutar(() => Modelo.devolver_etapa(ot, etapa, razon),
-      'Devuelta al encargado con el motivo.');
-  }));
-
-  document.querySelectorAll('[data-mt-abrir]').forEach((b) => b.addEventListener('click', () =>
-    abrirFicha(b.dataset.mtAbrir)));
+  engancharRevision();
 
   // El presupuesto de una orden a mi cargo, sin pasar por el listado.
   document.querySelectorAll('[data-mt-presu]').forEach((b) => b.addEventListener('click', () => {

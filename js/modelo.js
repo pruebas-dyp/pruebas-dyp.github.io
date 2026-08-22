@@ -380,6 +380,15 @@ const Modelo = (function () {
         validadaPor: ix.persona.get(x.validada_por)
           ? nombreDe(ix.persona.get(x.validada_por)) : null,
         esperandoValidacion: !!x.terminada_at && !x.salio_at,
+        /* La devolución, para que el encargado se entere en su tarjeta y no en
+           el expediente de la orden. `devueltaPendiente` es la que todavía no
+           ha vuelto a entregar: ésa es la que hay que gritarle. */
+        devueltaAt: x.devuelta_at || null,
+        devueltaPor: ix.persona.get(x.devuelta_por)
+          ? nombreDe(ix.persona.get(x.devuelta_por)) : null,
+        devueltaMotivo: x.devuelta_motivo || null,
+        devoluciones: x.devoluciones || 0,
+        devueltaPendiente: !!x.devuelta_at && !x.terminada_at && !x.salio_at,
         responsable: (ix.persona.get(x.persona_id) || {}).nombres || null
       })),
       asignado: (() => {
@@ -1197,6 +1206,19 @@ const Modelo = (function () {
   /* Lo que una persona tiene entre manos, en el orden en que hay que hacerlo:
      primero lo suyo, después lo que puede tomar. La antigüedad manda, porque
      el auto que lleva más días parado es el que más cuesta. */
+  /* ¿Esta persona trabaja los vehículos con las manos? Lo dice su ficha: las
+     etapas que tiene declaradas. Recepción y administración no tienen
+     ninguna, y para ellas las pantallas de etapas están vacías siempre —no
+     sólo hoy—, así que no se les ofrecen.
+
+     Vive acá, en el motor, y no en cada pantalla: lo preguntan la vista del
+     operario y el menú, y si cada una lo calculara por su lado tendríamos el
+     menú ofreciendo una pantalla que después sale en blanco. */
+  function tieneEtapas(persona_id) {
+    const id = persona_id || persona_actual;
+    return !!id && db.persona_etapa.some((h) => h.persona_id === id);
+  }
+
   /* ── LA BANDEJA DEL QUE VALIDA ─────────────────────────────────────────
      Etapas que alguien declaró terminadas y que nadie ha revisado. Es la lista
      del jefe de taller, y es corta a propósito: si crece, el problema no es la
@@ -1218,6 +1240,9 @@ const Modelo = (function () {
              listo hace tres días y nadie saberlo. */
           diasEsperando: Reglas.dias(a.terminadaAt, HOY),
           asignadaPor: a.asignadaPor || null,
+          /* Si ya se devolvió antes, el que revisa tiene que saberlo ANTES de
+             aceptar: la segunda vuelta de una misma etapa no se mira igual. */
+          devoluciones: a.devoluciones || 0,
           diasDeLaEtapa: a.asignadaAt ? Reglas.dias(a.asignadaAt, a.terminadaAt) : null
         });
       });
@@ -1295,6 +1320,15 @@ const Modelo = (function () {
           /* Días desde que se la asignaron. Es lo que mide al ENCARGADO,
              distinto de los días del vehículo, que empiezan mucho antes. */
           diasDesdeAsignada: a.asignadaAt ? Reglas.dias(a.asignadaAt, HOY) : null,
+          /* Si se la devolvieron y todavía no la vuelve a entregar, es LO
+             PRIMERO que tiene que leer: sin esto la tarjeta le reaparecía
+             idéntica a una asignación nueva y nadie le decía que su trabajo
+             había sido rechazado ni qué rehacer. */
+          devueltaPendiente: !!a.devueltaPendiente,
+          devueltaPor: a.devueltaPor || null,
+          devueltaMotivo: a.devueltaMotivo || null,
+          devueltaAt: a.devueltaAt || null,
+          devoluciones: a.devoluciones || 0,
         };
         if (oe && oe.persona_id === persona_id) mias.push(fila);
         else if (!oe || !oe.persona_id) {
@@ -1399,6 +1433,19 @@ const Modelo = (function () {
     fila.terminada_at = null;
     fila.terminada_por = null;
     const quien = db.persona.find((x) => x.id === persona_actual);
+    /* 🔴 EL MOTIVO SE GUARDA EN LA ETAPA, no sólo en la bitácora. Con el
+       motivo únicamente en el registro de eventos, al encargado le reaparecía
+       la tarjeta idéntica a una asignación nueva: mismo rótulo, misma fecha,
+       ni una palabra de que se la habían devuelto. Nadie va a buscar el
+       expediente de la orden para enterarse de que su trabajo fue rechazado.
+
+       Y el CONTADOR importa aparte del motivo: una etapa devuelta tres veces
+       es un problema distinto —de instrucción o de material— a una devuelta
+       una vez, y es la clase de cosa que sólo se ve si queda contada. */
+    fila.devuelta_at = ahora();
+    fila.devuelta_por = persona_actual || null;
+    fila.devuelta_motivo = razon;
+    fila.devoluciones = (fila.devoluciones || 0) + 1;
     registrarEvento(ot_id, 'etapa',
       'Devuelto' + (quien ? ' por ' + nombreDe(quien) : '') + ': ' + razon, etapa.id);
     tocado();
@@ -3559,7 +3606,7 @@ const Modelo = (function () {
     // operación
     crear_ot_desde_recepcion, asignar_etapas, finalizar_etapa, finalizar_etapas, quitar_etapa,
     tomar_etapa, soltar_etapa, miTrabajo, asignar_responsable_ot,
-    validar_etapa, devolver_etapa, porValidar, cargaDelEquipo,
+    validar_etapa, devolver_etapa, porValidar, cargaDelEquipo, tieneEtapas,
     personasParaEtapa, destinatarios, fijar_fecha_compromiso,
     registrar_salida, registrar_reingreso, cambiar_estado_ot, registrar_entrega,
     programar_entrega, corregir_recepcion, correccionesDeRecepcion,

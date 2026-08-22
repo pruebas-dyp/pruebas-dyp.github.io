@@ -1437,6 +1437,19 @@ body.sin-desplazar { overflow: hidden; }
 }
 .tarea-pie strong { color: var(--texto); }
 
+/* La etapa que el jefe devolvió. Se distingue de una asignación nueva a un
+   metro de distancia —borde rojo y el motivo escrito adentro— porque antes le
+   reaparecía al encargado idéntica a cualquier otra y nadie le decía que su
+   trabajo había sido rechazado. */
+.tarea.devuelta { border-color: var(--rojo-borde); background: var(--rojo-bg); }
+.motivo-devuelta {
+  margin-top: 7px; padding: 7px 9px; border-radius: 5px;
+  background: var(--neutro-bg); border-left: 3px solid var(--rojo);
+  font-size: 12px; line-height: 1.45; color: var(--texto);
+}
+.motivo-devuelta strong { color: var(--rojo-texto); }
+.motivo-devuelta em { font-style: normal; color: var(--texto); }
+
 .tarea-botones { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .tarea-botones .espera { font-size: 11.5px; color: var(--gris-2); font-style: italic; }
 

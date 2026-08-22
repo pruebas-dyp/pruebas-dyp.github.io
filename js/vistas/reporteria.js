@@ -778,26 +778,45 @@ function repAgregados(lista, meta) {
     lista.forEach((o) => {
       (o.etapasAsignadas || []).forEach((e) => {
         if (!e.finalizada || !e.terminadaPor || !e.asignadaAt || !e.terminadaAt) return;
-        const c = m.get(e.terminadaPor) || { n: 0, dias: 0, etapas: new Set() };
+        const c = m.get(e.terminadaPor) || { n: 0, dias: 0, dev: 0, etapas: new Set() };
         c.n++;
         c.dias += Math.max(0, (e.terminadaAt - e.asignadaAt) / MS);
+        /* Cuántas de las que cerró le habían sido devueltas antes. Es la
+           contraparte de la velocidad y hace falta para no premiar al que va
+           rápido rehaciendo: rápido y devuelto no es rápido. */
+        c.dev += (e.devoluciones || 0);
         c.etapas.add(e.nombre);
         m.set(e.terminadaPor, c);
       });
     });
     return [...m.entries()]
-      .map(([k, c]) => ({ k, v: c.n ? c.dias / c.n : 0, n: c.n,
+      .map(([k, c]) => ({ k, v: c.n ? c.dias / c.n : 0, n: c.n, dev: c.dev,
+        tasa: c.n ? (c.dev * 100) / c.n : 0,
         etapas: [...c.etapas].join(', ') }))
       .filter((x) => x.n >= 3)          // menos de tres etapas no es un promedio
       .sort((a, b) => a.v - b.v);       // el mas rapido primero
   })();
 
+  /* Los dos tramos en que el auto está quieto y nadie lo está trabajando.
+
+     🔴 EL REPARTO SE MIDE HASTA LA PRIMERA ETAPA, no hasta cada una. Acá se
+     promediaba `asignada − ingreso` de TODAS las etapas, y daba 31 días: pero
+     que Pintura se asigne el día 40 no es una demora, es que primero venían
+     Desarme y Desabolladura. Se estaba midiendo el largo del trabajo y
+     rotulándolo «mide al que asigna». Lo que sí es tiempo muerto es el auto
+     recibido que todavía no tiene NADA asignado — ahí no hay nadie
+     trabajándolo y el reloj del cliente ya corre. */
   const tramos = (() => {
     const MS = 86400000;
     let reparto = 0, nRep = 0, revision = 0, nRev = 0;
     lista.forEach((o) => {
+      const asignadas = (o.etapasAsignadas || []).filter((e) => e.asignadaAt);
+      if (asignadas.length && o.fechaIngreso) {
+        const primera = asignadas.reduce((min, e) => (e.asignadaAt < min ? e.asignadaAt : min),
+          asignadas[0].asignadaAt);
+        reparto += Math.max(0, (primera - o.fechaIngreso) / MS); nRep++;
+      }
       (o.etapasAsignadas || []).forEach((e) => {
-        if (e.asignadaAt && o.fechaIngreso) { reparto += Math.max(0, (e.asignadaAt - o.fechaIngreso) / MS); nRep++; }
         if (e.validadaAt && e.terminadaAt) { revision += Math.max(0, (e.validadaAt - e.terminadaAt) / MS); nRev++; }
       });
     });
@@ -1134,14 +1153,15 @@ function vReporteria() {
 
   <div class="panel destacado" style="margin-top:11px">
     <div class="cab"><div><h2>${ico('personal', 'g')}Quién demora menos</h2>
-      <div class="desc">Días promedio desde que se le asigna la etapa hasta que la termina.
-        <strong>El sistema actual no puede mostrar esto</strong>: no guarda quién hizo cada
-        etapa ni cuándo se la dieron</div></div>
+      <div class="desc">Días promedio desde que se le asigna la etapa hasta que la termina, y
+        cuántas le devolvieron. <strong>El sistema actual no puede mostrar esto</strong>: no guarda
+        quién hizo cada etapa, ni cuándo se la dieron, ni si hubo que rehacerla</div></div>
       ${g.porPersona.length ? '<span class="et verde">' + esc(g.porPersona[0].k) + ' es el más rápido</span>' : ''}</div>
     <div class="cuerpo">
       ${g.porPersona.length
         ? svgBarrasH(g.porPersona.map((p) => ({ k: p.k, v: p.v,
-            rot: (Math.round(p.v * 10) / 10).toString().replace('.', ',') + ' d · ' + p.n + ' etapas' })),
+            rot: (Math.round(p.v * 10) / 10).toString().replace('.', ',') + ' d · ' + p.n + ' etapas' +
+              (p.dev ? ' · ' + p.dev + ' devuelta' + (p.dev === 1 ? '' : 's') : '') })),
             { destacar: true }) +
           repFormulas([
             { que: 'Días de la persona', exp: 'Σ (terminó − se la asignaron) ÷ etapas que cerró',
@@ -1149,10 +1169,21 @@ function vReporteria() {
                 (Math.round(g.porPersona[0].v * 10) / 10).toString().replace('.', ',') + ' d' : '' },
             { que: 'Quién entra', exp: 'sólo con 3 etapas cerradas o más',
               num: g.porPersona.length + ' de ' + Modelo.base().persona.filter((p) => p.tipo === 'trabajador').length + ' del equipo' },
-            { que: 'Reparto', exp: 'del ingreso del auto a que alguien asigne la etapa',
+            { que: 'Reparto', exp: 'del ingreso del auto a que le asignen la PRIMERA etapa',
               num: (Math.round(g.tramos.reparto * 10) / 10).toString().replace('.', ',') + ' d · mide al que asigna' },
             { que: 'Revisión', exp: 'del término al visto bueno',
-              num: (Math.round(g.tramos.revision * 10) / 10).toString().replace('.', ',') + ' d · mide al que valida' }
+              num: (Math.round(g.tramos.revision * 10) / 10).toString().replace('.', ',') + ' d · mide al que valida' },
+            /* Rápido y devuelto no es rápido. Va en la misma tabla que la
+               velocidad a propósito: separadas, la primera se lee como un
+               ranking de quién trabaja mejor, y no lo es. */
+            { que: 'Se le devolvió', exp: 'etapas que el jefe rechazó ÷ etapas que cerró',
+              num: (function () {
+                const conDev = g.porPersona.filter((p) => p.dev > 0);
+                if (!conDev.length) return 'ninguna en el período';
+                const peor = conDev.slice().sort((a, b) => b.tasa - a.tasa)[0];
+                return peor.k + ': ' + peor.dev + ' de ' + peor.n + ' = ' +
+                  Math.round(peor.tasa) + '%';
+              })() }
           ])
         : vacio('Todavía no hay etapas cerradas con encargado en el período')}
       <div class="nota-panel"><p class="dato-demo">Dato de demostración: los tiempos por persona

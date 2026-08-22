@@ -149,6 +149,30 @@ const MENU = [
      ha visto. Se conserva la agrupación en tres bloques: diez íconos en una
      fila plana se leen peor que diez repartidos por para qué sirven. */
   { grupo: 'Operación diaria' },
+  /* 🔷 LAS DOS PUERTAS DEL CICLO DE ASIGNACIÓN (22-08-2026). Son nuestras, no
+     están entre los diez del cliente, y por eso cada una se le muestra SÓLO a
+     quien la usa — el resto del taller sigue viendo el menú de siempre:
+
+       · **Mi trabajo** — sólo si la ficha de la persona declara etapas. El que
+         pinta aterriza acá al entrar; sin la puerta, apretaba «Taller» una vez
+         y ya no tenía cómo volver. Recepción y administración no la ven: para
+         ellas está vacía siempre.
+       · **Por validar** — sólo con `etapa.validar`. Es lo único que nadie más
+         puede hacer, y hasta que se aprieta el vehículo no avanza. El jefe de
+         taller aterriza en la Torre, así que sin esta puerta no llegaba. */
+  { id: 'mitrabajo',  nombre: 'Mi trabajo',  icono: 'taller',
+    verSi: () => Modelo.tieneEtapas(),
+    /* El contador cuenta lo que HAY QUE HACER, no todo lo que está a mi
+       nombre: lo que ya entregué y espera el visto bueno no me toca a mí, y
+       si lo sumara el número no bajaría nunca al terminar una etapa. */
+    cuenta: () => {
+      const yo = Modelo.personaActual();
+      if (!yo) return null;
+      return Modelo.miTrabajo(yo.id).mias.filter((x) => !x.esperandoValidacion).length;
+    } },
+  { id: 'porvalidar', nombre: 'Por validar', icono: 'check',
+    verSi: () => Modelo.puede('etapa.validar'),
+    cuenta: () => Modelo.porValidar().length },
   { id: 'recepcion', nombre: 'Recepción',      icono: 'recepcion' },
   { id: 'torre',     nombre: 'Torre de control', icono: 'torre',   cuenta: () => Modelo.torre().length },
   { id: 'taller',    nombre: 'Taller',         icono: 'taller' },
@@ -182,6 +206,8 @@ const MENU = [
    construir todavía no se dibujan; los que sí, funcionan. */
 const MODULOS = {
   mitrabajo:   { ruta: ['Operación diaria', 'Mi trabajo'],
+                 acciones: [['refrescar', 'Actualizar', 'refrescar', 'F5']] },
+  porvalidar:  { ruta: ['Operación diaria', 'Por validar'],
                  acciones: [['refrescar', 'Actualizar', 'refrescar', 'F5']] },
   /* `Ingresar recepción` se llama igual que el botón del paso Verificar: es la
      misma operación y no puede tener dos nombres. Desde cualquier otro paso
@@ -276,15 +302,59 @@ function rotuloDeshacer() {
    lo tiene —allá el que entra a una pantalla puede todo lo que la pantalla
    ofrece— y hay que confirmarlo cargo por cargo antes de la puesta en marcha.
    Está anotado en la ficha de cada cuenta, en Personal. */
+/* 🔷 CON UNA EXCEPCION, Y HAY QUE DECIRLA (22-08-2026).
+
+   La lista de modulos de cada persona la armo Andres mirando las 39 pantallas
+   del sistema ACTUAL. Por construccion no puede nombrar una pantalla que ese
+   sistema no tiene. Si la lista gobernara tambien lo nuestro, todo lo que
+   agregamos quedaria invisible para las trece cuentas del cliente — y el jefe
+   de taller, que tiene lista escrita, se quedaria sin la bandeja donde valida
+   el trabajo terminado, que es justo lo que vinimos a agregar.
+
+   Entonces: para lo del cliente manda su lista; para lo nuestro manda el rol.
+   Cuando el cliente revise cuenta por cuenta antes de la puesta en marcha, lo
+   nuestro entra a la lista y esta excepcion se puede borrar. */
+const MODULOS_NUESTROS = ['mitrabajo', 'porvalidar', 'repuestos', 'detenidos', 'expediente'];
+
 function entraAlModulo(id) {
-  if (Modelo.modulosDe((Modelo.personaActual() || {}).id)) return Modelo.veModulo(id);
   const pide = PERMISO_DE_MODULO[id];
-  return !pide || Modelo.puede(pide);
+  const porRol = !pide || Modelo.puede(pide);
+  if (MODULOS_NUESTROS.indexOf(id) >= 0) return porRol;
+  if (Modelo.modulosDe((Modelo.personaActual() || {}).id)) return Modelo.veModulo(id);
+  return porRol;
+}
+
+/* Qué módulos le ofrece el menú a quien está adentro, sin tocar el DOM.
+
+   Está separado de `pintarMenu` para que se pueda PREGUNTAR sin un navegador
+   —lo usa la prueba de que el jefe de taller llega a su bandeja—. El ciclo de
+   validación se construyó, se probó y se publicó con el motor funcionando y
+   sin ninguna puerta en el menú: todo daba verde y en la pantalla no había por
+   dónde entrar. Una pregunta que sólo se puede hacer con el dedo no la hace
+   nadie dos veces.
+
+   Dos condiciones, y las dos tienen que dar: `entraAlModulo` responde si la
+   cuenta TIENE PERMISO, y `verSi` —cuando la entrada lo declara— si la
+   pantalla tiene algo que mostrarle. Ofrecer una puerta que se abre a una
+   pantalla vacía enseña a desconfiar del menú. */
+function menuVisible(m) {
+  return entraAlModulo(m.id) && (!m.verSi || m.verSi());
+}
+
+function modulosDelMenu() {
+  return MENU.filter((m) => !m.grupo && menuVisible(m)).map((m) => m.id);
+}
+
+/* A dónde cae alguien cuando la pantalla que pidió no es suya, y con qué se
+   abre el sistema. Lo primero que su propio menú le ofrece; si el menú le
+   quedó vacío, su trabajo — que no pide permiso porque sólo muestra lo suyo. */
+function primerModuloPermitido() {
+  return modulosDelMenu()[0] || 'mitrabajo';
 }
 
 function pintarMenu() {
   const nav = document.getElementById('nav');
-  const visible = (m) => entraAlModulo(m.id);
+  const visible = menuVisible;
 
   // Un grupo que se quedó sin módulos visibles tampoco se dibuja: un rótulo
   // solo, sin nada debajo, se lee como que algo se rompió.
@@ -317,6 +387,35 @@ function pintarMenu() {
      botones de «Cambiar mi clave» y «Cerrar sesión». Al entrar por el
      formulario no se notaba —ahí el orden es al revés— y por eso pasó. */
   montarRol();
+}
+
+/* Los números del menú, al día después de cada acción.
+
+   El menú se dibuja una vez al entrar y `render()` no lo volvía a tocar, así
+   que sus contadores se congelaban: el jefe de taller aceptaba una etapa, la
+   bandeja pasaba a tener tres, y al lado seguía diciendo cuatro. Un número
+   que miente al lado de la lista que lo desmiente es peor que no ponerlo.
+
+   Se actualiza el TEXTO del contador, no se redibuja el menú: rehacer el
+   `innerHTML` en cada render tira los listeners, parpadea y rompe el cajón
+   del celular a media apertura. Qué módulos se ven no cambia dentro de una
+   sesión —depende del permiso y de las etapas de la ficha—; lo que cambia son
+   los números. */
+function refrescarContadoresDelMenu() {
+  const nav = document.getElementById('nav');
+  if (!nav) return;
+  MENU.forEach((m) => {
+    if (m.grupo || !m.cuenta) return;
+    const a = nav.querySelector('a[data-vista="' + m.id + '"]');
+    if (!a) return;
+    let n;
+    try { n = m.cuenta(); } catch (e) { return; }
+    const span = a.querySelector('.cuenta');
+    if (n === null || n === undefined) { if (span) span.remove(); return; }
+    if (span) span.textContent = n;
+    else a.insertAdjacentHTML('beforeend', '<span class="cuenta">' + n + '</span>');
+    a.setAttribute('title', m.nombre + (n ? ' · ' + n : ''));
+  });
 }
 
 /* Quién está mirando la pantalla. Decía "Administrador" fijo en tres lugares
@@ -1012,6 +1111,7 @@ function dialogo(titulo, cuerpoHTML) {
    nadie pregunta por "Detenciones", pregunta por los autos parados. */
 const APODOS = {
   mitrabajo:     'lo mio pendientes tareas que me toca pintar reparar',
+  porvalidar:    'validar aceptar revisar visto bueno terminadas aprobar cerrar etapa',
   recepcion:     'ingreso nuevo vehiculo auto recibir entrada',
   torre:         'ordenes ot listado principal inicio',
   taller:        'etapas tablero piso boxes',
@@ -1109,7 +1209,15 @@ function ir(vista) {
        rebote que no repinta deja el marco como estaba antes, y así la barra de
        estado se quedó diciendo «Dueño» con Andrés Guzmán ya adentro: la
        navegación falló, nadie volvió a dibujar, y lo viejo quedó a la vista. */
-    if (!MODULOS[ui.vista]) ui.vista = 'mitrabajo';
+    /* 🔴 Y SE REBOTA A UNA PANTALLA QUE LA CUENTA SÍ ALCANCE (22-08-2026).
+       Acá decía «si la vista actual no es un módulo conocido, mitrabajo», y esa
+       condición no cubría el caso que importa: al arrancar con sesión guardada
+       `ui.vista` vale `torre`, que SÍ es un módulo conocido. Resultado: se
+       rechazaba la entrada, se avisaba que no tenía acceso… y se repintaba la
+       Torre igual. El operario de desabolladura terminó viendo la Torre de
+       control con nombres de clientes y compañía. El rebote tiene que mirar si
+       la cuenta alcanza el destino, no si el destino existe. */
+    if (!MODULOS[ui.vista] || !entraAlModulo(ui.vista)) ui.vista = primerModuloPermitido();
     render();
     return;
   }
@@ -1161,6 +1269,7 @@ function ir(vista) {
    había ahí vive ahora en el manual de la carpeta Capacitación. */
 const TITULOS = {
   mitrabajo:     'Mi trabajo',
+  porvalidar:    'Por validar',
   recepcion:     'Nuevo ingreso',
   torre:         'Torre de control',
   taller:        'Taller',
@@ -1219,10 +1328,11 @@ function render() {
   document.getElementById('bajada').textContent = '';
 
   pintarShell();
+  refrescarContadoresDelMenu();
 
   const c = document.getElementById('contenido');
   const fn = {
-    mitrabajo: vMiTrabajo, recepcion: vRecepcion, torre: vTorre, taller: vTaller, entrega: vEntrega,
+    mitrabajo: vMiTrabajo, porvalidar: vPorValidar, recepcion: vRecepcion, torre: vTorre, taller: vTaller, entrega: vEntrega,
     repuestos: vRepuestos, detenidos: vDetenidos, presupuesto: vPresupuesto,
     bodega: vBodega, documentos: vDocumentos, historico: vHistorico,
     expediente: vExpediente,
@@ -1230,7 +1340,7 @@ function render() {
   }[ui.vista];
   c.innerHTML = fn ? fn() : vSinLevantar(ui.vista);
   if (fn) {
-    const p = { mitrabajo: pMiTrabajo, recepcion: pRecepcion, torre: pTorre, taller: pTaller, entrega: pEntrega,
+    const p = { mitrabajo: pMiTrabajo, porvalidar: pPorValidar, recepcion: pRecepcion, torre: pTorre, taller: pTaller, entrega: pEntrega,
       repuestos: pRepuestos, detenidos: pDetenidos, presupuesto: pPresupuesto, bodega: pBodega,
       documentos: pDocumentos, historico: pHistorico, expediente: pExpediente,
       personal: pPersonal,
@@ -2595,6 +2705,8 @@ const PERMISO_DE_MODULO = {
   // declaraban nada y las veía cualquiera — un operario entraba al histórico
   // completo con los datos de todos los clientes.
   recepcion:     'ot.crear',
+  // La bandeja del que revisa. Sin este permiso no hay nada que aceptar.
+  porvalidar:    'etapa.validar',
   torre:         'torre.ver',
   taller:        'taller.ver',
   entrega:       'entrega.registrar',
@@ -2658,7 +2770,9 @@ if (!HAY_SESION) {
     try { return new URLSearchParams(window.location.hash.replace(/^#/, '')).get('vista'); }
     catch (e) { return null; }
   })();
-  ir(MENU.some((m) => m.id === pedida) ? pedida : 'torre');
+  /* El módulo con el que abre no puede ser «torre» a secas: hay cuentas que no
+     entran ahí. Se abre en lo primero que su propio menú le ofrece. */
+  ir(MENU.some((m) => m.id === pedida) ? pedida : primerModuloPermitido());
   pararEnLaOrden(leerDelAncla('ot'));
 }
 
