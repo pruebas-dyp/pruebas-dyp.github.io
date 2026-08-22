@@ -67,7 +67,7 @@ const Semilla = (function () {
      los navegadores que tengan la base anterior vuelven a sembrar solos. Sin
      esto, el reparto nuevo de las etapas no habría llegado a nadie que ya
      tuviera el sistema abierto, que es exactamente el problema del 18-08. */
-  const FORMA_DATOS = 2;
+  const FORMA_DATOS = 5;   // 5: etapas terminadas esperando validacion
   // TEMPARIO_HORA ($10.000, reglas §C.15) se eliminó el 13-08-2026 junto con
   // el tempario entero. La cifra queda medida en `reglas`, no en el sistema.
 
@@ -97,6 +97,7 @@ const Semilla = (function () {
     ['ot.crear',             'Crear órdenes de trabajo'],
     ['ot.editar',            'Editar la recepción de una orden'],
     ['etapa.asignar',        'Asignar etapas a un vehículo'],
+    ['etapa.validar',        'Validar el término de una etapa'],
     ['etapa.finalizar',      'Finalizar etapas'],
     ['presupuesto.ver',      'Ver el presupuesto y sus líneas'],
     ['presupuesto.montos',   'Ver los montos de venta del presupuesto'],
@@ -157,6 +158,13 @@ const Semilla = (function () {
      medianoche. Acá se reparte entre las 8:00 y las 17:59.
 
      `dias()` queda para las CUENTAS de días, donde la hora estorba. */
+  /* Una fecha a `aaaa-mm-dd`, que es lo que guarda un <input type="date"> y
+     por lo tanto lo que tiene que guardar el compromiso de una etapa. Se arma
+     con las partes locales y NO con `toISOString()`, que pasa a UTC y en Chile
+     devuelve el día anterior toda la tarde. */
+  const soloDia = (d) => d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+
   const diasHora = (n) => {
     const d = dias(n);
     d.setHours(8 + entre(0, 9), entre(0, 59), 0, 0);
@@ -682,7 +690,7 @@ const Semilla = (function () {
                     'perdida_total.declarar', 'historico.ver'],
       jefe_taller: ['torre.ver', 'taller.ver', 'repuesto.ver', 'espera.ver', 'ficha.completa',
                     'documento.ver', 'foto.ver', 'foto.cargar',
-                    'etapa.asignar', 'etapa.finalizar', 'presupuesto.ver', 'presupuesto.montos',
+                    'etapa.asignar', 'etapa.validar', 'etapa.finalizar', 'presupuesto.ver', 'presupuesto.montos',
                     'presupuesto.crear', 'presupuesto.abrir', 'personal.ver', 'salida.registrar',
                     // Quién decide que un auto se detiene y por qué: el que manda en el taller.
                     'detencion.gestionar'],
@@ -833,6 +841,40 @@ const Semilla = (function () {
         ],
         ayuda: 'El aviso sale al enviar y al resolverse, con las líneas y el monto reales. ' +
                'El modelo borrador NO manda correo: la cola está modelada y el envío es del servidor.' },
+      /* 🔶 QUIÉN REPARTE EL TRABAJO (22-08-2026, decisión de Marco).
+
+         Hasta ahora convivían dos modelos: el jefe asignaba etapas, y además
+         cualquiera con esa habilidad podía TOMAR una etapa abierta que
+         estuviera sin dueño. Se hizo así porque es como funciona el piso de un
+         taller —el auto entra a pintura y lo pinta el que esté libre—, pero es
+         lo contrario a que el que asigna tenga el control.
+
+         Marco lo cerró: *"la idea es que solo el que deba asignar asigne y no
+         se tome nada sin asignación"*. Queda apagado por omisión.
+
+         Va como PARÁMETRO y no como código borrado porque es una decisión del
+         taller, no una regla del negocio: el día que Andrés diga que en el
+         piso funciona al revés, se prende desde Configuración y nadie tiene
+         que programar. */
+      /* 🔶 LA VALIDACION DEL TERMINO (22-08-2026, pedido de Marco): el
+         encargado declara terminado y el jefe ACEPTA. Hasta que alguien lo
+         mira, la orden no avanza. Va como parametro porque hay etapas y
+         talleres donde revisar cada cierre es de mas -y porque apagarlo tiene
+         que ser una decision consciente, no un olvido-. */
+      { clave: 'validar_termino', nombre: 'Validar el término de cada etapa', valor: 'si', tipo: 'opcion',
+        opciones: [
+          { valor: 'si', nombre: 'Sí — el encargado declara terminado y el jefe lo acepta' },
+          { valor: 'no', nombre: 'No — al declarar terminado la etapa se cierra sola' }
+        ],
+        ayuda: 'Con la validación encendida, una etapa terminada queda esperando revisión y el ' +
+               'vehículo no avanza hasta que alguien la acepta. Queda registrado quién la aceptó.' },
+      { clave: 'auto_asignacion', nombre: 'Quién reparte el trabajo', valor: 'no', tipo: 'opcion',
+        opciones: [
+          { valor: 'no', nombre: 'Sólo el que asigna — nadie toma trabajo sin que se lo asignen' },
+          { valor: 'si', nombre: 'También el operario puede tomar una etapa libre' }
+        ],
+        ayuda: 'Con «sólo el que asigna», una etapa sin encargado no la puede agarrar nadie: ' +
+               'queda esperando a que el jefe la reparta, y eso queda medido.' },
       { clave: 'correlativo_ot', nombre: 'Próximo número de OT', valor: ULTIMA_OT + 1, tipo: 'numero',
         ayuda: 'Correlativo de cinco dígitos, sin año ni local. Al 12-08-2026 el sistema real iba por ' + ULTIMA_OT + '.' },
       { clave: 'iva', nombre: 'IVA', valor: 19, tipo: 'numero', ayuda: 'Porcentaje aplicado al neto del presupuesto.' },
@@ -1246,11 +1288,42 @@ const Semilla = (function () {
              ofrece para tomar, y si la semilla dejara todas asignadas no
              habría nada que mostrar. Dos de cada tres abiertas quedan libres. */
           const suelta = !cerrada && (idx + e.orden) % 3 !== 0;
+          /* 🔶 ALGUNAS YA ESTAN TERMINADAS Y ESPERANDO EL VISTO BUENO. Sin
+             ellas la bandeja del jefe sale vacia y no hay nada que mostrar en
+             la demostracion — y peor: no se ve el caso que justifica todo el
+             mecanismo, que es un auto listo hace dias que nadie reviso. */
+          const esperandoVisto = !cerrada && !suelta && idx % 4 === 1;
+          /* 🔶 QUIEN ASIGNO, CUANDO, QUIEN TERMINO Y QUIEN VALIDO (22-08-2026).
+
+             NO hay fecha comprometida ni horario: Marco lo corrigio explicito
+             -*"no es que tenga un horario y todo, sino que es como la
+             trazabilidad de cuando se le asigno nomas"*-, y tampoco hay tope
+             de cuantos autos puede tener una persona a la vez.
+
+             Lo que si queda es la CADENA COMPLETA de una etapa: se asigno, la
+             hizo alguien, la declaro terminada, y alguien la valido. Cuatro
+             fechas con cuatro nombres. */
           ot_etapa.push({
             id: 'oe-' + numero_ot + '-' + e.orden, ot_id, etapa_id: e.id,
             asignada_at: fechaTramo(t.desde),
             salio_at: cerrada ? cuando : null,
-            persona_id: suelta ? null : resp, observacion: ''
+            persona_id: suelta ? null : resp, observacion: '',
+            // Reparte el jefe de taller; una de cada cuatro las reparte
+            // recepción, que es la otra cuenta con el permiso de asignar.
+            asignada_por: (idx + e.orden) % 4 === 0 ? 'pe-t-1' : 'pe-t-2',
+            /* Una etapa cerrada paso por las dos manos: la término el operario
+               y la valido el jefe. En la demostracion la validacion va un rato
+               despues del termino, que es lo que pasa de verdad: el jefe la
+               revisa cuando alcanza. */
+            /* El término va a MITAD de camino entre la asignación y hoy: asi la
+               etapa tiene dias de trabajo Y dias esperando revision. Poniendolo
+               en `fin` -donde arranca la etapa abierta- las tarjetas salian
+               todas con "0 dias en la etapa", que se ve como un dato roto. */
+            terminada_at: cerrada ? cuando
+              : (esperandoVisto ? fechaTramo(Math.max(0, fin / 2)) : null),
+            terminada_por: cerrada ? resp : (esperandoVisto ? resp : null),
+            validada_at: cerrada ? cuando : null,
+            validada_por: cerrada ? 'pe-t-2' : null
           });
           if (cerrada) evento.push({ id: 'ev-' + (++seqEv), ot_id,
             fecha: cuando, tipo: 'etapa',

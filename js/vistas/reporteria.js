@@ -756,6 +756,54 @@ function repAgregados(lista, meta) {
       atrasoProm: atraso.length ? Math.round(atraso.reduce((s, d) => s + d, 0) / atraso.length) : 0 };
   })();
 
+  /* ── 🔶 QUIEN HACE QUE, Y CUANTO SE DEMORA CADA UNO ────────────────
+     Marco, 22-08-2026: *"esta data nos va a permitir tener trazabilidad de
+     quienes demoran menos, por vehiculo, en promedio, y mucha mas data que va
+     a ser muy util para el dueno... este es el valor anadido que nosotros
+     queremos darle"*.
+
+     Sale de la cadena que ahora guarda cada etapa: quien la asigno y cuando,
+     quien la termino y cuando, quien la valido y cuando. Con eso se pueden
+     medir TRES tramos que hoy no existen en ninguna parte:
+
+       · reparto   — del ingreso a que alguien la asigne  (mide al que asigna)
+       · ejecucion — de la asignacion al termino          (mide al encargado)
+       · revision  — del termino al visto bueno           (mide al que valida)
+
+     El sistema del cliente no tiene ninguno de los tres: guarda la etapa
+     actual y nada mas. */
+  const porPersona = (() => {
+    const MS = 86400000;
+    const m = new Map();
+    lista.forEach((o) => {
+      (o.etapasAsignadas || []).forEach((e) => {
+        if (!e.finalizada || !e.terminadaPor || !e.asignadaAt || !e.terminadaAt) return;
+        const c = m.get(e.terminadaPor) || { n: 0, dias: 0, etapas: new Set() };
+        c.n++;
+        c.dias += Math.max(0, (e.terminadaAt - e.asignadaAt) / MS);
+        c.etapas.add(e.nombre);
+        m.set(e.terminadaPor, c);
+      });
+    });
+    return [...m.entries()]
+      .map(([k, c]) => ({ k, v: c.n ? c.dias / c.n : 0, n: c.n,
+        etapas: [...c.etapas].join(', ') }))
+      .filter((x) => x.n >= 3)          // menos de tres etapas no es un promedio
+      .sort((a, b) => a.v - b.v);       // el mas rapido primero
+  })();
+
+  const tramos = (() => {
+    const MS = 86400000;
+    let reparto = 0, nRep = 0, revision = 0, nRev = 0;
+    lista.forEach((o) => {
+      (o.etapasAsignadas || []).forEach((e) => {
+        if (e.asignadaAt && o.fechaIngreso) { reparto += Math.max(0, (e.asignadaAt - o.fechaIngreso) / MS); nRep++; }
+        if (e.validadaAt && e.terminadaAt) { revision += Math.max(0, (e.validadaAt - e.terminadaAt) / MS); nRev++; }
+      });
+    });
+    return { reparto: nRep ? reparto / nRep : 0, nRep, revision: nRev ? revision / nRev : 0, nRev };
+  })();
+
   const venta = lista.reduce((s, o) => s + plataDe(o).ventaTotal, 0);
   const dentro = lista.filter((o) => o.diasReparacion <= meta).length;
 
@@ -767,6 +815,7 @@ function repAgregados(lista, meta) {
 
   return {
     dimDe, meses, top, ventaPorCompania, porEtapa, composicion, relojes, distribucion, compromiso,
+    porPersona, tramos,
     venta, dentro, delta, hayMesEnCurso, notaMesEnCurso, mesesCerrados: cerrados.length,
     mesEnCursoCorto: repMesCorto(mesEnCurso), diaDelMes: HOY.getDate(), diasDelMes,
     sumaDias, sumaTotales, sumaFuera: sumaTotales - sumaDias, n: lista.length,
@@ -1080,6 +1129,34 @@ function vReporteria() {
                 num: '= ' + compromiso.atrasoProm + ' d' }
             ])}
       </div>
+    </div>
+  </div>
+
+  <div class="panel destacado" style="margin-top:11px">
+    <div class="cab"><div><h2>${ico('personal', 'g')}Quién demora menos</h2>
+      <div class="desc">Días promedio desde que se le asigna la etapa hasta que la termina.
+        <strong>El sistema actual no puede mostrar esto</strong>: no guarda quién hizo cada
+        etapa ni cuándo se la dieron</div></div>
+      ${g.porPersona.length ? '<span class="et verde">' + esc(g.porPersona[0].k) + ' es el más rápido</span>' : ''}</div>
+    <div class="cuerpo">
+      ${g.porPersona.length
+        ? svgBarrasH(g.porPersona.map((p) => ({ k: p.k, v: p.v,
+            rot: (Math.round(p.v * 10) / 10).toString().replace('.', ',') + ' d · ' + p.n + ' etapas' })),
+            { destacar: true }) +
+          repFormulas([
+            { que: 'Días de la persona', exp: 'Σ (terminó − se la asignaron) ÷ etapas que cerró',
+              num: g.porPersona.length ? g.porPersona[0].k + ': ' +
+                (Math.round(g.porPersona[0].v * 10) / 10).toString().replace('.', ',') + ' d' : '' },
+            { que: 'Quién entra', exp: 'sólo con 3 etapas cerradas o más',
+              num: g.porPersona.length + ' de ' + Modelo.base().persona.filter((p) => p.tipo === 'trabajador').length + ' del equipo' },
+            { que: 'Reparto', exp: 'del ingreso del auto a que alguien asigne la etapa',
+              num: (Math.round(g.tramos.reparto * 10) / 10).toString().replace('.', ',') + ' d · mide al que asigna' },
+            { que: 'Revisión', exp: 'del término al visto bueno',
+              num: (Math.round(g.tramos.revision * 10) / 10).toString().replace('.', ',') + ' d · mide al que valida' }
+          ])
+        : vacio('Todavía no hay etapas cerradas con encargado en el período')}
+      <div class="nota-panel"><p class="dato-demo">Dato de demostración: los tiempos por persona
+        salen de la base sembrada. Con la base real de DyP se calcula igual.</p></div>
     </div>
   </div>
 

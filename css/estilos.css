@@ -1347,6 +1347,128 @@ body.sin-desplazar { overflow: hidden; }
   .anillo-caja { justify-content: center; }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   LA AGENDA DEL QUE ESTÁ EN EL PISO
+   ═══════════════════════════════════════════════════════════════════════
+   🔶 Pedido de Marco el 22-08-2026: que al asignado «le quede súper claro».
+
+   Antes esto era una tabla de nueve columnas. Una tabla sirve para COMPARAR
+   filas; el que está en pintura no compara nada: mira lo suyo, elige cuál
+   agarra ahora y lo cierra — en un celular, con las manos sucias, entre dos
+   autos. Por eso son tarjetas agrupadas por plazo, y lo primero que se lee no
+   es la patente sino si esto era para ayer. */
+
+/* La tira de arriba: cuánto debo y para cuándo, antes de cualquier detalle. */
+.tira-agenda {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px;
+  background: var(--borde); border: 1px solid var(--borde);
+  border-radius: 4px; overflow: hidden; margin-bottom: 11px;
+}
+.tira-agenda .dato {
+  background: var(--superficie); padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 1px;
+}
+.tira-agenda .cifra {
+  font-size: 26px; font-weight: 700; line-height: 1; color: var(--tinta);
+  font-variant-numeric: tabular-nums;
+}
+.tira-agenda .rot { font-size: 10.5px; color: var(--gris); text-transform: uppercase; letter-spacing: .5px; }
+.tira-agenda .dato.malo { background: var(--rojo-bg); }
+.tira-agenda .dato.malo .cifra { color: var(--rojo); }
+.tira-agenda .dato.aviso { background: var(--ambar-bg); }
+.tira-agenda .dato.aviso .cifra { color: var(--ambar); }
+
+/* El título de cada grupo de plazo. */
+.grupo-tareas + .grupo-tareas { margin-top: 18px; }
+.tit-grupo {
+  display: flex; align-items: center; gap: 9px; margin: 0 0 9px;
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .7px;
+  color: var(--gris);
+}
+.tit-grupo.urgente { color: var(--rojo); }
+.tit-grupo .cuantas {
+  background: var(--neutro-bg); border: 1px solid var(--neutro-borde);
+  border-radius: 9px; padding: 0 7px; font-size: 11px; color: var(--texto);
+  letter-spacing: 0;
+}
+.tit-grupo.urgente .cuantas { background: var(--rojo-bg); border-color: var(--rojo-borde); color: var(--rojo-texto); }
+.tit-grupo .dice { font-weight: 400; text-transform: none; letter-spacing: 0;
+  font-size: 11px; color: var(--gris-2); }
+
+/* Las tarjetas. Se acomodan solas: tres por fila en un monitor, una en el
+   teléfono, sin una sola consulta de ancho. */
+.tareas { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 9px; }
+
+.tarea {
+  display: flex; background: var(--superficie); border: 1px solid var(--borde);
+  border-radius: 5px; overflow: hidden; box-shadow: var(--sombra);
+}
+/* La franja de color de la etapa, al canto: identifica el trabajo de lejos,
+   que es como se mira una pantalla apoyada en un banco. */
+.tarea .franja { flex: 0 0 5px; }
+.tarea.tarde { border-color: var(--rojo-borde); }
+.tarea.hoy { border-color: var(--ambar-borde); }
+.tarea-cuerpo { flex: 1; min-width: 0; padding: 10px 12px 11px; }
+
+.tarea-alto { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.tarea-alto .etapa {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; color: var(--texto);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tarea-alto .plazo {
+  flex: 0 0 auto; font-size: 10.5px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .5px; padding: 2px 7px; border-radius: 9px;
+  background: var(--neutro-bg); color: var(--gris); border: 1px solid var(--neutro-borde);
+}
+.tarea-alto .plazo.tarde { background: var(--rojo-bg); color: var(--rojo-texto); border-color: var(--rojo-borde); }
+.tarea-alto .plazo.hoy { background: var(--ambar-bg); color: var(--ambar-texto); border-color: var(--ambar-borde); }
+.tarea-alto .plazo.pronto { background: var(--acento-bg); color: var(--acento-texto); border-color: var(--acento-borde); }
+
+/* La patente es lo que la persona busca con la vista: va grande. */
+.tarea-auto { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-top: 7px; }
+.tarea-auto .patente { font-size: 15px; }
+.tarea-auto .veh { font-size: 12.5px; color: var(--texto); }
+.tarea-auto .ot { font-size: 11px; color: var(--gris-2); font-variant-numeric: tabular-nums; }
+
+.tarea-pie {
+  display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 8px;
+  font-size: 11px; color: var(--gris); line-height: 1.5;
+}
+.tarea-pie strong { color: var(--texto); }
+
+.tarea-botones { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.tarea-botones .espera { font-size: 11.5px; color: var(--gris-2); font-style: italic; }
+
+/* ── La pantalla de repartir ──
+   Misma tarjeta que ve el operario, pero elegible: el jefe marca la etapa y
+   elige quién la hace. Que las dos pantallas usen la misma pieza no es
+   ahorro de CSS — es que el jefe vea exactamente lo que va a ver el otro. */
+.tarea.elegible { cursor: pointer; }
+.tarea.elegible:hover { border-color: var(--acento-borde); background: var(--seleccion); }
+.tarea.elegible .etapa input[type=checkbox] { width: 17px; height: 17px; cursor: pointer; }
+/* La tarjeta marcada se ve marcada: sin esto hay que leer la casilla una por
+   una para saber qué se está por asignar. */
+.tarea.elegible:has(input:checked) { border-color: var(--acento); background: var(--acento-bg); }
+.tarea .elige-quien { margin-top: 9px; }
+.tarea .elige-quien select { width: 100%; }
+.tarea.cerrada { opacity: .72; }
+.tarea .plazo.listo { background: var(--verde-bg); color: var(--verde-texto); border-color: var(--verde-borde); }
+
+.asignar .por-asignar { margin-top: 18px; }
+.pie-asignar {
+  display: flex; align-items: center; gap: 11px; flex-wrap: wrap; margin-top: 12px;
+  padding-top: 11px; border-top: 1px solid var(--borde);
+}
+
+@media (max-width: 560px) {
+  .tira-agenda { grid-template-columns: repeat(2, 1fr); }
+  .tareas { grid-template-columns: 1fr; }
+  /* En el teléfono los botones de la tarjeta ocupan la fila: son los que se
+     aprietan con el pulgar y con el auto delante. */
+  .tarea-botones .btn { flex: 1 1 auto; }
+}
+
 /* El aviso de que la tabla sigue hacia el lado. Lo pone `mejorarTablas()` sólo
    cuando el contenido de verdad no cabe, así que en el escritorio no aparece
    aunque la regla exista. */

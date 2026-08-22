@@ -57,6 +57,14 @@ const Reglas = (function () {
   //                    cuál se mide contra la meta.
   const kpiReparacion = (db) => parametro(db, 'kpi_reparacion', 'acumulado');
 
+  /* ¿Puede alguien tomar una etapa que nadie le asignó? Por omisión NO: el
+     reparto es del que asigna. Decisión de Marco del 22-08-2026. */
+  const autoAsignacion = (db) => parametro(db, 'auto_asignacion', 'no') === 'si';
+
+  /* ¿Una etapa terminada tiene que pasar por el visto bueno de alguien?
+     Por omision SI: terminar no es cerrar. */
+  const exigeValidacion = (db) => parametro(db, 'validar_termino', 'si') === 'si';
+
   /* ── Catálogo de estados ───────────────────────────────────────────────
      Dos booleanos, y son cosas distintas. Hay que no confundirlos:
 
@@ -654,7 +662,7 @@ const Reglas = (function () {
 
   return {
     // parámetros
-    parametro, metaDias, kpiReparacion,
+    parametro, metaDias, kpiReparacion, autoAsignacion, exigeValidacion,
     // estados
     estadoPorCodigo, esFinal, cierraOrden, estaAbierta, esTerminal, nombreEstado,
     // consultas

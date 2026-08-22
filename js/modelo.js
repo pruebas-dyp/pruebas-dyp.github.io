@@ -51,7 +51,7 @@ const Modelo = (function () {
           descripción de estado y la OR externa de las órdenes de empresa. */
   const CLAVE = 'dyp-modelo-v6';
 
-  // Y se barre lo que dejaron las versiones anteriores: ocupa espacio y no
+  // Y se barre lo que dejaron las versiónes anteriores: ocupa espacio y no
   // sirve para nada.
   try {
     ['dyp-modelo', 'dyp-modelo-v2', 'dyp-modelo-v3', 'dyp-modelo-v4', 'dyp-modelo-v5']
@@ -366,6 +366,20 @@ const Modelo = (function () {
       etapasAsignadas: etapas.map((x) => ({
         codigo: x.etapa.codigo, nombre: x.etapa.nombre, orden: x.etapa.orden, color: x.etapa.color,
         finalizada: !!x.salio_at, asignadaAt: x.asignada_at, finalizadaAt: x.salio_at,
+        /* Quién repartió y para cuándo. Van juntos a propósito: sin el «quién»
+           sólo se puede medir al que ejecuta, y el trabajo puede llevar días
+           parado porque nadie lo asignó. */
+        asignadaPor: ix.persona.get(x.asignada_por)
+          ? nombreDe(ix.persona.get(x.asignada_por)) : null,
+        /* La cadena completa de la etapa: quien la término y quien la valido.
+           Sin esto solo se sabe que esta cerrada, no quien respondio por ella. */
+        terminadaAt: x.terminada_at || null,
+        terminadaPor: ix.persona.get(x.terminada_por)
+          ? nombreDe(ix.persona.get(x.terminada_por)) : null,
+        validadaAt: x.validada_at || null,
+        validadaPor: ix.persona.get(x.validada_por)
+          ? nombreDe(ix.persona.get(x.validada_por)) : null,
+        esperandoValidacion: !!x.terminada_at && !x.salio_at,
         responsable: (ix.persona.get(x.persona_id) || {}).nombres || null
       })),
       asignado: (() => {
@@ -747,7 +761,7 @@ const Modelo = (function () {
       });
     });
 
-    // 5 · Bitácora: las comunicaciones al cliente y a la compañía.
+    // 5 · Bitácora: las comúnicaciones al cliente y a la compañía.
     bitacoraDe(o.id).forEach((b) => {
       sumar(b.fecha, 9, 'bitacora', 'Bitácora · ' + (b.asunto || 'mensaje'),
         b.mensaje, b.usuario);
@@ -1033,8 +1047,35 @@ const Modelo = (function () {
      etapa SE ASIGNA IGUAL y se avisa. Trabar el reparto entero por un
      desplegable mal elegido sería peor: la etapa es del vehículo, el
      responsable es un dato de quién la toma. */
-  function asignar_etapas(ot_id, etapa_ids, responsables) {
+  /* `aaaa-mm-dd` —lo que guarda un <input type="date">— a `dd-mm-aaaa`. Va
+     acá y no se toma de `app.js`: el modelo se carga ANTES que las vistas y
+     no puede depender de ellas. */
+  const diaLegible = (iso) => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+    return m ? m[3] + '-' + m[2] + '-' + m[1] : String(iso || '');
+  };
+
+  /* ── ASIGNAR: quién, a quién, para cuándo y desde cuándo ───────────────
+     🔶 Pedido de Marco el 22-08-2026: *"la idea es que el que asigne tenga el
+     control completo de quién tiene que hacer qué cosa y qué no"*, y *"tenemos
+     que tener el control y detalle de cuándo el que asignó hizo la asignación,
+     para medir tanto al que asigna como al asignado"*.
+
+     Por eso cada asignación guarda CUATRO cosas y no una:
+
+       · `persona_id`   — a quién le toca
+       · `asignada_por` — quién repartió (para medir al que asigna)
+       · `asignada_at`  — cuándo se repartió
+       · `para_cuando`  — para qué día tiene que estar
+
+     Con esas cuatro salen los dos indicadores que hoy no existen en ninguna
+     parte: cuánto tarda el jefe en repartir un trabajo que está esperando, y
+     cuánto tarda el encargado en cerrarlo desde que se lo dieron. Medir sólo
+     al segundo sería injusto: un auto puede llevar cuatro días parado porque
+     nadie lo asignó. */
+  function asignar_etapas(ot_id, etapa_ids, responsables, paraCuando) {
     const resp = responsables || {};
+    const cuando = paraCuando || {};
     const fallas = [];
     let n = 0;
     (etapa_ids || []).forEach((eid) => {
@@ -1054,9 +1095,14 @@ const Modelo = (function () {
       }
 
       db.ot_etapa.push({ id: nuevoId('oe'), ot_id, etapa_id: eid,
-        asignada_at: ahora(), salio_at: null, persona_id, observacion: '' });
-      registrarEvento(ot_id, 'etapa', persona_id
-        ? 'Asignada a ' + nombreDe(db.persona.find((x) => x.id === persona_id)) : 'Asignada', eid);
+        asignada_at: ahora(), salio_at: null, persona_id, observacion: '',
+        asignada_por: persona_actual || null,
+        para_cuando: cuando[eid] || null });
+      const quienAsigna = db.persona.find((x) => x.id === persona_actual);
+      registrarEvento(ot_id, 'etapa', (persona_id
+        ? 'Asignada a ' + nombreDe(db.persona.find((x) => x.id === persona_id)) : 'Asignada') +
+        (quienAsigna ? ' por ' + nombreDe(quienAsigna) : '') +
+        (cuando[eid] ? ', para el ' + diaLegible(cuando[eid]) : ''), eid);
       n++;
     });
     if (!n) return { ok: false, motivo: fallas[0] || 'No se asignó ninguna etapa.' };
@@ -1105,6 +1151,20 @@ const Modelo = (function () {
     if (!oe) return { ok: false, motivo: 'Esa etapa no está abierta en esta orden.' };
     const p = db.persona.find((x) => x.id === persona_id);
     if (!p) return { ok: false, motivo: 'La persona no existe.' };
+
+    /* 🔶 NADIE TOMA TRABAJO QUE NO LE ASIGNARON (22-08-2026). Decisión de
+       Marco: *"solo el que deba asignar asigne y no se tome nada sin
+       asignación"*. Quien tiene el permiso de repartir sigue pudiendo —eso ES
+       asignar—; el resto, no.
+
+       El mensaje dice QUIÉN reparte y no sólo que está prohibido: un rechazo
+       que no indica a quién recurrir deja a la persona parada igual. */
+    if (!Reglas.autoAsignacion(db) && !puede('etapa.asignar')) {
+      return { ok: false, motivo: 'En este taller el trabajo lo reparte quien asigna: ' +
+        'no se puede tomar una etapa que nadie te dio. Pídesela al jefe de taller. ' +
+        '(Se cambia en Configuración → Parámetros → Quién reparte el trabajo.)' };
+    }
+
     // Con alcance `asignado` uno toma para sí, no a nombre de otro.
     if (alcanceActual() === 'asignado' && persona_id !== persona_actual)
       return { ok: false, motivo: 'Solo puedes tomar etapas para ti. Repartir el trabajo es del jefe de taller.' };
@@ -1137,6 +1197,60 @@ const Modelo = (function () {
   /* Lo que una persona tiene entre manos, en el orden en que hay que hacerlo:
      primero lo suyo, después lo que puede tomar. La antigüedad manda, porque
      el auto que lleva más días parado es el que más cuesta. */
+  /* ── LA BANDEJA DEL QUE VALIDA ─────────────────────────────────────────
+     Etapas que alguien declaró terminadas y que nadie ha revisado. Es la lista
+     del jefe de taller, y es corta a propósito: si crece, el problema no es la
+     lista, es que nadie está revisando. */
+  function porValidar() {
+    const ix = indices();
+    const filas = [];
+    torre().forEach((o) => {
+      (o.etapasAsignadas || []).forEach((a) => {
+        if (a.finalizada || !a.terminadaAt) return;
+        filas.push({
+          ot_id: o.id, numeroOT: o.numeroOT, patente: o.patente,
+          marca: o.marca, modelo: o.modelo,
+          etapa: a.nombre, etapaCodigo: a.codigo, color: a.color,
+          quienTermino: a.responsable || null,
+          terminadaAt: a.terminadaAt,
+          /* Cuántos días lleva esperando el visto bueno. Es el número que mide
+             al REVISOR, y hoy no existe en ninguna parte: un auto puede estar
+             listo hace tres días y nadie saberlo. */
+          diasEsperando: Reglas.dias(a.terminadaAt, HOY),
+          asignadaPor: a.asignadaPor || null,
+          diasDeLaEtapa: a.asignadaAt ? Reglas.dias(a.asignadaAt, a.terminadaAt) : null
+        });
+      });
+    });
+    return filas.sort((a, b) => b.diasEsperando - a.diasEsperando);
+  }
+
+  /* ── LA CARGA DEL EQUIPO ───────────────────────────────────────────────
+     Cuantas etapas abiertas tiene cada persona ahora mismo, y cuantas de esas
+     ya declaro terminadas.
+
+     ⚠️ NO es un tope. Marco fue explicito: *"tampoco tengan limite de que no
+     le pueden asignar mas de un auto a la vez"*. Esto no bloquea nada: es lo
+     que el que reparte necesita VER para decidir. Repartir a ciegas es como se
+     reparte hoy. */
+  function cargaDelEquipo() {
+    const ix = indices();
+    const carga = new Map();
+    torre().forEach((o) => {
+      (o.etapasAsignadas || []).forEach((a) => {
+        if (a.finalizada) return;
+        const oe = db.ot_etapa.find((x) => x.ot_id === o.id &&
+          (ix.etapa.get(x.etapa_id) || {}).codigo === a.codigo && !x.salio_at);
+        if (!oe || !oe.persona_id) return;
+        const c = carga.get(oe.persona_id) || { abiertas: 0, terminadas: 0 };
+        c.abiertas++;
+        if (oe.terminada_at) c.terminadas++;
+        carga.set(oe.persona_id, c);
+      });
+    });
+    return carga;
+  }
+
   function miTrabajo(persona_id) {
     const habilidades = db.persona_etapa.filter((h) => h.persona_id === persona_id).map((h) => h.etapa_id);
     const mias = [], disponibles = [], aCargo = [];
@@ -1171,7 +1285,16 @@ const Modelo = (function () {
           etapa: etapa.nombre, etapaCodigo: etapa.codigo, color: etapa.color,
           dias: o.diasKpi, sobreMeta: o.sobreMeta, enTaller: o.enTaller,
           repuestosPendientes: o.repuestos.filter((r) => !r.fechaBodega).length,
-          desde: a.asignadaAt || null
+          desde: a.asignadaAt || null,
+          /* Lo que el asignado necesita saber y hoy no veía: quién se lo dio,
+             cuándo, y para cuándo. «Qué tengo que hacer» sin «para cuándo» no
+             es una agenda, es una lista. */
+          asignadaPor: a.asignadaPor || null,
+          esperandoValidacion: !!a.esperandoValidacion,
+          terminadaAt: a.terminadaAt || null,
+          /* Días desde que se la asignaron. Es lo que mide al ENCARGADO,
+             distinto de los días del vehículo, que empiezan mucho antes. */
+          diasDesdeAsignada: a.asignadaAt ? Reglas.dias(a.asignadaAt, HOY) : null,
         };
         if (oe && oe.persona_id === persona_id) mias.push(fila);
         else if (!oe || !oe.persona_id) {
@@ -1210,9 +1333,74 @@ const Modelo = (function () {
     const permiso = Reglas.puedeFinalizarEtapa(db, { ot_id, etapa_id: etapa.id });
     if (!permiso.ok) return permiso;
     const fila = Reglas.etapaAsignada(db, ot_id, etapa.id);
-    fila.salio_at = ahora();
     if (persona_id) fila.persona_id = persona_id;
-    registrarEvento(ot_id, 'etapa', 'Completado', etapa.id, persona_id);
+
+    /* 🔶 TERMINAR NO ES CERRAR (22-08-2026, pedido de Marco): *"cuando la
+       persona que está siendo asignada termina una etapa debe poder colocar
+       que está terminado, y el jefe de taller o el que revisa debe poder
+       validar el término, aceptarlo"*.
+
+       Así que acá la etapa NO se cierra: queda **terminada y esperando
+       revisión**. El que cierra es `validar_etapa`, y hasta entonces la orden
+       no avanza. Es la diferencia entre «dije que lo hice» y «alguien lo miró»,
+       y es justo donde hoy se pierde la responsabilidad en el taller.
+
+       Quien tiene el permiso de validar se ahorra el rebote: si el propio jefe
+       cierra una etapa, la da por revisada en el mismo acto. Pedirle que se
+       valide a sí mismo en dos clics sería burocracia, no control. */
+    fila.terminada_at = ahora();
+    fila.terminada_por = fila.persona_id || persona_actual || null;
+
+    if (!Reglas.exigeValidacion(db) || puede('etapa.validar')) {
+      fila.salio_at = ahora();
+      fila.validada_at = ahora();
+      fila.validada_por = persona_actual || null;
+      registrarEvento(ot_id, 'etapa', 'Completado', etapa.id, persona_id);
+    } else {
+      registrarEvento(ot_id, 'etapa', 'Terminado, esperando validación', etapa.id, persona_id);
+    }
+    tocado();
+    return { ok: true, motivo: '' };
+  }
+
+  /* ── VALIDAR Y DEVOLVER ────────────────────────────────────────────────
+     Las dos únicas salidas de una etapa terminada. Van juntas a propósito: un
+     revisor que sólo puede aceptar no está revisando, está firmando. */
+  function validar_etapa(ot_id, etapa_codigo) {
+    const etapa = Reglas.etapaPorCodigo(db, etapa_codigo);
+    if (!etapa) return { ok: false, motivo: 'La etapa "' + etapa_codigo + '" no existe.' };
+    const fila = db.ot_etapa.find((x) => x.ot_id === ot_id && x.etapa_id === etapa.id && !x.salio_at);
+    if (!fila) return { ok: false, motivo: 'Esa etapa no está abierta en esta orden.' };
+    if (!fila.terminada_at)
+      return { ok: false, motivo: 'Nadie ha declarado terminada esa etapa todavía. ' +
+        'La valida el jefe DESPUÉS de que el encargado dice que terminó.' };
+    fila.salio_at = ahora();
+    fila.validada_at = ahora();
+    fila.validada_por = persona_actual || null;
+    const quien = db.persona.find((x) => x.id === persona_actual);
+    registrarEvento(ot_id, 'etapa', 'Validado' + (quien ? ' por ' + nombreDe(quien) : ''), etapa.id);
+    tocado();
+    return { ok: true, motivo: '' };
+  }
+
+  function devolver_etapa(ot_id, etapa_codigo, motivo) {
+    const etapa = Reglas.etapaPorCodigo(db, etapa_codigo);
+    if (!etapa) return { ok: false, motivo: 'La etapa "' + etapa_codigo + '" no existe.' };
+    const fila = db.ot_etapa.find((x) => x.ot_id === ot_id && x.etapa_id === etapa.id && !x.salio_at);
+    if (!fila) return { ok: false, motivo: 'Esa etapa no está abierta en esta orden.' };
+    if (!fila.terminada_at)
+      return { ok: false, motivo: 'Esa etapa no está terminada: no hay nada que devolver.' };
+    /* 🔴 SE EXIGE EL MOTIVO. Una devolución sin motivo deja al encargado
+       mirando la misma etapa abierta otra vez, sin saber qué se rehace. Es la
+       clase de rechazo que en el taller se termina resolviendo a gritos. */
+    const razon = String(motivo || '').trim();
+    if (razon.length < 5)
+      return { ok: false, motivo: 'Escribe por qué se devuelve: el encargado tiene que saber qué rehacer.' };
+    fila.terminada_at = null;
+    fila.terminada_por = null;
+    const quien = db.persona.find((x) => x.id === persona_actual);
+    registrarEvento(ot_id, 'etapa',
+      'Devuelto' + (quien ? ' por ' + nombreDe(quien) : '') + ': ' + razon, etapa.id);
     tocado();
     return { ok: true, motivo: '' };
   }
@@ -1477,7 +1665,7 @@ const Modelo = (function () {
     db.recepcion_correccion.push({
       id: nuevoId('rc'), recepcion_id: r.id, ot_id, version, fecha: ahora(),
       persona_id: persona_actual || null, motivo: String(motivo).trim(), cambios: hechos,
-      // La silueta anterior, entera. Sin esto, "se versiona" sería mentira en
+      // La silueta anterior, entera. Sin esto, "se versióna" sería mentira en
       // el único campo que es un dibujo.
       danos_antes: danosAntes
     });
@@ -1874,7 +2062,7 @@ const Modelo = (function () {
     return { ok: true, motivo: '', presupuesto_id: pid, numero_or };
   }
 
-  /* ── Presupuesto · líneas, versiones y envío ──────────────────────────
+  /* ── Presupuesto · líneas, versiónes y envío ──────────────────────────
      El presupuesto es VERSIONADO en vez de editable en el sitio: cuando la
      aseguradora rechaza y pide ajustar, se crea la versión 2 y la 1 queda
      intacta. Eso es lo que hace auditable la discusión con la compañía, y es
@@ -2015,7 +2203,7 @@ const Modelo = (function () {
       codigo: '', cantidad: 1, proveedor: '', precio_unitario: 0
     }, linea, {
       // El proveedor se normaliza SIEMPRE: es el campo donde el original
-      // guarda cuatro formas de escribir el mismo taller.
+      // guarda cuatro formás de escribir el mismo taller.
       proveedor: Reglas.normalizarProveedor(linea.proveedor)
     }));
     recalcularPresupuesto(pid);
@@ -2209,7 +2397,7 @@ const Modelo = (function () {
     if (Reglas.esTerminal(db, o.estado))
       return { ok: false, motivo: 'La orden ' + o.numero_ot + ' está cerrada.' };
     const corr = Reglas.siguienteCorrelativoOR(db, p.ot_id, p.id_reparacion);
-    // La version nueva CONSERVA la OR: es el mismo trabajo, discutido otra vez.
+    // La versión nueva CONSERVA la OR: es el mismo trabajo, discutido otra vez.
     // Por eso acá no se pregunta si la OR esta libre — no lo esta, y esta bien.
     const numero_or = Reglas.formatoOR(o.numero_ot, p.id_reparacion);
     const nid = nuevoId('pr');
@@ -2442,7 +2630,7 @@ const Modelo = (function () {
     return { ok: true, motivo: '' };
   }
 
-  /* ── Fotos, firmas y documentos ───────────────────────────────────────
+  /* ── Fotos, firmás y documentos ───────────────────────────────────────
      Acá va SOLO la ficha: id, orden, etapa, momento, tamaño y medidas. Los
      bytes viven en IndexedDB (ver media.js). En producción es la misma
      separación entre la fila en Postgres y el objeto en el bucket. */
@@ -3089,6 +3277,8 @@ const Modelo = (function () {
     tomar_etapa: 'tomar la etapa',
     cambiar_clave: 'el cambio de clave',
     asignar_responsable_ot: 'el responsable de la orden',
+    validar_etapa: 'la validación de la etapa',
+    devolver_etapa: 'la devolución de la etapa',
     soltar_etapa: 'soltar la etapa',
     fijar_fecha_compromiso: 'la fecha de entrega',
     registrar_salida: 'la salida del taller',
@@ -3162,6 +3352,8 @@ const Modelo = (function () {
     fijar_fecha_compromiso: 'etapa.asignar',
     cambiar_estado_ot: 'ot.editar',
     asignar_responsable_ot: 'ot.editar',
+    validar_etapa: 'etapa.validar',
+    devolver_etapa: 'etapa.validar',
     registrar_salida: 'salida.registrar',
     registrar_reingreso: 'salida.registrar',
     registrar_entrega: 'entrega.registrar',
@@ -3280,6 +3472,7 @@ const Modelo = (function () {
   // del sistema, no del vehículo, y no tienen por qué ensuciar su expediente.
   const OT_DEL_PRIMER_ARGUMENTO = [
     'asignar_etapas', 'asignar_responsable_ot', 'tomar_etapa', 'soltar_etapa',
+    'validar_etapa', 'devolver_etapa',
     'finalizar_etapa', 'finalizar_etapas', 'quitar_etapa', 'fijar_fecha_compromiso',
     'registrar_salida', 'registrar_reingreso', 'cambiar_estado_ot', 'registrar_entrega',
     'programar_entrega', 'corregir_recepcion',
@@ -3366,6 +3559,7 @@ const Modelo = (function () {
     // operación
     crear_ot_desde_recepcion, asignar_etapas, finalizar_etapa, finalizar_etapas, quitar_etapa,
     tomar_etapa, soltar_etapa, miTrabajo, asignar_responsable_ot,
+    validar_etapa, devolver_etapa, porValidar, cargaDelEquipo,
     personasParaEtapa, destinatarios, fijar_fecha_compromiso,
     registrar_salida, registrar_reingreso, cambiar_estado_ot, registrar_entrega,
     programar_entrega, corregir_recepcion, correccionesDeRecepcion,

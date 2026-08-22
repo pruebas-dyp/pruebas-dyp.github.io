@@ -93,51 +93,88 @@ function vAsignarEtapas(o) {
     return Modelo.personasParaEtapa(etapa.id);
   };
 
-  return `
-  <div class="grid-envoltorio"><table class="grid">
-    <thead><tr><th style="width:34px">N°</th><th>Etapa</th><th style="width:32%">Responsable</th>
-      <th>Aplica</th><th>Situación</th><th></th></tr></thead>
-    <tbody>${ETAPAS.map((e) => {
-      const a = enc(e.codigo);
-      const gente = gentePara(e.codigo);
-      return '<tr><td style="text-align:center">' +
-        '<input type="checkbox" data-asignar="' + esc(e.codigo) + '"' +
-          (a ? ' checked' : '') + (a && a.finalizada ? ' disabled' : '') + '></td>' +
-        '<td><i class="punto" style="background:' + e.color + '"></i><strong>' + esc(e.nombre) + '</strong></td>' +
-        /* Ya asignada: el encargado es un dato, y cambiarlo es tomar la etapa,
-           que se hace en Finalizar. Acá se muestra quién la tiene. */
-        '<td>' + (a
-          ? (a.responsable
-              ? '<span>' + esc(a.responsable) + '</span>'
-              : '<span style="color:var(--gris-2)">sin tomar todavía</span>')
-          /* El desplegable existe en el DOM desde el arranque pero NO se ve
-             hasta que se marca la casilla, que es como aparece en el original.
-             Se oculta en vez de crearse al vuelo para no perder lo elegido si
-             alguien desmarca y vuelve a marcar, y para que el guardado lea
-             siempre del mismo sitio. */
-          : '<span class="resp-etapa' + '" style="display:none">' +
-            (gente.length
-              ? '<select data-respasignar="' + esc(e.codigo) + '">' +
-                '<option value="">Seleccionar encargado</option>' +
-                gente.map((p) => '<option value="' + esc(p.id) + '">' + esc(p.nombre) + '</option>').join('') +
-                '</select>'
-              : '<span class="et ambar" title="Se habilita en la ficha de cada persona">' +
-                'Nadie habilitado para esta etapa</span>') + '</span>') + '</td>' +
-        '<td>' + (e.opcional
-          ? '<span class="et ambar" title="Un tapabarro o un espejo no pasa por mecánica">no siempre</span>'
-          : '<span class="et gris">siempre</span>') + '</td>' +
-        '<td>' + (!a ? '<span style="color:var(--gris-2)">sin asignar</span>'
-          : a.finalizada ? '<span class="et verde">cerrada ' + fFechaHora(a.finalizadaAt) + '</span>'
-          : '<span class="et azul">abierta</span>') + '</td>' +
-        '<td>' + (a && !a.finalizada
-          ? '<button class="btn secundario chico" data-quitaretapa="' + esc(e.codigo) + '">Quitar</button>' : '') +
-        '</td></tr>';
-    }).join('')}</tbody>
-  </table></div>
+  /* La carga de cada persona AHORA, para que el que reparte no reparta a
+     ciegas. No es un tope —Marco fue explícito en que no hay límite de autos
+     por persona—: es información para decidir. */
+  const carga = Modelo.cargaDelEquipo();
+  const cuantoTiene = (id) => (carga.get(id) || { abiertas: 0 }).abiertas;
 
-  <div style="margin-top:11px;display:flex;gap:8px;align-items:center">
-    <button class="btn" id="btn-asignar">Asignar las marcadas</button>
-    <span class="pie-nota" style="margin:0">Una etapa ya cerrada no se puede desmarcar: el historial no se edita.</span>
+  const seleccionable = ETAPAS.filter((e) => !enc(e.codigo));
+  const yaPuestas = ETAPAS.filter((e) => enc(e.codigo));
+
+  return `
+  <div class="asignar">
+    ${yaPuestas.length ? `
+    <div class="ya-asignadas">
+      <h3 class="tit-grupo">Ya asignadas<span class="cuantas">${yaPuestas.length}</span></h3>
+      <div class="tareas">${yaPuestas.map((e) => {
+        const a = enc(e.codigo);
+        return `
+        <article class="tarea${a.esperandoValidacion ? ' esperando' : ''}${a.finalizada ? ' cerrada' : ''}">
+          <div class="franja" style="background:${e.color}"></div>
+          <div class="tarea-cuerpo">
+            <div class="tarea-alto">
+              <span class="etapa"><i class="punto" style="background:${e.color}"></i>${esc(e.nombre)}</span>
+              <span class="plazo ${a.finalizada ? 'listo' : (a.esperandoValidacion ? 'espera' : '')}">${a.finalizada
+                ? 'cerrada' : (a.esperandoValidacion ? 'esperando visto bueno' : 'en curso')}</span>
+            </div>
+            <div class="tarea-pie">
+              <span>${a.responsable
+                ? 'La hace <strong>' + esc(a.responsable) + '</strong>'
+                : '<em>sin encargado todavía</em>'}</span>
+              ${a.asignadaPor ? '<span>La asignó ' + esc(a.asignadaPor) +
+                (a.asignadaAt ? ' el ' + fFecha(a.asignadaAt) : '') + '</span>' : ''}
+              ${a.finalizada && a.validadaPor
+                ? '<span>Aceptada por ' + esc(a.validadaPor) + '</span>' : ''}
+            </div>
+            ${!a.finalizada ? `<div class="tarea-botones">
+              <button class="btn secundario" data-quitaretapa="${esc(e.codigo)}">Quitar</button>
+            </div>` : ''}
+          </div>
+        </article>`;
+      }).join('')}</div>
+    </div>` : ''}
+
+    ${seleccionable.length ? `
+    <div class="por-asignar">
+      <h3 class="tit-grupo">Agregar etapas a este vehículo</h3>
+      <p class="pie-nota" style="margin:0 0 9px">Marca las que aplican y elige quién las hace.
+        Entre paréntesis, cuántas etapas tiene cada uno abiertas ahora — no es un tope, es
+        para repartir sabiendo.</p>
+      <div class="tareas">${seleccionable.map((e) => {
+        const gente = gentePara(e.codigo);
+        return `
+        <label class="tarea elegible" for="asig-${esc(e.codigo)}">
+          <div class="franja" style="background:${e.color}"></div>
+          <div class="tarea-cuerpo">
+            <div class="tarea-alto">
+              <span class="etapa">
+                <input type="checkbox" id="asig-${esc(e.codigo)}" data-asignar="${esc(e.codigo)}">
+                <i class="punto" style="background:${e.color}"></i>${esc(e.nombre)}</span>
+              ${e.opcional
+                ? '<span class="plazo" title="Un tapabarro o un espejo no pasa por mecánica">no siempre</span>'
+                : ''}
+            </div>
+            <div class="elige-quien">
+              ${gente.length
+                ? '<select data-respasignar="' + esc(e.codigo) + '">' +
+                  '<option value="">Sin encargado por ahora</option>' +
+                  gente.map((per) => '<option value="' + esc(per.id) + '">' + esc(per.nombre) +
+                    ' (' + cuantoTiene(per.id) + ')</option>').join('') + '</select>'
+                : '<span class="et ambar" title="Se habilita en la ficha de cada persona">' +
+                  'Nadie habilitado para esta etapa</span>'}
+            </div>
+          </div>
+        </label>`;
+      }).join('')}</div>
+      <div class="pie-asignar">
+        <button class="btn" id="btn-asignar">Asignar las marcadas</button>
+        <span class="pie-nota" style="margin:0">Queda registrado quién asignó y cuándo.
+          Una etapa ya cerrada no se puede desmarcar: el historial no se edita.</span>
+      </div>
+    </div>` : `
+    <div class="vacio"><div class="titulo">Este vehículo ya tiene sus nueve etapas</div>
+      <div class="texto">No queda ninguna por agregar.</div></div>`}
   </div>`;
 }
 
@@ -237,28 +274,15 @@ function pEtapas(o) {
     ui.ficha.modoEtapas = b.dataset.modoetapa; refrescarFicha();
   }));
 
-  /* 🔶 EL ENCARGADO APARECE AL MARCAR LA ETAPA, no antes (15-08-2026). Pedido
-     del cliente: *"cuando apriete una etapa ahí te deje poner el asignado"*.
-
-     Con los nueve desplegables a la vista la pantalla pide nueve decisiones
-     cuando en un vehículo aplican dos o tres. Mostrando solo el de la fila
-     marcada, la pantalla pregunta una cosa a la vez y en el orden en que se
-     piensa: primero qué se le hace al auto, después quién lo hace.
-
-     No se repinta la tabla: se muestra la celda que corresponde. Repintar
-     perdería el resto de las casillas marcadas, que es justo lo que se está
-     armando. */
+  /* El desplegable del encargado ya NO se esconde: en la tarjeta vive siempre
+     a la vista, debajo del nombre de la etapa, con la carga de cada persona al
+     lado. Lo unico que queda es llevar el foco: al marcar la etapa, lo
+     siguiente que hay que contestar es quien la hace. */
   document.querySelectorAll('[data-asignar]').forEach((c) => {
-    const fila = c.closest('tr');
-    const zona = fila && fila.querySelector('.resp-etapa');
-    if (!zona) return;
-    const refrescar = () => { zona.style.display = c.checked ? '' : 'none'; };
-    refrescar();
+    const tarjeta = c.closest('.tarea');
+    if (!tarjeta) return;
     c.addEventListener('change', () => {
-      refrescar();
-      // Al marcarla, el foco se va al desplegable: es lo siguiente que hay que
-      // contestar, y ahorra ir a buscarlo con el mouse en una tabla de nueve.
-      const sel = zona.querySelector('select');
+      const sel = tarjeta.querySelector('select');
       if (c.checked && sel) sel.focus();
     });
   });

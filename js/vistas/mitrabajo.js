@@ -24,6 +24,159 @@
       todos. Es desarrollo nuevo y se cotiza aparte.
    ──────────────────────────────────────────────────────────────────────── */
 
+
+
+/* ══ LA BANDEJA DEL QUE VALIDA ═════════════════════════════════════════
+   Pedido de Marco el 22-08-2026: *"el jefe de taller o el que revisa debe
+   poder validar el termino, aceptarlo"*.
+
+   Es la contraparte exacta de la tarjeta del operario. Va arriba de todo en la
+   pantalla del jefe porque es lo unico que BLOQUEA: mientras no la revise, el
+   vehiculo no avanza aunque el trabajo este hecho. Un auto listo hace tres
+   dias que nadie mira es plata detenida en el patio.
+
+   Dos salidas, y las dos a la vista: aceptar o devolver. Un revisor que solo
+   puede aceptar no esta revisando, esta firmando. */
+function vPorValidar() {
+  if (!Modelo.puede('etapa.validar')) return '';
+  const filas = Modelo.porValidar();
+  if (!filas.length) {
+    return `
+    <div class="panel">
+      <div class="cab"><div><h2>${ico('check', 'g')}Terminadas esperando tu visto bueno</h2>
+        <div class="desc">Nadie tiene trabajo esperando revisión</div></div>
+        <span class="et verde">al día</span></div>
+    </div>`;
+  }
+  const esperaLarga = filas.filter((x) => x.diasEsperando >= 2).length;
+  return `
+  <div class="panel destacado">
+    <div class="cab"><div><h2>${ico('check', 'g')}Terminadas esperando tu visto bueno</h2>
+      <div class="desc">Hasta que las aceptes, el vehículo no avanza. La que lleva más
+        esperando va primero</div></div>
+      <span class="et ${esperaLarga ? 'roja' : 'ambar'}">${filas.length} por revisar</span></div>
+    <div class="cuerpo">
+      <div class="tareas">${filas.map((x) => `
+        <article class="tarea validar${x.diasEsperando >= 2 ? ' esperando' : ''}">
+          <div class="franja" style="background:${esc(x.color || 'var(--acento)')}"></div>
+          <div class="tarea-cuerpo">
+            <div class="tarea-alto">
+              <span class="etapa"><i class="punto" style="background:${esc(x.color)}"></i>${esc(x.etapa)}</span>
+              <span class="plazo ${x.diasEsperando >= 2 ? 'tarde' : 'espera'}">${x.diasEsperando === 0
+                ? 'terminada hoy'
+                : 'espera ' + x.diasEsperando + (x.diasEsperando === 1 ? ' día' : ' días')}</span>
+            </div>
+            <div class="tarea-auto">
+              <span class="patente">${esc(x.patente)}</span>
+              <span class="veh">${esc([x.marca, x.modelo].filter(Boolean).join(' ') || '')}</span>
+              <span class="ot">OT ${x.numeroOT}</span>
+            </div>
+            <div class="tarea-pie">
+              <span>La terminó <strong>${esc(x.quienTermino || 'sin encargado')}</strong>
+                el ${fFecha(x.terminadaAt)}</span>
+              ${x.diasDeLaEtapa !== null
+                ? '<span>' + x.diasDeLaEtapa + (x.diasDeLaEtapa === 1 ? ' día' : ' días') + ' en la etapa</span>'
+                : ''}
+              ${x.asignadaPor ? '<span>La asignó ' + esc(x.asignadaPor) + '</span>' : ''}
+            </div>
+            <div class="tarea-botones">
+              <button class="btn" data-mt-validar="${esc(x.ot_id)}|${esc(x.etapaCodigo)}">Aceptar</button>
+              <button class="btn secundario" data-mt-devolver="${esc(x.ot_id)}|${esc(x.etapaCodigo)}">Devolver</button>
+              <button class="btn secundario" data-mt-abrir="${esc(x.numeroOT)}">Ver orden</button>
+            </div>
+          </div>
+        </article>`).join('')}</div>
+    </div>
+  </div>`;
+}
+
+/* ══ LO QUE VE EL ASIGNADO ═════════════════════════════════════════════
+   Pedido de Marco el 22-08-2026: *"donde ve el asignado quiero que quede
+   super claro para el"*.
+
+   Antes esto era una tabla de nueve columnas. Una tabla sirve para COMPARAR
+   filas; el que esta en pintura no compara nada: mira lo suyo, elige cual
+   agarra ahora y lo cierra — en un celular, con las manos sucias, entre dos
+   autos. Por eso son tarjetas.
+
+   ⚠️ Y NO es una agenda por horario. Marco lo corrigio explicito: *"no es que
+   tenga un horario y todo, sino que es como la trazabilidad de cuando se le
+   asigno nomas"*, y tampoco hay tope de cuantos autos puede tener alguien a
+   la vez. Lo que se agrupa es el ESTADO DEL CICLO, no el reloj:
+
+     · Por hacer                  — asignada, todavia no la termina
+     · Terminada, esperando visto — el jefe todavia no la acepta
+
+   Ese segundo grupo es el que hace que el sistema no mienta: «terminado» por
+   el operario no es lo mismo que «revisado». */
+
+/* Una tarjeta de trabajo. `mia` distingue lo que la persona ya tiene entre
+   manos de lo que todavia no le asignaron. */
+function tarjetaTrabajo(x, mia, reparteElJefe) {
+  const esperando = !!x.esperandoValidacion;
+  return '<article class="tarea' + (esperando ? ' esperando' : '') + '">' +
+    '<div class="franja" style="background:' + esc(x.color || 'var(--acento)') + '"></div>' +
+    '<div class="tarea-cuerpo">' +
+      '<div class="tarea-alto">' +
+        '<span class="etapa"><i class="punto" style="background:' + esc(x.color) + '"></i>' +
+          esc(x.etapa) + '</span>' +
+        (esperando ? '<span class="plazo espera">esperando visto bueno</span>' : '') +
+      '</div>' +
+      '<div class="tarea-auto">' +
+        '<span class="patente">' + esc(x.patente) + '</span>' +
+        '<span class="veh">' + esc([x.marca, x.modelo].filter(Boolean).join(' ') || '') + '</span>' +
+        '<span class="ot">OT ' + x.numeroOT + '</span>' +
+      '</div>' +
+      '<div class="tarea-pie">' +
+        (mia && x.asignadaPor
+          ? '<span>Te la asignó <strong>' + esc(x.asignadaPor) + '</strong>' +
+            (x.desde ? ' el ' + fFecha(x.desde) : '') + '</span>'
+          : '<span>Sin encargado todavía</span>') +
+        (mia && x.diasDesdeAsignada !== null
+          ? '<span>' + x.diasDesdeAsignada + (x.diasDesdeAsignada === 1 ? ' día' : ' días') + ' conmigo</span>' : '') +
+        (esperando && x.terminadaAt
+          ? '<span>Terminada el ' + fFecha(x.terminadaAt) + '</span>' : '') +
+        (x.repuestosPendientes
+          ? '<span class="et ambar">' + x.repuestosPendientes + ' repuesto' +
+            (x.repuestosPendientes === 1 ? '' : 's') + ' por llegar</span>' : '') +
+        (!x.enTaller ? '<span class="et gris">el auto está afuera</span>' : '') +
+      '</div>' +
+      '<div class="tarea-botones">' +
+        (mia
+          ? (esperando
+              /* Terminada y esperando: no hay boton de cerrar, porque cerrar
+                 ya no depende de esta persona. Se dice de quien depende. */
+              ? '<span class="espera">La revisa el jefe de taller</span>' +
+                '<button class="btn secundario" data-mt-abrir="' + esc(x.numeroOT) + '">Ver orden</button>'
+              : '<button class="btn" data-mt-cerrar="' + esc(x.ot_id) + '|' + esc(x.etapaCodigo) + '">Terminé</button>' +
+                '<button class="btn secundario" data-mt-soltar="' + esc(x.ot_id) + '|' + esc(x.etapaCodigo) + '">Soltar</button>' +
+                '<button class="btn secundario" data-mt-abrir="' + esc(x.numeroOT) + '">Ver orden</button>')
+          : (reparteElJefe
+              ? '<span class="espera">La asigna el jefe de taller</span>'
+              : '<button class="btn secundario" data-mt-tomar="' + esc(x.ot_id) + '|' + esc(x.etapaCodigo) + '">Tomar</button>')) +
+      '</div>' +
+    '</div></article>';
+}
+
+/* Las tarjetas agrupadas por estado del ciclo. El grupo vacio no se dibuja: un
+   rotulo sobre nada se lee como que algo fallo. */
+function gruposDeTrabajo(lista, mia, reparteElJefe) {
+  const grupos = [
+    { tit: mia ? 'Por hacer' : '', dice: '', suyas: lista.filter((x) => !x.esperandoValidacion) },
+    { tit: 'Terminadas, esperando el visto bueno', dice: 'El jefe todavía no las acepta',
+      suyas: lista.filter((x) => x.esperandoValidacion) }
+  ];
+  return grupos.map((g) => {
+    if (!g.suyas.length) return '';
+    return '<div class="grupo-tareas">' +
+      (g.tit ? '<h3 class="tit-grupo">' + esc(g.tit) +
+        '<span class="cuantas">' + g.suyas.length + '</span>' +
+        (g.dice ? '<span class="dice">' + esc(g.dice) + '</span>' : '') + '</h3>' : '') +
+      '<div class="tareas">' + g.suyas.map((x) => tarjetaTrabajo(x, mia, reparteElJefe)).join('') + '</div>' +
+    '</div>';
+  }).join('');
+}
+
 function vMiTrabajo() {
   const yo = Modelo.personaActual();
 
@@ -41,29 +194,9 @@ function vMiTrabajo() {
   }
 
   const t = Modelo.miTrabajo(yo.id);
-
-  /* "Ver orden" solo en lo que YA es mío. En lo disponible no aparece, y no es
-     un detalle: el alcance del rol operario recorta la ficha a los vehículos
-     que tiene tomados, así que ese botón, en esa lista, llevaría a la pantalla
-     que dice "esta orden no es tuya". Se toma primero, se mira después. */
-  const fila = (x, mia) =>
-    '<tr class="fila' + (x.sobreMeta ? ' alerta' : '') + '">' +
-    '<td class="num"><strong>' + x.numeroOT + '</strong></td>' +
-    '<td><span class="patente">' + esc(x.patente) + '</span></td>' +
-    '<td>' + esc([x.marca, x.modelo].filter(Boolean).join(' ') || '—') + '</td>' +
-    '<td><i class="punto" style="background:' + x.color + '"></i>' + esc(x.etapa) + '</td>' +
-    '<td class="num">' + x.dias + (x.sobreMeta ? ' <span class="et roja">sobre la meta</span>' : '') + '</td>' +
-    '<td>' + (x.repuestosPendientes
-      ? '<span class="et ambar">' + x.repuestosPendientes + ' por llegar</span>'
-      : '<span class="et verde">al día</span>') + '</td>' +
-    '<td>' + (x.enTaller ? '<span class="et verde">en taller</span>' : '<span class="et gris">afuera</span>') + '</td>' +
-    '<td style="white-space:nowrap">' +
-      (mia
-        ? '<button class="btn" data-mt-cerrar="' + esc(x.ot_id) + '|' + esc(x.etapaCodigo) + '">Terminé</button> ' +
-          '<button class="btn secundario" data-mt-soltar="' + esc(x.ot_id) + '|' + esc(x.etapaCodigo) + '">Soltar</button>' +
-          ' <button class="btn secundario" data-mt-abrir="' + esc(x.numeroOT) + '">Ver orden</button>'
-        : '<button class="btn secundario" data-mt-tomar="' + esc(x.ot_id) + '|' + esc(x.etapaCodigo) + '">Tomar</button>') +
-    '</td></tr>';
+  /* ¿En este taller el trabajo se toma o se reparte? Es un parametro, y cambia
+     lo que esta pantalla OFRECE, no solo lo que dice. */
+  const reparteElJefe = !Reglas.autoAsignacion(Modelo.base()) && !Modelo.puede('etapa.asignar');
 
   const verCliente = Modelo.puede('ficha.completa');
   const puedePresupuestar = Modelo.puede('presupuesto.crear');
@@ -74,7 +207,25 @@ function vMiTrabajo() {
      Se dibujan únicamente si la cuenta sabe hacer algo con las manos. */
   const conEtapas = Modelo.base().persona_etapa.some((h) => h.persona_id === yo.id);
 
+  /* La tira de arriba: lo primero que la persona tiene que saber al abrir el
+     telefono es cuanto tiene y cuanto ya entrego. */
+  const esperandoVisto = t.mias.filter((x) => x.esperandoValidacion).length;
+  const porHacer = t.mias.length - esperandoVisto;
+  const resumen = conEtapas ? `
+  <div class="tira-agenda">
+    <div class="dato ${porHacer ? 'aviso' : ''}">
+      <span class="cifra">${porHacer}</span><span class="rot">por hacer</span></div>
+    <div class="dato">
+      <span class="cifra">${esperandoVisto}</span><span class="rot">esperando visto bueno</span></div>
+    <div class="dato">
+      <span class="cifra">${t.disponibles.length}</span><span class="rot">${reparteElJefe
+        ? 'sin asignar' : 'para tomar'}</span></div>
+    <div class="dato">
+      <span class="cifra">${t.aCargo.length}</span><span class="rot">a mi cargo</span></div>
+  </div>` : '';
+
   return `
+  ${vPorValidar()}
   ${t.aCargo.length ? `
   <div class="panel">
     <div class="cab"><div><h2>${ico('auto', 'g')}Vehículos a mi cargo</h2>
@@ -108,17 +259,21 @@ function vMiTrabajo() {
   </div>` : ''}
 
   ${conEtapas ? `
-  <div class="panel">
-    <div class="cab"><div><h2>${ico('taller', 'g')}Lo que tengo entre manos</h2>
-      <div class="desc">El vehículo que lleva más días parado va primero</div></div></div>
-    <div class="grid-envoltorio"><table class="grid">
-      <thead><tr><th>OT</th><th>Patente</th><th>Vehículo</th><th>Mi etapa</th><th>Días</th>
-        <th>Repuestos</th><th>Dónde está</th><th style="min-width:230px">Acción</th></tr></thead>
-      <tbody>${t.mias.length ? t.mias.map((x) => fila(x, true)).join('')
-        : '<tr><td colspan="8"><div class="vacio"><div class="titulo">No tienes nada tomado</div>' +
-          '<div class="texto">Abajo está lo que puedes tomar según las etapas que tienes habilitadas.</div>' +
-          '</div></td></tr>'}</tbody>
-    </table></div>
+  ${resumen}
+  <div class="panel destacado">
+    <div class="cab"><div><h2>${ico('taller', 'g')}Mi trabajo</h2>
+      <div class="desc">Lo que me asignaron. Al terminar, el jefe lo revisa y recién ahí la orden avanza</div></div>
+      <span class="et ${esperandoVisto ? 'azul' : 'verde'}">${esperandoVisto
+        ? esperandoVisto + ' esperando visto bueno' : 'nada pendiente de revisión'}</span></div>
+    <div class="cuerpo">
+      ${t.mias.length
+        ? gruposDeTrabajo(t.mias, true, reparteElJefe)
+        : '<div class="vacio">' + ico('check') + '<div class="titulo">No tienes nada asignado</div>' +
+          '<div class="texto">' + (reparteElJefe
+            ? 'Cuando el jefe de taller te asigne una etapa, aparece acá con quién te la dio y cuándo.'
+            : 'Abajo está lo que puedes tomar según las etapas que tienes habilitadas.') +
+          '</div></div>'}
+    </div>
     ${t.mias.length && Modelo.puede('foto.cargar') ? `
     <div class="cuerpo">
       <fieldset class="bloque"><legend>Foto del avance</legend>
@@ -134,21 +289,19 @@ function vMiTrabajo() {
   </div>
 
   <div class="panel">
-    <div class="cab"><div><h2>${ico('nuevo', 'g')}Disponible para tomar</h2>
-      <div class="desc">Etapas abiertas que nadie tomó, de las que sabes hacer</div></div></div>
-    <div class="grid-envoltorio"><table class="grid">
-      <thead><tr><th>OT</th><th>Patente</th><th>Vehículo</th><th>Etapa</th><th>Días</th>
-        <th>Repuestos</th><th>Dónde está</th><th style="min-width:230px">Acción</th></tr></thead>
-      ${/* Iba cortada en 40 y sin decirlo en ninguna parte: el que no veía su
-            trabajo en la lista concluía que no había trabajo. Va entera; si
-            pasa de 50 aparece el pie con el selector. */''}
-      <tbody>${t.disponibles.length ? t.disponibles.map((x) => fila(x, false)).join('')
-        : '<tr><td colspan="8"><div class="vacio"><div class="titulo">Nada disponible ahora</div>' +
-          '<div class="texto">Cuando se reciba un vehículo que pase por ' +
-          esc(Modelo.sesionesPosibles().find((p) => p.id === (Modelo.personaActual() || {}).id)
-            ? (Modelo.sesionesPosibles().find((p) => p.id === Modelo.personaActual().id).etapas.join(', ') || 'tus etapas')
-            : 'tus etapas') + ', aparece acá.</div></div></td></tr>'}</tbody>
-    </table></div>
+    <div class="cab"><div><h2>${ico('nuevo', 'g')}${reparteElJefe
+      ? 'Lo que viene' : 'Disponible para tomar'}</h2>
+      <div class="desc">${reparteElJefe
+        ? 'Etapas abiertas de las que sabes hacer, todavía sin encargado. En este taller las reparte ' +
+          'el jefe: están acá para saber qué viene, no para agarrarlas'
+        : 'Etapas abiertas que nadie tomó, de las que sabes hacer'}</div></div></div>
+    <div class="cuerpo">
+      ${t.disponibles.length
+        ? gruposDeTrabajo(t.disponibles, false, reparteElJefe)
+        : '<div class="vacio">' + ico('auto') + '<div class="titulo">' +
+          (reparteElJefe ? 'Nada esperando asignación' : 'Nada disponible ahora') + '</div>' +
+          '<div class="texto">Cuando entre un vehículo que pase por tus etapas, aparece acá.</div></div>'}
+    </div>
   </div>` : ''}
 
   ${!conEtapas && !t.aCargo.length ? `
@@ -174,13 +327,35 @@ function pMiTrabajo() {
     ejecutar(() => Modelo.soltar_etapa(ot, etapa), 'La devolviste a la lista.');
   }));
 
-  /* "Terminé" cierra la etapa a nombre de quien la tenía. Es la misma
-     operación que usa el jefe de taller desde la ficha, con las mismas reglas:
-     si la etapa exige repuestos y faltan, se rechaza y se explica. */
+  /* "Termine" DECLARA terminado. Con la validación encendida no cierra la
+     etapa: la deja esperando el visto bueno del jefe, y el aviso lo dice —si
+     dijera "cerrada" el operario se iria creyendo que el auto avanzo—. Si
+     quien aprieta es el propio revisor, se cierra en el acto. */
   document.querySelectorAll('[data-mt-cerrar]').forEach((b) => b.addEventListener('click', () => {
     const [ot, etapa] = par(b, 'mtCerrar');
+    const cierraSolo = !Reglas.exigeValidacion(Modelo.base()) || Modelo.puede('etapa.validar');
     ejecutar(() => Modelo.finalizar_etapa(ot, etapa, yo.id),
-      'Etapa cerrada. La orden ya avanzó en la torre.');
+      cierraSolo
+        ? 'Etapa cerrada. La orden ya avanzó en la torre.'
+        : 'Quedó terminada, esperando el visto bueno del jefe de taller.');
+  }));
+
+  /* ── Las dos salidas de la revisión ── */
+  document.querySelectorAll('[data-mt-validar]').forEach((b) => b.addEventListener('click', () => {
+    const [ot, etapa] = par(b, 'mtValidar');
+    ejecutar(() => Modelo.validar_etapa(ot, etapa),
+      'Aceptada. La orden ya avanzó en la torre.');
+  }));
+
+  document.querySelectorAll('[data-mt-devolver]').forEach((b) => b.addEventListener('click', () => {
+    const [ot, etapa] = par(b, 'mtDevolver');
+    /* El motivo se PIDE, no es opcional: una devolucion sin motivo deja al
+       encargado mirando la misma etapa otra vez sin saber que rehacer. La
+       regla lo exige igual; esto es para no hacerle dar el viaje en vano. */
+    const razon = prompt('¿Por qué se devuelve? El encargado tiene que saber qué rehacer.');
+    if (razon === null) return;
+    ejecutar(() => Modelo.devolver_etapa(ot, etapa, razon),
+      'Devuelta al encargado con el motivo.');
   }));
 
   document.querySelectorAll('[data-mt-abrir]').forEach((b) => b.addEventListener('click', () =>

@@ -1493,6 +1493,81 @@ const Pruebas = (function () {
         });
       })();
 
+      /* ── Terminar NO es cerrar ────────────────────────────────────────
+         🔴 LA REGLA NUEVA DEL 22-08-2026, y la mas facil de romper sin darse
+         cuenta: alcanza con que alguien vuelva a poner `salio_at` dentro de
+         `finalizar_etapa` para que el visto bueno del jefe deje de existir y
+         nadie lo note — la etapa se cierra igual, la orden avanza igual, y el
+         control simplemente ya no esta.
+
+         Marco lo pidio asi: el encargado declara terminado, el jefe acepta, y
+         hasta entonces el vehiculo NO avanza. */
+      (function () {
+        const o = abiertaCualquiera();
+        const etapa = db.etapa.find((e) => e.codigo === 'desarme');
+        // Escenario limpio: una etapa asignada a un operario, sin cerrar.
+        db.ot_etapa = db.ot_etapa.filter((x) => x.ot_id !== o.id);
+        /* Un operario DE VERDAD: alguien con el rol de operario, no el primer
+           trabajador de la lista -que es Recepcion y si puede repartir-. */
+        const rolOper = (db.persona_rol.find((r) => r.rol_id === 'ro-3') || {}).persona_id;
+        const oper = db.persona.find((p) => p.id === rolOper) ||
+                     db.persona.find((p) => p.tipo === 'trabajador');
+        if (!db.persona_etapa.some((h) => h.persona_id === oper.id && h.etapa_id === etapa.id)) {
+          db.persona_etapa.push({ persona_id: oper.id, etapa_id: etapa.id });
+        }
+        db.ot_etapa.push({ id: 'oe-val', ot_id: o.id, etapa_id: etapa.id,
+          asignada_at: HOY, salio_at: null, persona_id: oper.id, observacion: '',
+          asignada_por: 'pe-t-2', terminada_at: null, terminada_por: null,
+          validada_at: null, validada_por: null });
+
+        // El operario dice que termino. No puede validar.
+        /* Solo la persona: `fijar_rol_actual` borra la sesion de persona, y la
+           etapa quedaba "tomada por otro" contra un `persona_actual` vacio. */
+        Modelo.fijar_persona_actual(oper.id);
+        const rTerm = Modelo.finalizar_etapa(o.id, 'desarme', oper.id);
+        const fila = db.ot_etapa.find((x) => x.id === 'oe-val');
+        const quedoAbierta = !!fila && !fila.salio_at && !!fila.terminada_at;
+
+        // El jefe la acepta: recien ahi se cierra.
+        Modelo.fijar_persona_actual(null);
+        Modelo.fijar_rol_actual('ro-6');
+        const rVal = Modelo.validar_etapa(o.id, 'desarme');
+        const cerroAlValidar = !!fila.salio_at && !!fila.validada_at;
+
+        push({
+          nombre: '🔴 Terminar una etapa no la cierra: la cierra quien la valida',
+          intento: 'Un operario declara terminada su etapa y despues el jefe la acepta',
+          esperado: 'Al terminar queda esperando revision; recien al aceptarla se cierra',
+          paso: rTerm.ok && quedoAbierta && rVal.ok && cerroAlValidar,
+          detalle: !rTerm.ok ? 'No dejo declarar terminada: ' + rTerm.motivo
+            : (!quedoAbierta ? 'Se CERRO al declarar terminada: el visto bueno del jefe no existe'
+              : (!rVal.ok ? 'No dejo validar: ' + rVal.motivo
+                : (!cerroAlValidar ? 'Al validar no quedo cerrada'
+                  : 'Terminada queda esperando; validada cierra y registra quien acepto')))
+        });
+      })();
+
+      /* Devolver sin motivo deja al encargado sin saber que rehacer. */
+      (function () {
+        const o = abiertaCualquiera();
+        const etapa = db.etapa.find((e) => e.codigo === 'desabolladura');
+        db.ot_etapa = db.ot_etapa.filter((x) => x.id !== 'oe-dev');
+        db.ot_etapa.push({ id: 'oe-dev', ot_id: o.id, etapa_id: etapa.id,
+          asignada_at: HOY, salio_at: null, persona_id: null, observacion: '',
+          asignada_por: 'pe-t-2', terminada_at: HOY, terminada_por: null,
+          validada_at: null, validada_por: null });
+        const r = Modelo.devolver_etapa(o.id, 'desabolladura', '');
+        const conMotivo = Modelo.devolver_etapa(o.id, 'desabolladura', 'Falta lijar el borde');
+        push({
+          nombre: 'Una etapa no se puede devolver sin decir por que',
+          intento: 'Devolver una etapa terminada con el motivo en blanco',
+          esperado: 'Rechazo pidiendo el motivo, y aceptacion cuando se escribe',
+          paso: !r.ok && conMotivo.ok,
+          detalle: r.ok ? 'La devolvio SIN motivo: el encargado no sabe que rehacer.'
+            : (conMotivo.ok ? r.motivo : 'Con motivo tampoco dejo: ' + conMotivo.motivo)
+        });
+      })();
+
       restaurarSesion();
       return res;
     });
