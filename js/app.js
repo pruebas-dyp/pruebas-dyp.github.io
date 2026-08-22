@@ -498,6 +498,8 @@ const HERRAMIENTAS_DEMO = [
     pie: 'El recorrido corto: qué mostrar y en qué orden' },
   { texto: 'Probar reglas de negocio', icono: 'check', accion: 'pruebas',
     pie: 'Cada prueba intenta algo prohibido y falla por la regla, con el motivo' },
+  { texto: 'Probar el flujo operacional', icono: 'refrescar', accion: 'flujo',
+    pie: 'Que lo cargado en una pantalla le llegue a la que tiene que enterarse' },
   { texto: 'Comprobar cifras de la demostración', icono: 'consolidado', accion: 'cifras',
     pie: 'Que los datos inventados sigan cuadrando con lo medido en el sistema real' },
   { texto: 'Adelantar la fecha del sistema 7 días', icono: 'reloj', accion: 'adelantar',
@@ -1080,6 +1082,34 @@ function ejecutarAccion(accion) {
         '<td style="color:var(--gris)">' + esc(x.intento) + '</td>' +
         '<td>' + esc(x.detalle) + '</td></tr>').join('') +
       '</tbody></table></div>');
+  }
+
+  /* El flujo operacional. Se agrupa por VIAJE —de qué pantalla a qué
+     pantalla— porque lo que se está comprobando no es una regla suelta sino
+     que la información llegue a quien tiene que enterarse. */
+  if (accion === 'flujo') {
+    const r = Flujo.correr();
+    const pasaron = r.filter((x) => x.paso).length;
+    let grupo = null;
+    const filas = r.map((x) => {
+      const cabeza = x.grupo !== grupo
+        ? (grupo = x.grupo, '<tr><td colspan="4" style="background:var(--fondo-2);font-weight:700;' +
+           'color:var(--azul)">' + esc(x.grupo) + '</td></tr>')
+        : '';
+      return cabeza +
+        '<tr><td>' + (x.paso ? '<span class="et verde">OK</span>' : '<span class="et roja">Falló</span>') +
+        '</td><td><strong>' + esc(x.nombre) + '</strong></td>' +
+        '<td style="color:var(--gris)">' + esc(x.viaje) + '</td>' +
+        '<td>' + esc(x.detalle) + '</td></tr>';
+    }).join('');
+    return dialogo('Flujo operacional · ' + pasaron + ' de ' + r.length + ' comprobaciones',
+      '<p class="pie-nota" style="margin:0 0 10px">No se comprueba acá si el sistema rechaza lo ' +
+      'prohibido —para eso están las reglas— sino que <strong>lo que se carga en una pantalla ' +
+      'le llegue a la que tiene que enterarse</strong>: el repuesto al bodeguero, la etapa a quien ' +
+      'la va a hacer, el vehículo entregado al histórico. Corre sobre una copia aislada.</p>' +
+      '<div class="grid-envoltorio"><table class="grid"><thead><tr>' +
+      '<th style="width:26px"></th><th>Qué tiene que pasar</th><th>El viaje</th>' +
+      '<th>Qué pasó</th></tr></thead><tbody>' + filas + '</tbody></table></div>');
   }
 
   if (accion === 'cifras') {
