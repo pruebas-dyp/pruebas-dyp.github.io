@@ -656,8 +656,15 @@ function recSelect(clave, rotulo, filas, opciones) {
    autocompletado, que ahí sí sirve y además deja escribir para filtrar. */
 function recTactil() {
   try {
-    return window.matchMedia('(pointer: coarse)').matches ||
-           window.matchMedia('(max-width: 860px)').matches;
+    // El dispositivo apuntador manda: si el principal es un dedo, es táctil,
+    // mida lo que mida la ventana.
+    if (window.matchMedia('(pointer: coarse)').matches) return true;
+    /* El ancho es sólo el respaldo, y **se exige que sea mayor que cero**: una
+       pestaña en segundo plano informa `innerWidth = 0`, y sin este resguardo un
+       computador de escritorio quedaba clasificado como celular y perdía el
+       autocompletado. Salió probando el 22-08-2026. */
+    const w = window.innerWidth;
+    return w > 0 && w <= 860;
   } catch (e) { return false; }   // navegador sin matchMedia: queda el de siempre
 }
 
