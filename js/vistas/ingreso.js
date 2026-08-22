@@ -90,6 +90,9 @@ const CSS_INGRESO = `
   .pie-ing .enlace{min-height:40px;font-size:13px;padding:8px 10px}
   .claves-demo table td{padding-top:8px;padding-bottom:8px}
   .claves-demo .tit button{min-height:36px;font-size:12.5px}
+  /* El boton que entra con una cuenta de demostracion: en un celular es EL
+     boton, el que aprieta quien recibe el link por primera vez, y medía 21 px. */
+  .claves-demo .entrar{min-height:38px;font-size:13px;padding:6px 10px}
 }
 `;
 
