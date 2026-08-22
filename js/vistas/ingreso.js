@@ -73,9 +73,23 @@ const CSS_INGRESO = `
 .claves-demo .entrar:hover{border-color:var(--acento);background:var(--acento-bg)}
 .claves-demo .aviso-demo{font-size:10px;color:var(--gris-2);margin-top:10px;line-height:1.5}
 
-@media (max-width:480px){
+/* La pantalla de ingreso trae su propia hoja, asi que la capa de toque de
+   estilos.css no la alcanza: hay que repetirla aca. Es la PRIMERA pantalla que
+   ve alguien que abre el link en el celular, y el enlace de las credenciales
+   de demostracion es lo que le deja entrar.
+
+   OJO: esto vive dentro de un template literal de JavaScript. Un acento grave
+   en un comentario CSS lo TERMINA y el archivo entero deja de cargar, sin
+   error visible: la funcion pantallaIngreso simplemente no existe y el sistema
+   arranca en la torre SIN PEDIR CLAVE. Aca se escribe sin acentos graves. */
+@media (max-width:860px), (pointer: coarse){
   .velo-ingreso{padding:20px 14px}
   .marca-ing .placa img{height:52px}
+  .tarjeta-ing input{height:44px;font-size:16px}
+  .tarjeta-ing .btn{height:46px;font-size:15px}
+  .pie-ing .enlace{min-height:40px;font-size:13px;padding:8px 10px}
+  .claves-demo table td{padding-top:8px;padding-bottom:8px}
+  .claves-demo .tit button{min-height:36px;font-size:12.5px}
 }
 `;
 

@@ -1357,16 +1357,61 @@ body.sin-desplazar { overflow: hidden; }
 .pista-desliza::before { content: '\2194\00a0'; color: var(--acento-texto); font-weight: 700; }
 @media (max-width: 860px) { .pista-desliza { display: block; } }
 
-/* ───────── Dedo, no mouse ─────────
-   No es cosa del ancho: una tablet de 1024 px se toca igual que un teléfono.
-   `pointer: coarse` pregunta por el aparato, que es lo correcto.
-   40 px de alto es el mínimo con el que un botón se acierta a la primera. */
-@media (pointer: coarse) {
-  .btn, button.btn, .herramientas button, .tabs button {
-    min-height: 40px; padding-top: 8px; padding-bottom: 8px;
+/* ═══════════════════════════════════════════════════════════════════════
+   LA CAPA DE TOQUE
+   ═══════════════════════════════════════════════════════════════════════
+   🔴 POR QUÉ EXISTE, Y POR QUÉ NO BASTABA `pointer: coarse` (21-08-2026).
+
+   Una auditoría que recorrió las 38 pantallas del sistema a 390 px encontró
+   **265 problemas**, y ninguno era de ancho: eran botones de 14 a 27 px de
+   alto y letra de 11 a 12 px. Es la densidad del ERP de escritorio, que en un
+   teléfono se traduce en errar el botón y no poder leer la casilla.
+
+   Las reglas estaban escritas, pero sólo bajo `@media (pointer: coarse)`, y
+   esa consulta la responde el APARATO: un navegador de escritorio angostado,
+   una tablet con teclado, o un emulador, contestan «fino» y la capa entera no
+   se aplicaba. Por eso ahora aplica con **cualquiera de las dos** condiciones:
+   pantalla chica O puntero grueso.
+
+   ⚠️ Y los selectores tienen que PESAR. `input { font-size: 16px }` no le gana
+   a `input[type=text] { font-size: 12px }` — un selector de atributo pesa más
+   que uno de elemento—, así que la casilla seguía en 12 px aunque la regla
+   estuviera ahí. Hay que repetir la forma con atributo. Lo mismo con `height`
+   fijo: `.btn` trae `height: 24px` y se necesita `height: auto` para que el
+   `min-height` mande. */
+@media (max-width: 860px), (pointer: coarse) {
+  /* 40 px es el mínimo con el que un botón se acierta a la primera. */
+  #contenido button, .velo button, .btn, button.btn,
+  .herramientas button, .tabs button, .chip, button.chip {
+    height: auto; min-height: 40px; font-size: 13px;
+    padding-top: 7px; padding-bottom: 7px;
   }
-  input, select, textarea { min-height: 40px; }
-  .nav a { padding-top: 10px; padding-bottom: 10px; }
+  /* La flecha que despliega una fila no crece: es una celda de la tabla, y
+     estirarla desalinea la fila entera. Se toca igual porque su celda sí
+     creció con el `padding` de más abajo. */
+  #contenido td.flecha-col button { min-height: 0; padding: 0; }
+
+  /* ⚠️ `input:not(...)` y NO una lista de `input[type=…]`. Un `<input>` sin
+     atributo `type` —que es la mitad de los del sistema: el buscador de
+     patente, el de cliente— NO casa `input[type=text]`, así que se quedaban en
+     21 px mientras los demás crecían. La forma negada los alcanza a todos y
+     de paso pesa más que cualquier regla de la densidad de escritorio.
+     Se dejan fuera los que no se tocan con el dedo como una casilla. */
+  input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=range]),
+  select, textarea {
+    /* 16 px no es estética: bajo ese tamaño Safari en iPhone hace zoom solo al
+       tocar la casilla y deja la pantalla corrida, sin volver. */
+    font-size: 16px; min-height: 40px;
+  }
+  input[type=search] { min-width: 0; }
+  /* El «Mostrar 100 ▾» del pie de las tablas trae su propio tamaño, más
+     específico que la regla de arriba, y se quedaba en 11 px. Es la casilla
+     con la que se decide cuánta data se ve: no puede ser la más chica de la
+     pantalla. */
+  .pie-grid .cuantas, .pie-grid .cuantas select { font-size: 13px; }
+  .pie-grid .cuantas select { min-height: 40px; padding: 4px 6px; }
+
+  .nav a { padding-top: 10px; padding-bottom: 10px; min-height: 40px; }
   table.grid td, table.grid th { padding-top: 8px; padding-bottom: 8px; }
   /* El tirador de la barra lateral no se agarra con el dedo y sólo estorba. */
   .sidebar .tirador { display: none; }

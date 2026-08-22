@@ -1616,6 +1616,35 @@ const Pruebas = (function () {
           });
           return cortados;
         })(), 0],
+      /* 🔴 QUE TODAS LAS PANTALLAS SE HAYAN CARGADO (21-08-2026).
+
+         Un acento grave dentro de un comentario CSS —en `ingreso.js`, donde el
+         CSS vive dentro de un template literal— TERMINÓ el literal y el archivo
+         entero dejó de cargar. El navegador no mostró ningún error: los otros
+         archivos siguieron cargando, la torre se pintó, y lo único que pasó fue
+         que `pantallaIngreso` ya no existía.
+
+         El resultado era el peor posible: **el sistema arrancaba en la Torre de
+         control, con todos los datos a la vista y sin pedir clave**. Un fallo
+         silencioso que se ve como si todo estuviera bien.
+
+         La trampa estaba documentada en `impresos.js` desde antes y aun así se
+         repitió, que es exactamente para lo que sirve una cifra: acordarse por
+         uno. Si un archivo de vista se rompe, esta cuenta deja de dar cero. */
+      ['Pantallas del sistema que no cargaron',
+        (function () {
+          const debe = ['pantallaIngreso', 'vTorre', 'vTaller', 'vPresupuesto', 'vBodega',
+            'vDocumentos', 'vHistorico', 'vConsolidado', 'vPersonal', 'vConfiguracion',
+            'vRecepcion', 'vEntrega', 'vMiTrabajo', 'vReporteria', 'vExpediente',
+            'vRepuestos', 'vDetenidos', 'mostrarImpreso', 'svgSilueta'];
+          /* Se pregunta por `window`, no evaluando el nombre: una `function`
+             de nivel superior en un script clásico SÍ queda colgada de
+             `window` —a diferencia de un `const`, que no—, así que alcanza
+             para saber si su archivo cargó. */
+          const donde = (typeof window !== 'undefined') ? window : globalThis;
+          return debe.filter((n) => typeof donde[n] !== 'function').length;
+        })(), 0],
+
       ['Repuestos nacidos de una línea que no es «cambio»',
         (function () {
           const proc = {};
