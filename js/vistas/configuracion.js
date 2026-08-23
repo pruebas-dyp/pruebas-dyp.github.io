@@ -1,28 +1,9 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   CONFIGURACIÓN — los catálogos del sistema.
+/* CONFIGURACIÓN — los catálogos del sistema.
 
-   Esta pantalla ES el producto. Todo lo demás es una réplica mejorada de algo
-   que ya existe; esto es lo único que se pidió y hoy no está:
+   Los once maestros que en el original están escritos en el código y acá se editan:
+   etapas, estados, compañías, motivos de detención, asuntos de bitácora y los demás.
 
-     "Las etapas tú las creas, pero esto es fijo. Hoy el sistema actual no es
-      escalable. Solamente puedo cambiar nombres y maestros. No puedo crear
-      maestros."                                              [00:08:08]
-
-   Contra qué se compara, medido en el sistema real:
-     · Configuración tiene 7 tarjetas y TRES apuntan a sí mismas (Colores,
-       Prioridades, Tipos de Ingreso). No llevan a ninguna parte.
-     · No existe "Administrar Etapas": las 9 etapas son casillas con `name`
-       fijo en el HTML del formulario de personal.
-     · No existe "Administrar Alertas", aunque se cree que sí: los
-       seis asuntos de la bitácora están escritos en el código.
-     · El maestro de estados SÍ se puede editar, pero el formulario de ingreso
-       no lo lee: por eso conviven cuatro vocabularios para lo mismo.
-     · No hay integridad: 19 valores de compañía para 7 aseguradoras reales.
-
-   Acá los diez catálogos son tablas de verdad, con alta, edición, baja lógica
-   y control de uso. Agregar una décima etapa es el paso 1 del guion de prueba.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/configuracion.js */
 
 /* Las secciones del panel. El orden es deliberado: primero lo que gobierna el
    flujo del taller, después los catálogos de datos, al final el acceso. */

@@ -1,35 +1,10 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   EL REPOSITORIO. Guarda las tablas, las persiste, y es el único punto por
-   donde las vistas leen y escriben. Ninguna vista toca un arreglo crudo.
+/* EL REPOSITORIO. Guarda las tablas, las persiste, y es el único punto por donde las
+   vistas leen y escriben. Ninguna vista toca un arreglo crudo.
 
-   Dos ideas que conviene no perder:
+   Está escrito para que cada operación se traduzca casi 1:1 a la base real: cuando llegue
+   PostgreSQL, lo que cambia es dónde vive el dato, no qué se le puede hacer.
 
-   · Las tablas están NORMALIZADAS como van a estar en PostgreSQL; las vistas
-     reciben objetos DESNORMALIZADOS armados al leer. Es la misma separación
-     que va a haber entre las tablas y las consultas en producción.
-
-   · Cada mutación se llama como el procedimiento que después va a existir en
-     la base (`crear_ot_desde_recepcion`, `asignar_etapas`, `finalizar_etapa`,
-     `registrar_salida`, `registrar_reingreso`) y devuelve { ok, motivo }.
-     Ninguna valida por su cuenta: todas le preguntan a Reglas.
-
-   Persistencia: solo texto y números, en localStorage. Las fotos NO van acá
-   —el límite del navegador son 5 a 10 MB y en el original hay ~47 fotos por
-   orden—; van en IndexedDB referenciadas por id. Eso es de la tanda 2.
-
-   🔴 LO QUE ESTE PROTOTIPO NO PUEDE DEMOSTRAR. Tres requisitos de la
-   auditoría solo se cumplen de verdad en la base de datos:
-     A-1  permisos a nivel de campo — ocultar un campo en el navegador no
-          impide leerlo;
-     A-2  enmascaramiento de RUT y domicilio por rol — si el dato llegó al
-          navegador, ya se entregó;
-     A-10 traza de lecturas y exportaciones — un registro que vive en el
-          mismo navegador que audita no prueba nada.
-   Acá están MODELADOS y se pueden mostrar. Se GARANTIZAN al migrar a
-   Postgres con RLS. No decimos "cumple" donde lo correcto es "está modelado,
-   falta la base".
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/modelo.js */
 
 const Modelo = (function () {
 

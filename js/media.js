@@ -1,34 +1,9 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   LAS FOTOS Y LAS FIRMAS.
+/* LAS FOTOS Y LAS FIRMAS.
 
-   Por qué esto es un archivo aparte y no una tabla más del repositorio:
+   Archivo aparte del repositorio porque los binarios NO caben en localStorage: el límite
+   del navegador son 5 a 10 MB y una sola foto de teléfono los llena. Viven en IndexedDB.
 
-   · Los binarios NO caben en localStorage. El límite del navegador son 5 a
-     10 MB y en el sistema actual hay **~47 fotos por orden**. Una sola
-     recepción sin comprimir se come la cuota entera y el sistema deja de
-     guardar, en silencio.
-
-   · Por eso: los BYTES van en IndexedDB, que no tiene ese techo, y en
-     `db.media` queda solo la ficha —id, orden, etapa, tamaño, medidas—, que
-     es texto y sí cabe. Es la misma separación que va a haber en producción
-     entre el bucket de objetos y la fila en Postgres.
-
-   ── La compresión, y por qué es un argumento de venta ────────────────────
-
-   El cliente tiene 650 GB y borra las fotos al año **por falta de disco**,
-   no por política — y al mismo tiempo la Superintendencia le exige un año de
-   trazabilidad para poder trabajar con las aseguradoras. Las dos cosas
-   chocan, y la que pierde es la obligación.
-
-   A 180 vehículos al mes con ~47 fotos de ~3 MB, la proyección es de
-   **~296 GB al año**. Comprimiendo a ~350 KB con el lado largo en 1600 px,
-   baja a **~34 GB**. *(Cálculo nuestro sobre supuestos declarados, no una
-   medición: así hay que rotularlo donde se escriba.)*
-
-   El número que importa mostrar en pantalla es el de cada foto: `4,2 MB →
-   340 KB`. Ese es el que hace entender por qué el problema se resuelve.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/media.js */
 
 const Media = (function () {
 

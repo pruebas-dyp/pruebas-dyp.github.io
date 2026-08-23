@@ -1,29 +1,9 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   LA SILUETA DEL VEHÍCULO. Se usa en dos lados —la recepción, donde se marca,
-   y la ficha de la orden, donde se consulta—, así que vive aparte.
+/* LA SILUETA DEL VEHÍCULO. Se usa en dos lados: la recepción y el impreso.
 
-   🔶 REHECHA EL 15-08-2026, pedido del cliente mirando el sistema real.
+   Es un dibujo del auto sobre el que se raya, no una lista de piezas: se marca dónde está
+   el daño con el dedo o el mouse, que es como lo hace el recepcionista con el papel.
 
-   Antes era un croquis de rectángulos con rótulos, y se marcaba haciendo clic
-   en uno. El taller marca de otra manera: sobre un dibujo del auto con sus
-   CINCO VISTAS —superior, frontal, trasera y los dos laterales— y rayando
-   encima con el dedo, como en un papel. Eso es lo que hay ahora.
-
-   ⚠️ Y acá hay una tensión que conviene tener escrita, porque la decisión
-   anterior era al revés y por un motivo bueno: **un dibujo libre no se puede
-   consultar**. Si el daño es un garabato, nadie puede preguntarle después al
-   sistema cuántos vehículos de SURA llegaron con daño en la puerta delantera
-   izquierda.
-
-   Cómo se resolvió sin perder ninguna de las dos cosas: **el trazo se dibuja
-   libre, pero no se guarda suelto**. Al soltar el dedo se calcula el centro del
-   trazo, se mira en qué vista y en qué zona cayó, y la marca se guarda con
-   `vista`, `zona`, `tipo`, `severidad` y coordenada normalizada —exactamente
-   los mismos campos de antes— más el trazo para poder redibujarlo. El mapa de
-   zonas existe, simplemente ya no se ve: el recepcionista raya, y el sistema
-   clasifica solo.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/silueta.js */
 
 /* El lienzo mide 900×470 y ahí caben las cinco vistas, repartidas como en el
    dibujo del sistema real: la superior a la izquierda ocupando todo el alto, y

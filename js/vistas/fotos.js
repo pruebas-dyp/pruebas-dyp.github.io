@@ -1,22 +1,8 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   LA ZONA DE FOTOS. Un solo componente para todas las pantallas que suben
-   imágenes: recepción, la ficha de la orden, las etapas y documentos.
+/* LA ZONA DE FOTOS. Un solo componente para todas las pantallas que suben imágenes.
 
-   Existe por un problema real, no por prolijidad. En la primera prueba el
-   sistema "no dejaba subir fotos". Sí dejaba: comprimir una foto de celular
-   toma entre 1 y 4 segundos, y en ese rato la pantalla no mostraba
-   absolutamente nada. Un input de archivo pelado más un aviso que se va solo
-   es indistinguible de un botón roto.
+   Se comprimen en el navegador antes de subir: de 4 MB a ~100 KB.
 
-   Lo que hace este componente:
-     · Una zona grande y evidente, con botón y con arrastrar-y-soltar.
-     · **Progreso visible mientras comprime**, foto por foto y con el nombre.
-     · Miniaturas con el peso antes y después.
-     · Aguanta que se suban muchas de una: es lo que hace la gente — saca las
-       fotos con el celular, las pasa al computador, y después las sube todas
-       juntas.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/fotos.js */
 
 const CSS_FOTOS = `
 .zona-fotos{border:2px dashed var(--borde-fuerte);border-radius:5px;padding:16px;text-align:center;

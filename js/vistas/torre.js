@@ -1,29 +1,9 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   TORRE DE CONTROL — la pantalla de entrada y la que el dueño mira todos los
-   días.
+/* TORRE DE CONTROL — la pantalla de entrada y la que más se mira.
 
-   Las DIECISIETE columnas son las del sistema real, en su orden:
-     OT · OR · Patente · N° Siniestro · Cliente · Compañia · Marca · Modelo ·
-     Color · Ingreso · Tipo · Días · Estado · Etapa · Encargado ·
-     Fecha Entrega · Alerta,  más la lupa.
-   Nuestro borrador anterior mostraba doce y con otros nombres.
+   Las 17 columnas del sistema actual, en su orden. Un clic despliega el expandible;
+   doble clic abre la orden.
 
-   Tres cosas que se corrigen sin cambiar la forma de la pantalla:
-
-   🔴 `Días`. En el original es UN contador y no mide días en el taller: mide
-      días desde el último cambio de estado. Verificado al día exacto en ocho
-      órdenes, todas con el evento `'Recibido' a 'Recibido'`. Acá esa columna
-      muestra el reloj que Configuración haya elegido, y al lado va el total,
-      que nunca se reinicia.
-
-   · `Alerta`. Las letras son la INICIAL del asunto de cada mensaje de
-     bitácora: E(nvio) · A(utorizado) · O(tro) · R(epuestos) ·
-     C(orrecciones) · P(resupuesto). El orden en que salen no significa nada.
-
-   · `Estado` sale del maestro con su redacción exacta. El original tiene
-     cuatro vocabularios distintos para lo mismo.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/torre.js */
 
 /* ───────────────── Orden de la torre ─────────────────
    El cliente pidió el 15-08-2026 que la torre esté SIEMPRE ordenada por

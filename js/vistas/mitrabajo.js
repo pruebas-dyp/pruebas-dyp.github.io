@@ -1,28 +1,11 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   MI TRABAJO — la pantalla del que está en el piso.
+/* MI TRABAJO — la pantalla del que está en el piso.
 
-   Es la contraparte del panel del administrador. Él ve las 102 órdenes; el que
-   está en pintura necesita ver las cuatro que tiene que pintar, y nada más.
+   Él ve las cuatro que tiene que pintar, no las 102 del taller.
 
-   Las cuentas son por ROL, no por persona: en un taller chico el sistema no lo
-   abre "Marcelo", lo abre el que está en desabolladura ese día.
+   ⚠️ Esto NO existe en el sistema actual: ninguna de las 39 pantallas tiene una vista por
+   puesto de trabajo. Es desarrollo nuevo y se cotiza aparte.
 
-   Cómo llega el trabajo hasta acá, sin que nadie reparta a mano:
-
-     1 · El vehículo se recibe y se le declaran las etapas que aplican.
-     2 · Cada etapa abierta queda disponible para la cuenta que tenga esa
-         habilidad marcada en su ficha.
-     3 · Quien entra con esa cuenta ve lo disponible y lo TOMA.
-     4 · Al cerrarla, la orden avanza sola en la torre del administrador.
-
-   Nadie le avisa a nadie: el estado del vehículo es el mensaje. Es lo que hoy
-   se resuelve gritando en el taller o mandando un WhatsApp.
-
-   ⚠️ Esto NO existe en el sistema actual. Ninguna de las 39 pantallas tiene
-      una vista por puesto de trabajo; el original tiene una sola torre para
-      todos. Es desarrollo nuevo y se cotiza aparte.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/mitrabajo.js */
 
 
 

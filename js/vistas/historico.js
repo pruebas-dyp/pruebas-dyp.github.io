@@ -1,29 +1,9 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   HISTÓRICO Y CONSOLIDADO.
+/* HISTÓRICO Y CONSOLIDADO.
 
-   🔴 El Histórico NO es un listado: es un BUSCADOR. Al entrar no muestra
-      ninguna fila y hay que filtrar por patente, cliente, marca, modelo,
-      compañía, estado o rango de fechas. Nuestro borrador lo paginaba como
-      tabla, y eso estaba mal: con 2.100 órdenes al año no se navega.
+   El histórico es un BUSCADOR, no un listado: sin filtro no muestra nada, igual que el
+   original. El consolidado suma por compañía y por mes.
 
-   El original trae 22 columnas: venta y costo abiertos en tres líneas y la
-   utilidad por orden.
-
-   🔶 SIN COSTOS NI UTILIDAD (decisión del 13-08-2026): el taller no los
-      lleva por orden. Quedan las **tres líneas de venta** —mano de obra,
-      repuestos y ToT— más el total. Es lo que se puede sostener con datos
-      reales, y es lo que se ocupa: cuánto se vendió por vehículo.
-
-   🔴 Lo que se corrige: el Histórico del original **no tiene columna de
-      días**. Una vez entregada la orden el contador desaparece, y con él la
-      posibilidad de saber si se cumplió la meta de 15 días. Acá los tres
-      relojes sobreviven a la entrega — es la otra mitad del arreglo.
-
-   ⚠️ `ToT` se deduce que son trabajos a terceros, por su correspondencia con
-      el bloque `Externos` del presupuesto y con la pantalla `Valorizar TOT`
-      de Bodega. **Es una deducción**, y está rotulada como tal. Pregunta 5.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/historico.js */
 
 /* Lo que se está mostrando, para que el botón de PDF imprima EXACTAMENTE eso
    y no vuelva a filtrar por su cuenta. Si volviera a filtrar, el papel y la

@@ -1,34 +1,9 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   LAS REGLAS DE NEGOCIO. Funciones puras: reciben la base y los parámetros,
-   devuelven { ok, motivo }. No tocan el DOM, no mutan nada, no dependen de
-   ninguna vista.
+/* LAS REGLAS DE NEGOCIO. Funciones puras: reciben la base y los parámetros, devuelven
+   { ok, motivo }. No tocan el DOM, no mutan nada, no dependen de ninguna vista.
 
-   Están escritas así a propósito: cada una se traduce casi 1:1 a un
-   constraint o un trigger de PostgreSQL cuando el sistema pase a producción.
+   Escritas así a propósito: cada una se traduce casi 1:1 a una restricción de la base.
 
-   REGLA DE ORO: ninguna de estas se aplica deshabilitando un botón. El botón
-   se puede apretar siempre; la regla rechaza y explica el motivo. Si el
-   usuario no entiende por qué no puede hacer algo, el sistema falló.
-
-   ── Qué cambió respecto de la versión anterior, y por qué ────────────────
-
-   1 · NADA QUEMADO. Antes esta misma constante decidía el destino de una
-       orden:  ESTADOS_TERMINALES = ['entregado','perdida_total','rechazado'].
-       Era exactamente el defecto que le auditamos al sistema actual, cometido
-       por nosotros. Ahora los estados salen del catálogo `estado` y quien
-       decide es su booleano, editable desde Configuración.
-
-   2 · TRES RELOJES, NO DOS. Ver `calcularRelojes`. En la reunión se pidió que al
-       reingresar el cronómetro "vuelva a cero" (grabación [00:34:58]); el
-       levantamiento mostró que hoy se reinicia solo con regrabar el estado,
-       que es otra cosa y es un defecto. Los dos números conviven y CUÁL de
-       ellos es el KPI es un parámetro de negocio, no una decisión nuestra.
-
-   3 · PRECEDENCIA Y REPUESTOS, APAGADAS. No sabemos si esas reglas existen
-       en el sistema actual (preguntas 1 y 3, sin confirmar). Están construidas y
-       apagadas: se encienden por etapa desde Configuración, sin tocar código.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/reglas.js */
 
 const Reglas = (function () {
 

@@ -1,32 +1,13 @@
-/* ═══════════════════════════════════════════════════════════════════════
-   LA SALA COMPARTIDA — que el celular y el computador vean lo mismo
-   ───────────────────────────────────────────────────────────────────────
-   POR QUÉ EXISTE. El modelo borrador guarda todo en el almacenamiento del
-   navegador, así que cada dispositivo abría su propia copia: se creaba una
-   orden en el teléfono y en el computador no aparecía. Con razón —no había
-   nada en el medio—, pero era imposible de explicar y parecía una falla.
+/* LA SALA COMPARTIDA — que el celular y el computador vean lo mismo.
 
-   QUÉ ES, Y QUÉ NO ES. Esto NO es el modelo de datos del sistema. El modelo
-   real va tabla por tabla, con sus restricciones y su seguridad por rol, y
-   es el hito H1 de la carta gantt. Esto es un PUENTE: manda el estado
-   completo como un solo documento y avisa a los demás que hay algo nuevo.
+   El modelo borrador guarda todo en el navegador, así que cada dispositivo abría su
+   propia copia. Esto es un PUENTE: manda el estado completo como un solo documento.
 
-   Existe así por una razón concreta: el motor del borrador es síncrono de
-   punta a punta —cada operación responde en el acto—, y hablarle a una base
-   de datos es asíncrono. Convertirlo obligaría a reescribir sus cincuenta
-   operaciones y todas las pantallas. El puente no toca ni una línea del
-   motor: mueve el mismo texto que el modelo ya guarda.
+   ⚠️ NO es el modelo de datos del sistema, que va tabla por tabla con su seguridad por
+   rol y es el hito H1. Y SÓLO datos de demostración: acá no entra el RUT, el domicilio
+   ni la fotografía de una persona real.
 
-   🔴 SOLO DATOS DE DEMOSTRACIÓN. La sala se lee y se escribe sin
-   identificarse, y eso se acepta únicamente porque lo que hay dentro es
-   inventado: patente AABB11, RUT 11.111.111-1, «Cliente de Prueba». Acá no
-   entra el RUT, el domicilio ni la fotografía de una persona real.
-
-   SIN LIBRERÍAS. Se habla con la base por `fetch`, como cualquier dirección
-   de internet. No se carga ningún paquete de terceros: el borrador sigue
-   siendo HTML, CSS y JavaScript, y si mañana esto se apaga, el sistema
-   funciona igual.
-   ═══════════════════════════════════════════════════════════════════════ */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/sala.js */
 
 const Sala = (function () {
   'use strict';

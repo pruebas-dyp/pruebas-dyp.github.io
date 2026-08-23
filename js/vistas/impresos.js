@@ -1,26 +1,11 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   LOS CUATRO DOCUMENTOS IMPRIMIBLES.
+/* LOS CUATRO DOCUMENTOS IMPRIMIBLES.
 
-     1 · Comprobante de recepción — datos, silueta con daños, los 28 ítems
-         del inventario y observaciones. Con fotos de ingreso y espacio para firmar.
-     2 · Presupuesto / OR — número compuesto, versión, y las líneas como
-         planilla: cada monto cae en su columna, con neto, IVA y total.
-     3 · Ficha completa de la OT — historial con fecha, hora y responsable;
-         repuestos con trazabilidad; los tres relojes. Con fotos por etapa.
-     4 · Acta de entrega — cierre, fotos de salida, fecha y espacio para firmar.
+   Comprobante de recepción, presupuesto (la OR), acta de entrega y expediente.
 
-   Se imprimen con `@media print` y `window.print()`, sin librerías: no hay
-   CDN y no hace falta. Si más adelante la paginación no se deja controlar,
-   ahí entra jsPDF — con `integrity` y `crossorigin`, no de cualquier manera.
+   ⚠️ Ojo con el acento grave dentro de un comentario CSS en un template literal: termina
+   el literal y el archivo entero deja de cargar SIN dar error en la consola.
 
-   🔴 Y una corrección de seguridad heredada: el original escribe estos PDF en
-      `/pdf/` con nombre deducible del número de orden —`recepcion-23446.pdf`,
-      un correlativo de cinco dígitos— y llevan nombre, RUT, domicilio,
-      teléfono, VIN y patente. Acá el documento se
-      arma en el navegador desde los datos de la sesión: **no hay archivo en
-      una ruta adivinable**, y nada se sirve sin sesión.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/impresos.js */
 
 const IMPRESOS = {
   recepcion:  { rot: 'Comprobante de recepción', archivo: (o) => 'recepcion-' + o.patente + '-' + o.numeroOT },

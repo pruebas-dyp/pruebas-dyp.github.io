@@ -1,50 +1,9 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   NUEVO INGRESO — la pantalla más rica del sistema.
+/* NUEVO INGRESO — la pantalla más rica del sistema.
 
-   Es la única que NO se puede probar en el sistema actual sin meter
-   un vehículo real al taller, así que acá vale doble.
+   Cinco pasos, con el orden que pidió el cliente el 15-08-2026. Es la única que NO se
+   puede probar en el sistema actual sin meter un vehículo real al taller.
 
-   🔶 REDISEÑO DEL 15-08-2026, pedido por el cliente después de ver el sistema
-   real funcionando. Lo que cambió respecto de la tanda 1:
-
-     · CINCO pasos, no seis, y en otro orden: primero el cliente, después el
-       vehículo. Se recibe a una persona, no a una patente.
-     · `Inventario` y `Fotografías` dejaron de ser pasos propios: los dos son
-       el estado del vehículo al entrar, y viven dentro de `Estado descriptivo`.
-     · Un paso nuevo al final, `Verificar Orden`: todo lo cargado de solo
-       lectura antes de crear nada.
-     · **No se avanza con el paso incompleto**, y sí se retrocede siempre.
-     · El inventario dejó de ser un sí/no: son cuatro estados.
-
-   Lo que se replica tal cual del original (`?ver=ingreso`):
-     · El formulario POR PASOS, con Anterior y Siguiente.
-     · Los 28 ítems del checklist, con su campo de observación por ítem.
-     · El combustible en NUEVE posiciones (0/8 a 8/8), no ocho.
-     · El marcador `Seleccione Estado` arriba del desplegable de estados.
-     · 🔴 Y lo que nuestro diseño no tenía: los campos de la solicitud son
-       ARREGLOS con botón `+`. **Una recepción puede generar varias órdenes**,
-       cada una con su siniestro, su compañía y su deducible.
-
-   Lo que se corrige:
-     · Marca, modelo, color, compañía, prioridad y estado salen del CATÁLOGO,
-       no de listas escritas en el HTML. Modelo depende de marca, y los tres
-       primeros se ESCRIBEN: la lista se achica sola y, si el valor no está,
-       se agrega al catálogo sin salir de la recepción.
-     · La silueta es una sola vista, la superior. Antes ofrecía cinco pestañas
-       y las cinco dibujaban lo mismo.
-     · Sin firma en pantalla: el comprobante se firma en papel.
-     · Las fotos se comprimen antes de guardar y el peso se muestra en
-       pantalla — ver media.js.
-     · El borrador se guarda solo. Un formulario de 90 campos que se pierde
-       al recargar es una forma de perder el trabajo de la recepcionista.
-
-   ⚠️ NINGUNA REGLA SE APLICA DESHABILITANDO UN BOTÓN. `Siguiente` se puede
-      apretar siempre, en cualquier paso y con el formulario vacío: lo que hace
-      es quedarse donde está, decir cuántos campos faltan y cuáles son con su
-      nombre en palabras, marcarlos en rojo y poner el cursor en el primero. Un
-      botón gris no enseña nada; un rechazo con el motivo, sí.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/recepcion.js */
 
 const RECEPCION_PASOS = [
   { id: 'cliente',   n: 'Datos del cliente' },

@@ -1,39 +1,9 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   PRESUPUESTO — y la OR, que es "el apellido de la OT".
+/* PRESUPUESTO — y la OR, que es «el apellido de la OT».
 
-   Del original se copian los tres bloques (`Mano de Obra` · `Repuestos` ·
-   `Externos` · `Observación`) y los tres procesos (`Cambio` · `Reparar` ·
-   `Externo`).
+   Del original se copian los tres bloques (Mano de Obra · Repuestos · Externos ·
+   Observación) y los tres procesos (Cambio · Reparar · Externo).
 
-   🔶 EL TEMPARIO VUELVE (16-08-2026). Se había sacado el 13-08 creyendo que
-      el taller cotizaba un precio por trabajo. El PDF de la OR
-      23505-18401-001 demuestra que no: cada línea lleva horas en DM, Reparar
-      y Pintar, y el precio de cada columna es HORAS × TEMPARIO. Las once
-      cifras de ese documento cuadran al peso con la fórmula que hay en
-      `Reglas.totalesPresupuesto`, y hay una prueba que las compara para que
-      si alguien la toca se caiga antes de una reunión.
-
-      Textual de Marco: «Ya entendí que el tempario después se multiplica por
-      las horas que colocan y te va dando el valor a cobrar de la operación».
-
-   Lo que se corrige:
-
-   🔴 La OR es COMPUESTA — `<OT>-<id_reparación>-<NNN>` — y el correlativo es
-      por orden, no global. Nuestro diseño anterior la trataba como un
-      consecutivo del sistema.
-
-   🔴 El presupuesto se VERSIONA en vez de editarse encima. Cuando la
-      aseguradora rechaza y pide ajustar, nace la versión 2 y la 1 queda
-      intacta. Eso es lo que hace auditable la discusión con la compañía, y
-      es imposible con el PDF actual — que además es el dolor #2 que el
-      cliente nombró.
-
-   🔶 SIN COSTOS NI UTILIDAD (decisión del 13-08-2026). El taller no lleva
-      costos por orden, así que el presupuesto es la VENTA y nada más. Lo que
-      sí gana valor con eso: la **venta parada**, que es la suma de lo
-      presupuestado en órdenes que todavía no se entregan.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/presupuesto.js */
 
 /* Las tres operaciones del desplegable «OP» del sistema actual. El orden es
    el de la pantalla real. */

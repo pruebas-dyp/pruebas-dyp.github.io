@@ -1,30 +1,10 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   PERSONAL Y CARGA DE TRABAJO.
+/* PERSONAL Y CARGA DE TRABAJO.
 
-   Las columnas del original se copian, menos una. Lo que cambia es quién ve qué:
+   Las cuentas del sistema, sus etapas habilitadas y a qué módulos entra cada una.
 
-   🔶 EL VALOR HORA SE ELIMINÓ (decisión del 13-08-2026). El cliente no lo
-      ocupa. Y conviene decírselo así: la auditoría pedía protegerlo con su
-      propia política de acceso, porque hoy **cualquier cuenta ve el sueldo de
-      los 89 trabajadores**. Al no recoger el dato, el requisito A-3 deja de
-      aplicar. **El dato que no se guarda no se puede filtrar.**
+   ⚠️ La carga de trabajo por persona NO existe en el sistema actual. Es desarrollo nuevo.
 
-   🔴 A-2 · RUT, domicilio y teléfono se enmascaran por rol.
-
-   🔴 B-7 · SE PUEDE DAR DE BAJA. En el original **no existe pantalla para
-      desactivar una cuenta**, y por eso hoy las once cuentas externas no se
-      pueden cerrar sin tocar la base de datos. Y no se elimina gente: *"si
-      vuelve hay que recargar todo y se pierde el registro"*.
-
-   · RUT y número de ficha son inmutables. Así se pidió, y es correcto.
-
-   ⚠️ La pantalla "Ver nómina de pagos" del original **muestra la Torre de
-      Control**: mismas 102 órdenes, mismas 17 columnas, ni un dato de pagos.
-      Nunca se construyó, y acá tampoco: se sacó la vista de carga de trabajo
-      que la reemplazaba (decisión del 13-08-2026) porque no existe en el
-      sistema actual y no se replica lo que no está.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/personal.js */
 
 function personalEstado() {
   ui.personal = ui.personal || { pantalla: 'listado', busqueda: '', personaId: null, verBajas: false };

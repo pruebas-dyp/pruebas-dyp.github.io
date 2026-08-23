@@ -1,32 +1,11 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   EXPEDIENTE DEL VEHÍCULO — pedido del cliente el 15-08-2026, y declarado por
-   él como lo más importante de todo el sistema. Su frase, textual:
+/* EXPEDIENTE DEL VEHÍCULO — declarado por el cliente como lo más importante del sistema.
 
-     "todo movimiento, todo lo que se le haga al vehículo y todos los
-      documentos que se suban, todas las etapas por las que pasó, toda la
-      bitácora de observaciones, todo, absolutamente todo lo que tuvo detrás
-      el proceso operacional del vehículo debiese quedar en el registro
-      histórico"
+   Su frase, el 15-08-2026: «todo movimiento, todo lo que se le haga al vehículo y todos
+   los documentos que se suban, todas las etapas por las que pasó».
 
-   Y para qué lo quiere, que es lo que define cómo se construye:
+   ⚠️ Esto NO existe en el sistema actual. Es desarrollo nuevo y se cotiza aparte.
 
-     "tener el registro histórico le permite tener transparencia de cara a las
-      compañías de seguro, pero también a los que van con el auto particular"
-
-   No es un reporte de gestión: es el documento con el que le responde a una
-   aseguradora. De ahí las tres decisiones de esta pantalla:
-
-   · Todo en UNA pantalla y en orden cronológico. El criterio de aceptación
-     era poder reconstruir la historia completa de un vehículo sin abrir
-     ninguna otra.
-   · Se imprime. Es lo que se entrega.
-   · No se edita, y se dice en pantalla. Un registro que se puede corregir
-     después no sirve para respaldar nada.
-
-   Se distingue del Histórico, que es un buscador de órdenes cerradas con sus
-   columnas. Acá el sujeto es el vehículo, no la fila.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/expediente.js */
 
 function expedienteEstado() {
   if (!ui.expediente) ui.expediente = { busqueda: '', otId: null, grupos: {} };

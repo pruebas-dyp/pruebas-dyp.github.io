@@ -1,20 +1,9 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   LOS DATOS DE DEMOSTRACIÓN.
+/* LOS DATOS DE DEMOSTRACIÓN.
 
-   🔶 TODO LO QUE HAY ACÁ ES INVENTADO. Ninguna persona, patente, RUT,
-   teléfono ni domicilio corresponde a nadie real. Los nombres se arman por
-   combinación desde listas neutras y los RUT son de la serie 11.111.111-1.
+   ⚠️ Todos inventados salvo una cosa: los nombres y cargos de las 13 cuentas son la
+   nómina real que entregó el jefe de recepción. RUT, teléfono y domicilio son inventados.
 
-   Lo que NO es inventado son los CATÁLOGOS y los TOTALES: salen del
-   levantamiento del sistema actual, medidos pantalla por pantalla el
-   12-08-2026, y están citados uno por uno con la sección del documento de
-   reglas de donde vienen. Si un número de acá cambia, es que se rompió algo.
-
-   La generación es DETERMINISTA (ver `rnd`): la misma semilla produce
-   siempre los mismos datos. Sin eso, las cifras de control cambiarían en
-   cada recarga y no se podría comprobar nada.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/semilla.js */
 
 /* Fecha de referencia del modelo borrador. Es la del levantamiento, para que
    los días calculados cuadren con lo que se midió en el sistema real.

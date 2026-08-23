@@ -1,48 +1,9 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   REPORTERÍA — la tercera hoja del Histórico.
+/* REPORTERÍA — la tercera hoja del Histórico.
 
-   Pedido de Marco el 16-08-2026: *"me falta un panel de reportería BI, que se
-   vean gráficos, estadísticas, tablas dinámicas"*. Y el 19-08-2026, mirándola
-   ya funcionando: *"que los gráficos fueran como más tecnología, que la data
-   fuera mejor, que la visual básicamente quede mucho mejor"*.
+   Los gráficos se dibujan a mano en SVG: sin librerías, porque el modelo tiene que
+   abrirse en el taller sin internet.
 
-   Cinco cosas que conviene tener claras antes de mirarlo:
-
-   1 · **Los gráficos están dibujados acá, en SVG.** Sin Chart.js, sin D3 y sin
-       CDN. No es purismo: el modelo borrador tiene que abrirse en el mesón del
-       taller aunque no haya internet, y una librería traída de afuera lo
-       rompe justo el día de la demostración. Áreas con degradado, anillos,
-       barras y chispas — todas escritas a mano, unos 400 caracteres de path
-       cada una, sin nada que descargar.
-
-   2 · **La tabla dinámica es de verdad dinámica**: se elige qué agrupa las
-       filas, qué abre las columnas y qué se suma adentro. No es una tabla fija
-       con nombre bonito.
-
-   3 · **Todo sale del mismo dato que el resto del sistema.** No hay una base
-       de reportes aparte que alguien tenga que refrescar de noche: se calcula
-       al mirarlo. Por eso no puede quedar viejo, y por eso también es honesto
-       decir que con 2.100 órdenes al año esto se calcula rápido, pero que si
-       algún día son 50.000 hay que precalcular.
-
-   4 · **Un solo lugar hace las cuentas**: `repAgregados`. La pantalla y el PDF
-       lo llaman a él. Si cada uno sumara por su cuenta, el día que se toque
-       una fórmula el papel y la pantalla empezarían a decir cosas distintas —
-       y en un reporte ése es el peor defecto posible.
-
-   🔶 Para qué sirve de verdad, y es lo que hay que mostrarle al dueño, son
-      dos vistas que el sistema actual **no puede tener**:
-
-      · **Dónde se van los días.** El desglose de la reparación etapa por
-        etapa. Responde la única pregunta que importa cuando un auto lleva
-        sesenta días adentro: ¿en cuál se quedó pegado? Su sistema guarda la
-        etapa actual y nada más, así que no puede restar dos fechas que no
-        tiene.
-
-      · **Días de reparación por mes contra la meta.** Al entregar, el sistema
-        actual pierde el contador — el defecto central que encontramos.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/reporteria.js */
 
 function repEstado() {
   ui.reporteria = ui.reporteria || {

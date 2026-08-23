@@ -1,19 +1,13 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   ETIQUETA, TEMA, ROL Y ARRANQUE
+/* ETIQUETA, TEMA, ROL Y ARRANQUE.
 
-   La etiqueta de datos, el tema, quien mira, la barra lateral, el cajon del
-   celular y el ARRANQUE del sistema.
+   La etiqueta de datos, el tema, quién mira, la barra lateral y el cajón del celular.
 
-   ⚠️ Este archivo se carga SIEMPRE AL FINAL. Es el unico que EJECUTA algo al
-   cargar -monta el tema, retoma la sesion, pinta la primera pantalla-, asi que
-   necesita que todo lo demas ya este definido. Si se adelanta, el sistema
-   arranca contra funciones que todavia no existen y no da error: da undefined.
+   ⚠️ Este archivo se carga SIEMPRE AL FINAL. Es el único que EJECUTA algo al cargar
+   —monta el tema, retoma la sesión, pinta la primera pantalla— así que necesita que todo
+   lo demás esté definido. Si se adelanta, el sistema arranca contra funciones que todavía
+   no existen y no da error: da undefined.
 
-   Salio de `app.js` el 22-08-2026 (COD-7), que llego a 3.249 lineas — por
-   encima del punto donde la casa midio que un archivo ya no se puede revisar
-   en un pull request. No se movio ni una linea de logica: es corte y pegue.
-   ─────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/app.js */
 
 /* ───────────── Etiqueta de datos ─────────────
    Pedido del cliente el 15-08-2026, en dos partes que son la misma cosa:

@@ -1,45 +1,10 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   TALLER — dos apartados, y el que manda es el LISTADO.
+/* TALLER — dos apartados, y el que manda es el LISTADO.
 
-   Pedido del cliente el 15-08-2026, mirando el sistema actual: *"el principal
-   debe ser el mismo estilo de la imagen 1 donde salen en fila distintas OT y
-   uno puede asignar etapas como acción"*, y el tablero por etapa *"debe ser un
-   apartado aparte que uno aprieta"*.
+   Las 14 columnas y la acción única salen del original, verificadas contra
+   `miembros.php?ver=taller`. La columna Días se corrige: es la reparación acumulada y
+   no los días desde el último cambio de estado, que es el bug C-1.
 
-   ── Por qué el listado va primero, y no es sólo obediencia ───────────────
-
-   El tablero por etapa responde «cómo viene el taller»: es una foto para
-   mirar. El listado responde «qué hago con este auto»: es una fila por orden
-   con su acción al lado. En el mesón se trabaja orden por orden —llega la OT
-   23506 y hay que decirle qué etapas aplican—, y en el tablero esa orden hay
-   que ir a buscarla entre las columnas.
-
-   Los dos sirven, y por eso ninguno se borra. Pero el que se abre primero
-   tiene que ser el que se usa todo el día.
-
-   ── Qué se copia del original ────────────────────────────────────────────
-
-   · Las columnas y su orden: OT · Patente · Cliente · Marca · Modelo · Color ·
-     Ingreso · Días · Estado · Etapa · Encargado · Fecha de Entrega · Acción ·
-     Datos. Verificado contra la pantalla `miembros.php?ver=taller`.
-   · La acción `Asignar Etapas` en su propia columna, y la lupa de `Datos`.
-   · Que la lista incluya también los vehículos FUERA de taller. En el original
-     aparece la OT 23505 en «Fuera de taller / Espera repuesto»: la orden sigue
-     viva y hay que poder trabajarla aunque el auto no esté ocupando un box.
-
-   · Que la acción sea UNA SOLA y se llame igual en todas las filas:
-     `Asignar etapas`. Se probó cambiándole el rótulo según la orden y el
-     cliente lo corrigió — *"aquí solo se puede asignar etapas"*. Ver
-     `TALLER_ACCION` más abajo.
-
-   ── Qué se corrige ───────────────────────────────────────────────────────
-
-   🔴 La columna `Días` es la REPARACIÓN ACUMULADA, no los días desde el
-      último cambio de estado que muestra el original. Ese número es el bug de
-      C-1, y copiarlo justo en la pantalla donde se decide el trabajo del día
-      sería replicar el defecto en el peor lugar posible.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/taller.js */
 
 const TALLER_APARTADOS = [
   { id: 'listado', rot: 'Listado' },

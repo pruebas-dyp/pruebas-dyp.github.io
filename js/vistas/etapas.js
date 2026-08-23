@@ -1,31 +1,10 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   ETAPAS — asignar y finalizar. Son DOS pantallas, no una.
+/* ETAPAS — asignar y finalizar. Son DOS pantallas en el original y acá también.
 
-   Así funciona el sistema actual y así se replica, porque es el mecanismo que
-   se describió en la reunión: primero se declara QUÉ ETAPAS APLICAN al vehículo
-   —"no toda la etapa se hace mecánica, hay unas que puede ser un tapabarro o
-   un espejo y no tiene mecánica"—, y después se cierran una a una.
+   ⚠️ El ciclo completo —quién asigna, quién termina y quién da el visto bueno— NO existe
+   en el sistema actual: allá cerrar una etapa la cierra y se acabó. Es desarrollo nuevo
+   y se cotiza aparte (C-43).
 
-   El enrutamiento también se copia: una OT sin etapas asignadas cae en la
-   pantalla de asignar; con etapas, en la de finalizar. Verificado pidiendo
-   `taller-etapas-v2` sobre una OT sin asignar: el sistema devuelve
-   `taller-habilitar-etapas`.
-
-   ── Lo que se corrige ────────────────────────────────────────────────────
-
-   🔴 La pantalla de asignar del original muestra las nueve casillas EN BLANCO
-      aunque la OT ya tenga etapas cerradas. No refleja lo asignado, así que
-      no hay forma de saber qué se marcó sin ir a la otra pantalla. Acá sí.
-
-   · En el original la casilla de `Desarme` sobrevive al cierre en las tres OT
-     examinadas, mientras las demás etapas completadas la pierden. Tiene pinta
-     de error de renderizado en la primera fila del bucle. No se replica.
-
-   · Se pueden cerrar VARIAS etapas en un mismo guardado, cada una con su
-     responsable. Verificado: Preparación y Pintura quedaron cerradas en el
-     mismo segundo.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/etapas.js */
 
 /* La regla de enrutamiento del original, tal cual. */
 const modoEtapasPorDefecto = (o) => (o.etapasAsignadas.length ? 'finalizar' : 'asignar');

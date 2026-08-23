@@ -1,24 +1,9 @@
-/* ═══════════════════════════════════════════════════════════════════════
-   EL FLUJO OPERACIONAL — que la información viaje de un módulo al otro
-   ───────────────────────────────────────────────────────────────────────
-   Las pruebas de `pruebas.js` comprueban las REGLAS: que el sistema rechace
-   lo que el negocio prohíbe. Éstas comprueban otra cosa distinta y que no
-   estaba cubierta: que lo que se carga en una pantalla LLEGUE a la que
-   tiene que enterarse.
+/* EL ARNÉS DE FLUJO.
 
-   Un presupuesto con repuestos tiene que aparecerle al bodeguero. Una etapa
-   asignada tiene que aparecerle al que la va a hacer, y a nadie más. Un
-   vehículo entregado tiene que salir de la torre y entrar al histórico.
-   Nada de eso lo detecta una prueba de reglas: el motor puede rechazar
-   correctamente todo lo que corresponde y aun así dejar un dato huérfano en
-   el camino.
+   `pruebas.js` comprueba las REGLAS una por una; esto comprueba que la información VIAJE
+   entre módulos: que lo cargado en una pantalla le llegue a la que tiene que enterarse.
 
-   Cada comprobación dice EL VIAJE —de qué pantalla a qué pantalla— y si el
-   dato llegó. Corren dentro de `Modelo.sandbox`, sobre una copia que se
-   descarta: no tocan lo que el usuario tenga cargado.
-
-   Se ejecutan desde «Datos de demostración → Probar el flujo operacional».
-   ═══════════════════════════════════════════════════════════════════════ */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/flujo.js */
 
 const Flujo = (function () {
   'use strict';

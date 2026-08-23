@@ -1,25 +1,9 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   SALIDA, REINGRESO Y ENTREGA — el cierre del ciclo.
+/* SALIDA, REINGRESO Y ENTREGA — el cierre del ciclo.
 
-   Tres cosas distintas que el sistema actual mezcla en una sola:
+   La entrega ofrece tres de los cinco estados finales, igual que el original. Los otros
+   dos no los inventamos.
 
-   1 · SALIDA. El vehículo se inspecciona, se presupuesta y **se devuelve al
-       cliente** mientras llegan los repuestos. En el original esto no se
-       registra: el campo `Fecha de salida` de la ficha existe y está vacío
-       incluso en órdenes ya entregadas.
-
-   2 · REINGRESO. Vuelve cuando llegan las piezas. En el original el único
-       rastro es un `Cambio de estado: 'Recibido' a 'Recibido'` que además
-       **reinicia el contador de días** — medido al día exacto en ocho
-       órdenes.
-
-   3 · ENTREGA. Cierra la orden. Acá sí existe pantalla, busca por patente y
-       pide fecha obligatoria, observación y tipo de entrega.
-
-   Acá las tres son hechos con fecha sobre `ot_estadia`, y por eso los relojes
-   no se pueden reiniciar regrabando nada.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/entrega.js */
 
 function entregaEstado() {
   ui.entrega = ui.entrega || { patente: '', otId: null, obs: '', estado: null };

@@ -1,18 +1,9 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   LAS PRUEBAS NEGATIVAS. Son el criterio de aceptación del motor.
+/* LAS PRUEBAS NEGATIVAS. Son el criterio de aceptación del modelo, no un extra.
 
-   Cada una intenta hacer algo que el negocio prohíbe y tiene que fallar POR
-   LA REGLA, con un mensaje que explique el motivo — no por un botón
-   deshabilitado ni por una excepción de JavaScript.
+   Cada una intenta algo que el negocio prohíbe. Tiene que fallar POR LA REGLA y con un
+   motivo explicado, no por un botón deshabilitado ni por una excepción.
 
-   Corren contra los procedimientos de verdad (`Modelo.*`), no contra una
-   imitación, pero dentro de un aislamiento que se descarta al terminar: no
-   tocan los datos con los que está trabajando el usuario.
-
-   Se ejecutan desde el rótulo «Datos de demostración», arriba a la derecha de
-   cada panel: Probar reglas de negocio.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/pruebas.js */
 
 const Pruebas = (function () {
 

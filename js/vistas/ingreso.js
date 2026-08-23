@@ -1,25 +1,11 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   LA PANTALLA DE INGRESO.
+/* LA PANTALLA DE INGRESO.
 
-   El sistema actual no tiene nada de esto: se entra y ya. Acá cada puesto
-   entra con SU usuario y SU clave, y con eso el sistema sabe quién está
-   trabajando —no solo qué rol tiene—, que es lo que permite mostrarle lo suyo
-   y dejar registrado quién hizo cada cosa.
+   ⚠️ El CSS de esta pantalla vive dentro de un template literal. Un acento grave dentro
+   de un comentario acá terminó el literal, el archivo dejó de cargar sin dar error, y el
+   sistema arrancó en la Torre con todos los datos y sin pedir clave. Está cuidado por la
+   cifra «Pantallas del sistema que no cargaron».
 
-   Es la primera pantalla que ve alguien, así que es la que dice de qué calidad
-   es el resto. Por eso va sobria y sin ruido: logo, dos campos y un botón.
-
-   Las credenciales de demostración están OCULTAS por omisión (decisión del
-   13-08-2026). Sirven la primera vez y estorban después: quien ya las tiene
-   guardadas no necesita una lista de claves ocupando media pantalla delante
-   del cliente. Se abren con un enlace discreto, y la elección se recuerda.
-
-   ⚠️ Es un ingreso MODELADO. La clave vive en el mismo navegador que la
-      revisa: cualquiera que abra las herramientas del desarrollador la lee.
-      La autenticación de verdad vive en el servidor, con la clave cifrada y
-      sin viajar nunca hasta acá.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/ingreso.js */
 
 const CLAVE_VER_CREDENCIALES = 'dyp-ingreso-credenciales';
 

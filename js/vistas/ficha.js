@@ -1,20 +1,9 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   LA FICHA DE LA ORDEN — el centro del sistema.
+/* LA FICHA DE LA ORDEN — el centro del sistema.
 
-   Es la única pantalla que reúne todo: del original cuelgan OCHO pantallas y
-   ninguna otra las junta. Por eso vale la pena que tenga dirección propia:
-   se le manda el enlace de una orden a quien sea en vez de explicarle dónde
-   buscarla.
+   Los 10 campos de la cabecera en sus dos bloques, y las 8 pantallas que cuelgan de ella.
+   Es la única que las reúne.
 
-   La cabecera copia los diez campos del original, en sus dos bloques y en su
-   orden — incluido `Fecha de salida`, que allá es un campo muerto.
-
-   🔴 `Fecha de salida` está VACÍA en el sistema actual incluso en órdenes ya
-      entregadas. Es el dato que falta para reconstruir el ciclo de salida y
-      reingreso, y por eso el contador de días se puede reiniciar sin que nadie
-      lo note. Acá sale de `ot_estadia` y por eso siempre está.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/ficha.js */
 
 /* Las pestañas de la ficha, cada una con el permiso que pide. Sin permiso no
    se dibuja: no está gris ni avisa al apretarla, no está.

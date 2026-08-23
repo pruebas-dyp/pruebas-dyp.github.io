@@ -1,20 +1,8 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   DOCUMENTOS — guías de despacho, facturas y órdenes de compra.
+/* DOCUMENTOS — guías de despacho, facturas y órdenes de compra.
 
-   Existe por una obligación regulatoria, no por comodidad: desde 2023 la
-   Superintendencia obliga a tener **un año de trazabilidad de los datos**, y
-   sin eso el taller no puede trabajar con las aseguradoras. Es condición del
-   negocio, no una preferencia.
+   Los archivos que se cuelgan de una orden, con su tipo y su fecha.
 
-   Como en el original, **solo muestra vehículos que están en la torre**.
-
-   🔴 B-4 · Lo que se corrige: los botones `Enviar Fotografías por Email` y
-      `Enviar Documentos por Email` del sistema actual mandan a cualquier
-      dirección **sin registro visible del destinatario**. Acá todo envío
-      queda registrado —quién, a quién, qué y cuándo— y los destinatarios
-      salen de un catálogo, no de un campo libre.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/documentos.js */
 
 function documentosEstado() {
   ui.documentos = ui.documentos || { otId: null, busqueda: '' };

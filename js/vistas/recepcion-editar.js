@@ -1,27 +1,9 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   EDITAR RECEPCIÓN — la cuarta opción del menú de Recepción.
+/* EDITAR RECEPCIÓN — la cuarta opción del menú del recepcionista.
 
-   Era la única que no estaba construida, y no por tiempo: una recepción es lo
-   que el cliente firmó. Marco la pidió el 15-08-2026 y se construyó con tres
-   respuestas que quedan anotadas para que el taller las confirme —están
-   escritas al lado de la operación, en `corregir_recepcion`—:
+   Se versiona en vez de editar encima: la recepción original queda, y el impreso declara
+   qué versión es. Corregir el papel firmado sin dejar rastro no se puede.
 
-     · **se versiona**, no se pisa;
-     · la hace **quien tiene `ot.editar`** —recepción y administración—;
-     · el papel firmado no se toca: el **impreso dice qué versión es**.
-
-   Se corrige con **las mismas pantallas del ingreso y en el mismo orden** —el
-   pedido de Marco fue textual: "editar sobre lo creado y no editar sobre algo
-   nuevo"—: datos del cliente, datos del vehículo y estado descriptivo, este
-   último con su dibujo, su casilla única de observaciones, el tablero, las
-   fotos y el inventario. Lo único que no se vuelve a pedir es la **firma**, y
-   eso lo decide el taller, no nosotros.
-
-   Vive en su propio archivo a propósito. `recepcion.js` lo está trabajando
-   Benjamín en paralelo y dos manos en el mismo archivo terminan en conflicto;
-   acá el enganche son cuatro líneas allá y todo lo demás está en éste.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/recepcion-editar.js */
 
 function editRec() {
   ui.editarRec = ui.editarRec || { otId: null, campos: null, inventario: {}, motivo: '', bloque: 'cliente' };

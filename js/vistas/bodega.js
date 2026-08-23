@@ -1,43 +1,9 @@
-/* Automotora DyP — Modelo Borrador · Arttmize SpA
-   ────────────────────────────────────────────────────────────────────────
-   BODEGA — dos pantallas. Eran cuatro; las otras dos no se usan (ver abajo).
+/* BODEGA — dos pantallas. Eran cuatro; las otras dos no se usan.
 
-   Bodega NO es inventario de venta: es control de repuestos por orden de
-   trabajo, y solo opera sobre vehículos que están en la torre. La razón es de
-   negocio y se dio en la reunión: *"se obliga al bodeguero a cargar sí o sí
-   mientras el auto está en el taller, porque yo no puedo facturar teniendo un
-   pendiente"*.
+   No es inventario de venta: es control de repuestos por orden de trabajo, y sólo opera
+   sobre vehículos que están en la torre.
 
-   | Pantalla del original            | Estado hoy                          |
-   |----------------------------------|-------------------------------------|
-   | Check-list Repuestos Presupuestos| ✅ funciona                          |
-   | Seguimiento Repuestos            | ✅ 102 filas, 14 columnas           |
-   | Costos de Reparación             | ✅ 98 filas                          |
-   | Valorizar TOT                    | ❌ cuelga el navegador               |
-
-   🔴 CORRECCIÓN NUESTRA (16-08-2026). Este archivo decía que el check-list del
-   original "no devuelve nada" y que "hoy no sirve". **Es falso y el error fue
-   de nosotros, no del sistema del cliente.** La pantalla
-   `?ver=mostrar-repuestos` usa `idp` —el identificador de la OR— y no `id`; se
-   probó pasándole el número de OT, que devuelve la página vacía. Está anotado
-   en `01 Levantamiento\SISTEMA-ACTUAL-INVENTARIO`, que ya lo había corregido:
-   *"se marcó rota por este motivo antes de verificar el parámetro; era error
-   de quien levantaba"*.
-
-   Se corrige acá porque esto se dice en una reunión: llegar a decirle al
-   cliente que su pantalla está rota cuando la rota era nuestra prueba cuesta
-   la credibilidad de todo lo demás que sí encontramos.
-
-   Lo que SÍ es cierto y sigue en pie: allá los dos hitos son **casillas
-   sí/no** (`ok_bodega` y `entregado`), y por eso el sistema actual no puede
-   responder cuánto demoró un repuesto. Acá son dos fechas. Eso es la mejora,
-   y no hace falta exagerar nada para sostenerla.
-
-   ⚠️ `Valorizar TOT` NO se construye. Cuelga el navegador en los dos intentos
-   y no se pudo ver qué hace. Construir a ciegas la pantalla que alimenta
-   `Venta ToT` —una de las tres líneas de venta del Histórico— sería inventar.
-   Es la pregunta 5, sin confirmar.
-   ──────────────────────────────────────────────────────────────────────── */
+   Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/bodega.js */
 
 /* 🔶 BODEGA ENTRA POR UN MENÚ DE OPCIONES, COMO RECEPCIÓN (16-08-2026).
 
