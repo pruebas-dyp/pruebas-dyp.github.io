@@ -35,6 +35,7 @@ const Sala = (function () {
   let versionEnviada = -1;     // la última versión del MODELO que ya subí
   let aplicando = false;       // estoy escribiendo lo que llegó: no rebotar
   let ultimoError = null;
+  let pisado = null;           // aviso de que lo de otro equipo tapo lo mio
   let sincronizando = false;
 
   /* Quién soy. Sirve para no repintarme con mi propio eco: si la sala dice
@@ -161,12 +162,38 @@ const Sala = (function () {
       ultimoError = 'La sala trajo algo que no es una base del sistema: ' + malo;
       return false;
     }
+    /* 🔴 ANTES ESTO PISABA EN SILENCIO (SIS-2, 23-08-2026).
+
+       Si los dos dispositivos cambiaron algo dentro de la misma ventana —hasta
+       2,5 s de latido más 1,2 s de espera—, el que llega segundo escribe lo del
+       otro encima de lo suyo. Sin mezcla, sin conflicto, sin una palabra. Y esa
+       ventana es la de dos personas trabajando en paralelo, que es justo lo que
+       va a pasar en la demostración con el cliente.
+
+       Mezclar es H1. Lo que se puede hacer hoy —y es infinitamente mejor que
+       nada— es DARSE CUENTA y decirlo.
+
+       ⚠️ Va acá y no en `latido()` por dos razones, y la segunda pesa más:
+       ésta es la función que pisa, y ésta es la que se puede probar. `latido()`
+       es asíncrona y habría que fingir la red entera para tocarla; `aplicar` es
+       síncrona y ya salía exportada para eso mismo. */
+    const yoTambienCambie = versionEnviada >= 0 && Modelo.versionGuardada() !== versionEnviada;
+
     aplicando = true;
     try {
       localStorage.setItem(Modelo.CLAVE, JSON.stringify(fila.db));
       const ok = Modelo.recargarDeDisco();
       versionVista = Number(fila.version) || versionVista;
-      versionEnviada = Modelo.version();   // lo que acabo de aplicar ya está en la sala
+      versionEnviada = Modelo.versionGuardada();   // lo que acabo de aplicar ya está en la sala
+      if (ok && yoTambienCambie) {
+        pisado = 'Llegaron cambios de otro equipo y se aplicaron encima. ' +
+          'Lo que estabas haciendo acá se perdió: hay que volver a hacerlo.';
+        /* `avisar` vive en `js/app/acciones.js`, que carga DESPUÉS que este
+           archivo, así que se busca al usarla y no antes. Si no está —el arnés
+           de consola, por ejemplo— el aviso igual queda guardado y lo puede
+           leer `porQueSePerdio()`. */
+        if (typeof avisar === 'function') avisar({ ok: false, motivo: pisado }, '', { persistente: true });
+      }
       if (ok && typeof render === 'function') render();
       return ok;
     } catch (e) {
@@ -177,6 +204,26 @@ const Sala = (function () {
 
   /* ── El ciclo ────────────────────────────────────────────────────────── */
 
+  /* 🔴 ¿HAY ALGO QUE MANDAR? (SIS-2, 23-08-2026)
+
+     Esta pregunta estaba escrita adentro de `latido()`, en línea, y comparaba
+     `Modelo.version()` — el contador de los memos, que sube también al entrar,
+     al salir y al cambiar de cuenta. Entrar al sistema no cambia ningún dato, y
+     sin embargo mandaba el documento entero: 2,4 MB de subida más 2,4 MB de
+     bajada por cada otro dispositivo conectado. El contador de la sala iba en
+     508 sin que nadie hubiera trabajado tanto.
+
+     Ahora mira `versionGuardada`, que sube sólo cuando el documento guardado
+     cambió, que es exactamente lo que esta función manda.
+
+     ⚠️ Y sale de `latido()` a propósito: `latido` es asíncrona y probarla
+     obliga a fingir la red entera. Acá la decisión es síncrona, se exporta, y
+     hay una prueba que la corre — que es la única forma de que este error no
+     vuelva a entrar sin que nadie se entere. */
+  function hayQueSubir() {
+    return !aplicando && Modelo.versionGuardada() !== versionEnviada;
+  }
+
   async function latido() {
     if (!encendida || sincronizando) return;
     sincronizando = true;
@@ -186,22 +233,33 @@ const Sala = (function () {
       // La sala no existe todavía: la abre el primero que llega.
       if (!cabeza) {
         await subir(1);
-        versionVista = 1; versionEnviada = Modelo.version();
+        versionVista = 1; versionEnviada = Modelo.versionGuardada();
         ultimoError = null; return;
       }
 
       // Alguien más escribió después que yo: traigo lo suyo.
       if (Number(cabeza.version) > versionVista && cabeza.origen !== yo()) {
+        /* 🔴 ANTES ESTO PISABA EN SILENCIO (SIS-2, 23-08-2026).
+
+           Si los dos dispositivos cambiaron algo dentro de la misma ventana
+           —hasta 2,5 s de latido más 1,2 s de espera—, el que llegaba segundo
+           bajaba lo del otro y lo aplicaba encima de lo suyo. Sin mezcla, sin
+           conflicto, sin una palabra. Y esa ventana es la de dos personas
+           trabajando en paralelo, que es justo lo que va a pasar en la
+           demostración.
+
+           Mezclar es H1. Lo que se puede hacer hoy —y es infinitamente mejor
+           que nada— es DARSE CUENTA y decirlo. */
         const fila = await bajar();
         aplicar(fila);
         ultimoError = null; return;
       }
 
       // Nadie escribió afuera, pero yo cambié algo acá: lo mando.
-      if (!aplicando && Modelo.version() !== versionEnviada) {
+      if (hayQueSubir()) {
         const proxima = Math.max(Number(cabeza.version) || 0, versionVista) + 1;
         await subir(proxima);
-        versionVista = proxima; versionEnviada = Modelo.version();
+        versionVista = proxima; versionEnviada = Modelo.versionGuardada();
       }
       ultimoError = null;
     } catch (e) {
@@ -233,7 +291,7 @@ const Sala = (function () {
       try {
         const cabeza = await mirar();
         if (cabeza) { const fila = await bajar(); aplicar(fila); }
-        else { await subir(1); versionVista = 1; versionEnviada = Modelo.version(); }
+        else { await subir(1); versionVista = 1; versionEnviada = Modelo.versionGuardada(); }
         ultimoError = null;
       } catch (e) { ultimoError = (e && e.message) || 'sin conexión'; }
       if (typeof render === 'function') render();
@@ -251,16 +309,44 @@ const Sala = (function () {
 
   function alternar() { if (encendida) apagar(); else encender(); return encendida; }
 
+  /* Cuánto pesa el documento que sube y baja, y a partir de cuándo hay que
+     preocuparse. El techo real es `localStorage`: 5 a 10 MB según navegador, y
+     ahí el sistema deja de guardar. El aviso se pone MUY antes, en 3 MB, porque
+     un techo que llega solo en medio de una demostración no tiene arreglo. */
+  const AVISA_DESDE = 3 * 1024 * 1024;
+
+  function peso() {
+    const b = Modelo.pesoGuardado();
+    return {
+      bytes: b,
+      apretado: b >= AVISA_DESDE,
+      rotulo: b < 1024 * 1024
+        ? Math.round(b / 1024) + ' KB'
+        : (b / (1024 * 1024)).toFixed(1).replace('.', ',') + ' MB'
+    };
+  }
+
+  /* El aviso de que lo de otro equipo tapó lo mío. Se lee y se olvida, igual
+     que `porQueSeResembro` del modelo: se muestra una vez y no reaparece en
+     cada repintado. */
+  function porQueSePerdio() {
+    const m = pisado;
+    pisado = null;
+    return m;
+  }
+
   function estado() {
+    const p = peso();
     return {
       encendida: encendida,
       error: ultimoError,
       version: versionVista,
       dispositivo: yo(),
+      peso: p,
       // Lo que se muestra abajo a la izquierda, en una sola frase.
       rotulo: !encendida ? 'Datos en este equipo'
             : ultimoError ? 'Sala sin conexión'
-            : 'Sala compartida'
+            : 'Sala compartida · ' + p.rotulo
     };
   }
 
@@ -296,5 +382,6 @@ const Sala = (function () {
      es lo unico que separa el sistema de un documento cualquiera puesto por un
      tercero, y una defensa que no se puede probar no se sabe si esta. */
   return { iniciar, encender, apagar, alternar, estado, empujar, latido, reponer, aplicar,
+           peso, porQueSePerdio, hayQueSubir,
            esBaseCreible };
 })();

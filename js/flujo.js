@@ -144,7 +144,7 @@ const Flujo = (function () {
         const despues = Modelo.otPorId(otA.ot_id).repuestos.length;
         push({
           grupo: 'Presupuesto → Bodega',
-          nombre: '🔴 La pieza escrita en el presupuesto le llega sola al bodeguero',
+          nombre: 'La pieza escrita en el presupuesto le llega sola al bodeguero',
           viaje: 'Bloque Repuestos de la OR · panel de Bodega',
           paso: ok(r) && despues === antes + 1,
           detalle: despues > antes
@@ -270,7 +270,7 @@ const Flujo = (function () {
           paso: gente.length > 0,
           detalle: gente.length
             ? gente.length + ' habilitados para ' + etapaD.nombre + ' · primero: ' + (personaD.nombres || personaD.nombre || '—')
-            : '⚠️ NADIE puede hacer ' + etapaD.nombre + ': esa etapa no se puede asignar a ninguna cuenta.'
+            : 'NADIE puede hacer ' + etapaD.nombre + ': esa etapa no se puede asignar a ninguna cuenta.'
         });
       });
 
@@ -315,7 +315,7 @@ const Flujo = (function () {
         const esta = mio.some((x) => x.ot_id === otA.ot_id || x.id === otA.ot_id);
         push({
           grupo: 'Etapas · quién y a quién',
-          nombre: '🔴 La etapa le llega a «Mi trabajo» de esa persona',
+          nombre: 'La etapa le llega a «Mi trabajo» de esa persona',
           viaje: 'El jefe asigna · el operario abre su pantalla',
           paso: esta,
           detalle: esta ? 'La OT aparece entre las ' + mio.length + ' de ' + (personaD.nombres || personaD.nombre)
@@ -433,7 +433,7 @@ const Flujo = (function () {
         if (!ajeno) {
           push({
             grupo: 'Etapas · quién y a quién',
-            nombre: '🔴 Nadie cierra la etapa que tiene otro a su nombre',
+            nombre: 'Nadie cierra la etapa que tiene otro a su nombre',
             viaje: 'Otra persona intenta terminar trabajo ajeno',
             paso: false,
             detalle: 'No se pudo probar: ninguna cuenta activa tiene alcance de operario. ' +
@@ -449,7 +449,7 @@ const Flujo = (function () {
         comoDueno();
         push({
           grupo: 'Etapas · quién y a quién',
-          nombre: '🔴 Nadie cierra la etapa que tiene otro a su nombre',
+          nombre: 'Nadie cierra la etapa que tiene otro a su nombre',
           viaje: 'Otra persona intenta terminar trabajo ajeno',
           paso: !ok(r),
           detalle: !ok(r)
@@ -481,7 +481,7 @@ const Flujo = (function () {
         const v = Modelo.otPorId(otA.ot_id);
         push({
           grupo: 'Salida y reingreso',
-          nombre: '🔴 Al reingresar, la estadía vuelve a cero y los totales siguen',
+          nombre: 'Al reingresar, la estadía vuelve a cero y los totales siguen',
           viaje: 'Reingreso · los tres relojes de la ficha',
           paso: ok(r) && v.diasEstadiaActual === 0 && v.diasTotales >= 0,
           detalle: ok(r)
@@ -541,7 +541,7 @@ const Flujo = (function () {
         const histDespues = (Modelo.historico({ patente: 'FLUJ01' }) || []).length;
         push({
           grupo: 'Entrega → Histórico',
-          nombre: '🔴 Entregar saca de la torre y deja en el histórico',
+          nombre: 'Entregar saca de la torre y deja en el histórico',
           viaje: 'Entrega · torre de control · histórico',
           paso: ok(r) && !sigueEnTorre && histDespues > histAntes,
           detalle: ok(r)

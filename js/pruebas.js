@@ -442,7 +442,10 @@ const Pruebas = (function () {
         const fabricar = (n) => {
           const id = 'pe-prueba-' + n;
           db.persona.push({ id, tipo: 'trabajador', ficha: 9000 + n, rut: '11.111.11' + n + '-1',
-            usuario: 'operario' + n + '@prueba.cl', clave: 'x', clave_inicial: false,
+            // Huella, no clave: desde SIS-1 ninguna cuenta guarda su clave, y
+            // hay una prueba que recorre `db.persona` y caza a la que lo haga.
+            usuario: 'operario' + n + '@prueba.cl',
+            clave_hash: Reglas.claveHash(id, 'x'), clave_inicial: false,
             nombres: 'Operario', apellidos: 'de prueba ' + n, cargo: 'Operario',
             correo: 'operario' + n + '@prueba.cl', telefono: '', direccion: '', comuna: '',
             modulos: null, activo: true, demo: true });
@@ -1418,7 +1421,7 @@ const Pruebas = (function () {
         Object.keys(ESPERADO).forEach((usuario) => {
           const p = db.persona.find((x) => x.usuario === usuario);
           if (!p) { malas.push(usuario + ': la cuenta no existe'); return; }
-          const r = Modelo.iniciar_sesion(p.usuario, p.clave);
+          const r = Modelo.iniciar_sesion(p.usuario, Semilla.CLAVE_DEMO);
           if (!r.ok) { malas.push(usuario + ': no entra — ' + r.motivo); return; }
           const ve = Modelo.MODULOS_MENU.filter((m) => entraAlModulo(m.id)).map((m) => m.id);
           const falta = ESPERADO[usuario].filter((x) => ve.indexOf(x) < 0);
@@ -1864,7 +1867,7 @@ const Pruebas = (function () {
         try { localStorage.removeItem(CLAVE); } catch (e) { /* sin almacenamiento */ }
 
         const p = db.persona.find((x) => x.usuario === 'gabriel.diaz@dyp.cl');
-        const r = p ? Modelo.iniciar_sesion(p.usuario, p.clave) : { ok: false, motivo: 'sin cuenta' };
+        const r = p ? Modelo.iniciar_sesion(p.usuario, Semilla.CLAVE_DEMO) : { ok: false, motivo: 'sin cuenta' };
         let quedo = null;
         try { quedo = localStorage.getItem(CLAVE); } catch (e) { quedo = null; }
         try { if (previo !== null) localStorage.setItem(CLAVE, previo); } catch (e) { /* nada */ }
@@ -1881,6 +1884,296 @@ const Pruebas = (function () {
         });
       })();
 
+
+      /* 🔴 SIS-1 · LA CLAVE NO SE GUARDA EN NINGUNA PARTE (23-08-2026).
+
+         El documento entero sube a la sala compartida, y la sala se lee sin
+         cuenta con la llave publicable, que va publicada en `js/sala.js`. Un
+         GET anónimo devolvía las catorce cuentas con su clave legible.
+
+         Esta prueba mira el DATO, no el código: da lo mismo cómo se escriba
+         mientras en `persona` no quede una clave que se pueda leer. */
+      (function () {
+        const cuentas = db.persona.filter((p) => p.usuario);
+        const conTexto = cuentas.filter((p) => p.clave !== undefined);
+        const sinHuella = cuentas.filter((p) => !p.clave_hash);
+
+        push({
+          nombre: '🔴 Ninguna cuenta guarda su clave, sólo la huella',
+          intento: 'Recorrer las ' + cuentas.length + ' cuentas y buscar el campo `clave`',
+          esperado: 'Cero con clave legible, las ' + cuentas.length + ' con `clave_hash`',
+          paso: cuentas.length > 0 && conTexto.length === 0 && sinHuella.length === 0,
+          detalle: conTexto.length
+            ? conTexto.length + ' cuentas siguen guardando la clave en texto: ' +
+              conTexto.slice(0, 3).map((p) => p.usuario).join(', ')
+            : (sinHuella.length
+              ? sinHuella.length + ' cuentas no tienen huella y no va a entrar nadie'
+              : 'Las ' + cuentas.length + ' guardan huella y ninguna guarda la clave')
+        });
+      })();
+
+      /* 🔴 SIS-1 · Y LA HUELLA TIENE QUE SERVIR PARA ALGO.
+
+         ⚠️ Sin esta segunda prueba, la de arriba se aprueba borrando el campo
+         `clave` y nada más: cero claves legibles, cero forma de entrar. Ya pasó
+         en este proyecto una prueba que daba verde sin probar nada. */
+      (function () {
+        const p = db.persona.find((x) => x.usuario === 'gabriel.diaz@dyp.cl');
+        const buena = p ? Modelo.iniciar_sesion(p.usuario, Semilla.CLAVE_DEMO) : { ok: false };
+        const mala = p ? Modelo.iniciar_sesion(p.usuario, Semilla.CLAVE_DEMO + 'x') : { ok: true };
+
+        push({
+          nombre: '🔴 La clave buena entra y la equivocada no',
+          intento: 'Entrar con la clave de demostración, y después con esa misma más una letra',
+          esperado: 'La primera entra, la segunda no',
+          paso: !!buena.ok && !mala.ok,
+          detalle: !buena.ok ? 'La clave BUENA no entró: ' + buena.motivo
+            : (mala.ok ? 'La clave equivocada entró: la huella no se está comparando'
+              : 'Entra la buena, rebota la equivocada')
+        });
+      })();
+
+      /* 🔴 SIS-1 · CAMBIAR LA CLAVE TAMPOCO LA ESCRIBE.
+
+         Éste es el daño que de verdad se cierra. La clave de demostración es
+         pública y da lo mismo; la que escribe una persona es SUYA, y de las que
+         se reutilizan en otras partes. Antes quedaba en el documento. */
+      (function () {
+        const p = db.persona.find((x) => x.usuario === 'nicole.hernandez@dyp.cl');
+        const NUEVA = 'clave-de-prueba-2026';
+        const antes = p ? p.clave_hash : null;
+        const r = p ? Modelo.cambiar_clave(p.id, Semilla.CLAVE_DEMO, NUEVA) : { ok: false, motivo: 'sin cuenta' };
+        const quedoEnTexto = !!p && JSON.stringify(p).indexOf(NUEVA) >= 0;
+        const entraConLaNueva = r.ok && Modelo.iniciar_sesion(p.usuario, NUEVA).ok;
+        // Se deja como estaba: las demás pruebas cuentan con la clave de demostración.
+        if (p && antes) { p.clave_hash = antes; p.clave_inicial = true; }
+
+        push({
+          nombre: '🔴 La clave que escribe una persona tampoco queda escrita',
+          intento: 'Cambiar la clave de una cuenta y buscar el texto nuevo dentro de su ficha',
+          esperado: 'No aparece por ninguna parte, y aun así se puede entrar con ella',
+          paso: r.ok && !quedoEnTexto && entraConLaNueva,
+          detalle: !r.ok ? 'No dejó cambiarla: ' + r.motivo
+            : (quedoEnTexto ? 'La clave nueva quedó escrita en la ficha, legible'
+              : (!entraConLaNueva ? 'Se guardó, pero después no deja entrar con ella'
+                : 'Sólo quedó la huella, y sirve para entrar'))
+        });
+      })();
+
+      /* 🔶 SIS-1 · EL SHA-256 ES EL DE VERDAD.
+
+         Está escrito a mano —el proyecto no tiene dependencias y `crypto.subtle`
+         es asíncrono— así que hay que comprobarlo contra los vectores conocidos.
+         Una huella «casi» correcta no da error: da otro número, y nadie entra. */
+      (function () {
+        const VECTORES = [
+          ['', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'],
+          ['abc', 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'],
+          ['hello', '2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824'],
+          /* ⚠️ Con ñ y con tilde, que es el que se rompe de verdad: si el texto
+             no entra como bytes UTF-8, «Muñoz» da una huella en un navegador y
+             otra en otro, y la persona deja de poder entrar según dónde esté. */
+          ['Muñoz', '02529cce20e22bd9fbbe678115e1e3c318c8c7159c54ac2b2d1420c7199ab4c7'],
+          ['clave con ñ y tilde: áéíóú',
+            '8d35f931090b706b453abe71686ef21492c9da4eadc7c6d7b81b08291a2c9e25']
+        ];
+        const fallan = VECTORES.filter(([t, esperado]) => Reglas.sha256(t) !== esperado);
+        const idAdentro = Reglas.claveHash('pe-t-5', 'x') !== Reglas.claveHash('pe-t-6', 'x');
+
+        push({
+          nombre: '🔶 El SHA-256 escrito a mano da los vectores conocidos',
+          intento: 'Hashear los cinco vectores conocidos, con ñ y tilde incluidos',
+          esperado: 'Los cinco calzan, y la huella cambia si cambia la persona',
+          paso: fallan.length === 0 && idAdentro,
+          detalle: fallan.length
+            ? fallan.length + ' vectores no calzan: el hash está roto y no va a entrar nadie'
+            : (!idAdentro ? 'Dos personas con la misma clave dan la misma huella'
+              : 'Los cinco vectores calzan y la huella lleva el id adentro')
+        });
+      })();
+
+
+      /* 🔴 SIS-2 · ENTRAR AL SISTEMA NO SUBE NADA A LA SALA (23-08-2026).
+
+         `fijar_persona_actual` y `cerrar_sesion` suben `version` —y hacen bien:
+         cambian los permisos y hay que botar los memos— pero la sala estaba
+         usando ESE número para decidir si tenía algo que mandar. Entrar y salir
+         subía el documento entero, 2,4 MB, sin que hubiera cambiado un dato. El
+         contador de la sala iba en 508 sin que nadie hubiera trabajado tanto.
+
+         La prueba mira los DOS contadores, porque el arreglo consiste
+         exactamente en que dejen de moverse juntos. */
+      (function () {
+        const p = db.persona.find((x) => x.usuario === 'gabriel.diaz@dyp.cl');
+        const q = db.persona.find((x) => x.usuario === 'nicole.hernandez@dyp.cl');
+
+        /* Se parte de una sala SINCRONIZADA: se aplica un documento, y con eso
+           la sala anota que lo que hay acá ya está allá. */
+        // Igual que abajo: el documento que de verdad viaja, con sus fechas.
+        try { Sala.aplicar({ version: 900, db: JSON.parse(localStorage.getItem(Modelo.CLAVE)) }); } catch (e) { /* sin almacenamiento */ }
+        const alDia = Sala.hayQueSubir();
+
+        Modelo.iniciar_sesion(p.usuario, Semilla.CLAVE_DEMO);
+        Modelo.iniciar_sesion(q.usuario, Semilla.CLAVE_DEMO);
+        Modelo.cerrar_sesion();
+        Modelo.iniciar_sesion(p.usuario, Semilla.CLAVE_DEMO);
+        const trasEntrarYSalir = Sala.hayQueSubir();
+
+        Modelo.guardar_catalogo('asunto_bitacora', { nombre: 'Un cambio de verdad' });
+        const trasCambiarUnDato = Sala.hayQueSubir();
+
+        push({
+          nombre: '🔴 Entrar y salir no le manda nada a la sala',
+          intento: 'Preguntarle a la SALA si tiene algo que subir: recién sincronizada, ' +
+            'tras entrar y salir cuatro veces, y tras cambiar un dato',
+          esperado: 'No · No · Sí',
+          paso: !alDia && !trasEntrarYSalir && trasCambiarUnDato,
+          detalle: alDia
+            ? 'Cree que tiene algo que subir cuando acaba de sincronizar'
+            : (trasEntrarYSalir
+              ? 'Entrar y salir la hace subir el documento entero: 2,4 MB por nada, ' +
+                'y otros 2,4 de bajada por cada equipo conectado'
+              : (!trasCambiarUnDato
+                ? 'Un cambio de verdad NO subiría: la sala dejó de sincronizar en silencio, que es peor'
+                : 'Sólo sube cuando cambió el documento guardado'))
+        });
+      })();
+
+      /* 🔴 SIS-2 · PERO CAMBIAR UN DATO SÍ TIENE QUE LLEGAR.
+
+         ⚠️ Sin esta segunda, la de arriba se aprueba dejando el contador
+         clavado en cero: nada sube nunca y la sala deja de sincronizar en
+         silencio, que es peor que el problema que vino a arreglar. */
+      (function () {
+        const antes = Modelo.versionGuardada();
+        // Sin `id`: es un alta, que no necesita que la fila exista de antes.
+        const r = Modelo.guardar_catalogo('asunto_bitacora', { nombre: 'Prueba SIS-2' });
+        const despues = Modelo.versionGuardada();
+
+        push({
+          nombre: '🔴 Cambiar un dato sí sube exactamente una vez',
+          intento: 'Guardar una fila de catálogo y mirar el contador que lee la sala',
+          esperado: 'Sube 1',
+          paso: !!r.ok && despues === antes + 1,
+          detalle: !r.ok ? 'No dejó guardar: ' + r.motivo
+            : (despues === antes
+              ? 'El contador no se movió: el cambio NO llegaría nunca a la sala'
+              : (despues - antes) + ' de diferencia')
+        });
+      })();
+
+      /* 🔶 SIS-2 · EL PESO DEL DOCUMENTO SE PUEDE MIRAR.
+
+         El techo real es `localStorage`: 5 a 10 MB según navegador, y ahí el
+         sistema deja de guardar. A 11 KB por orden y 180 órdenes al mes, eso
+         llega a los dos meses y medio de operación de verdad. Un techo que se
+         ve venir tiene arreglo; uno que aparece en medio de una demostración,
+         no. */
+      (function () {
+        const p = (typeof Sala !== 'undefined' && Sala.peso) ? Sala.peso() : null;
+        const bytes = p ? p.bytes : 0;
+
+        push({
+          nombre: '🔶 Cuánto pesa el documento que sube a la sala se puede ver',
+          intento: 'Preguntarle a la sala el peso de lo guardado',
+          esperado: 'Un número mayor que cero, con su rótulo, y bajo el aviso de 3 MB',
+          paso: !!p && bytes > 0 && !!p.rotulo && !p.apretado,
+          detalle: !p ? 'La sala no sabe decir cuánto pesa'
+            : (bytes === 0 ? 'Dice 0 bytes: no está leyendo lo guardado'
+              : (p.apretado
+                ? 'Ya pasó los 3 MB (' + p.rotulo + '): hay que cortar lo que viaja'
+                : p.rotulo + ' guardados, bajo el aviso de 3 MB'))
+        });
+      })();
+
+
+
+      /* 🔴 SIS-3 · EL DOBLE CLIC NO ESCRIBE DOS VECES (23-08-2026).
+
+         La regla 15 estaba escrita desde el principio y enchufada en UN solo
+         lugar: la recepción. Comprobado en el navegador, sobre la orden 23267:
+         dos llamadas seguidas dejaban DOS bitácoras idénticas. Y había una
+         tercera copia de la misma idea —`Reglas.operacionYaHecha`— exportada y
+         sin un solo uso.
+
+         ⚠️ La segunda llamada no devuelve un error: devuelve LO MISMO que la
+         primera, marcado `repetida`. Para quien apretó, salió bien una vez, que
+         es lo que cree que pasó. */
+      (function () {
+        /* `Modelo.base()` en vez del `db` de arriba: la sala puede haber
+           reemplazado el objeto, y contar en el viejo da cero. */
+        const bd = Modelo.base();
+        const ot = bd.orden_trabajo.find((o) => !Reglas.esTerminal(bd, o.estado));
+        const asunto = bd.asunto_bitacora[0];
+        const MENSAJE = 'Prueba de doble clic ' + Date.now();
+        const antes = bd.bitacora.length;
+
+        const a = Modelo.escribir_bitacora(ot.id, { asunto_id: asunto.id, mensaje: MENSAJE });
+        const b = Modelo.escribir_bitacora(ot.id, { asunto_id: asunto.id, mensaje: MENSAJE });
+        const agregadas = bd.bitacora.length - antes;
+
+        // Y un mensaje DISTINTO en la misma orden sí tiene que entrar.
+        const c = Modelo.escribir_bitacora(ot.id, { asunto_id: asunto.id, mensaje: MENSAJE + ' y algo más' });
+        const agregadasDespues = bd.bitacora.length - antes;
+
+        push({
+          nombre: '🔴 Dos clics en la bitácora dejan UNA anotación',
+          intento: 'Escribir el mismo mensaje dos veces seguidas, y después uno distinto',
+          esperado: 'Una sola anotación de las dos primeras; la tercera sí entra',
+          paso: a.ok && b.ok && agregadas === 1 && c.ok && agregadasDespues === 2,
+          detalle: agregadas === 2
+            ? 'Quedaron DOS anotaciones idénticas: el doble clic sigue duplicando'
+            : (!b.ok ? 'La segunda devolvió un error en vez de devolver lo mismo: ' + b.motivo
+              : (agregadasDespues !== 2
+                ? 'Un mensaje DISTINTO no entró: la llave está agarrando de más'
+                : 'Una anotación de las dos iguales, y la distinta entró'))
+        });
+
+        push({
+          nombre: '🔶 La segunda llamada dice que fue repetida',
+          intento: 'Mirar lo que devuelve la segunda',
+          esperado: 'ok, y marcada `repetida`',
+          paso: !!b.ok && !!b.repetida,
+          detalle: b.repetida ? 'Devuelve lo mismo que la primera, marcado'
+            : 'No viene marcada: quien llame no puede saber que no escribió'
+        });
+      })();
+
+      /* 🔶 SIS-3 · LA TABLA DE OPERACIONES NO CRECE PARA SIEMPRE.
+
+         Viaja a la sala dentro del documento, así que una lista que sólo crece
+         es peso muerto cruzando la red en cada sincronización. Se poda con la
+         misma ventana con la que se decide si algo fue un doble clic.
+
+         ⚠️ La prueba PLANTA una operación vieja en vez de esperar a que pase el
+         tiempo. Sin eso no probaba nada: en una corrida nunca se juntan las
+         suficientes para notar la diferencia, y la mutación «que no se pode
+         nunca» pasaba en verde.  */
+      (function () {
+        const bd = Modelo.base();
+        bd.operacion.push({ llave: 'plantada-vieja', resultado: { ok: true }, ms: 1 });
+        const conLaVieja = bd.operacion.length;
+
+        // Cualquier acción con llave dispara la poda.
+        const ot = bd.orden_trabajo.find((o) => !Reglas.esTerminal(bd, o.estado));
+        Modelo.escribir_bitacora(ot.id, { asunto_id: bd.asunto_bitacora[0].id,
+          mensaje: 'Dispara la poda ' + Date.now() });
+
+        const quedaLaVieja = Modelo.base().operacion.some((o) => o.llave === 'plantada-vieja');
+        const ahora = Modelo.base().operacion.length;
+
+        push({
+          nombre: '🔶 Las operaciones viejas se podan solas',
+          intento: 'Plantar una operación de hace rato y ejecutar una acción con llave',
+          esperado: 'La vieja ya no está; las de la ventana sí',
+          paso: conLaVieja > 0 && !quedaLaVieja && ahora > 0,
+          detalle: quedaLaVieja
+            ? 'La vieja sigue ahí: la tabla crece para siempre y viaja entera en cada sincronización'
+            : (ahora === 0
+              ? 'Se podó todo, incluida la recién hecha: no ataja ningún doble clic'
+              : 'La vieja se fue y quedaron ' + ahora + ' dentro de la ventana')
+        });
+      })();
       /* 🔴 3 · EL COLOR DE UN CATALOGO SE LIMPIA EN EL MOTOR.
 
          El color se pinta dentro de un atributo `style`. La vista lo escapa,
@@ -1972,6 +2265,81 @@ const Pruebas = (function () {
         });
       })();
 
+
+
+      /* ⚠️ ESTA PRUEBA VA ULTIMA, Y NO ES CAPRICHO.
+
+         Llama a `Sala.aplicar`, que por dentro hace `Modelo.recargarDeDisco()`,
+         y eso REEMPLAZA el objeto `db` del modelo por otro. El arnés capturó el
+         suyo en la primera línea de `correr()`: desde acá para abajo, esa
+         referencia mira un objeto que ya no es el del sistema.
+
+         Costó encontrarlo: la prueba de la bitácora decía que un mensaje nuevo
+         no entraba, y sí entraba — lo que pasaba es que se estaba contando en
+         el `db` viejo. Lo que se ve no falla; lo que se mide, sí. */
+
+      /* 🔴 SIS-2 · PISAR LO DE OTRO EQUIPO YA NO ES SILENCIOSO (23-08-2026).
+
+         La prueba llama a `Sala.aplicar()`, que es la función que de verdad
+         escribe encima — no a un ayudante que decida bien por su cuenta. Es la
+         lección de COD-1: una prueba que comprueba el JUICIO y no el CABLEADO
+         se queda verde cuando alguien desenchufa la llamada. */
+      (function () {
+        const nombreP = '🔴 Cuando lo de otro equipo tapa lo mío, el sistema lo dice';
+        if (typeof Sala === 'undefined' || !Sala.aplicar) {
+          push({ nombre: nombreP, intento: 'Aplicar lo que llega de la sala',
+            esperado: 'Avisa', paso: false, detalle: 'La sala no está cargada' });
+          return;
+        }
+
+        /* ⚠️ El documento tiene que ser el QUE DE VERDAD VIAJA, y no uno armado
+           acá con `Modelo.base()`: el modelo escribe las fechas con su propio
+           serializador, y un `JSON.stringify` sin él las deja como texto plano.
+           Con eso adentro, la Reportería revienta con «getFullYear is not a
+           function» tres pantallas más allá. Se toma el guardado tal cual. */
+        let crudo = null;
+        try { crudo = localStorage.getItem(Modelo.CLAVE); } catch (e) { crudo = null; }
+        if (!crudo) {
+          push({ nombre: nombreP, intento: 'Aplicar lo que llega de la sala',
+            esperado: 'Avisa', paso: false, detalle: 'Sin almacenamiento: no se pudo probar' });
+          return;
+        }
+        const ajeno = { version: 999, db: JSON.parse(crudo) };
+
+        /* ⚠️ Punto de partida propio. Las pruebas de más arriba dejan cambios
+           sin subir, y sin esta primera pasada el aviso salta por lo que hizo
+           OTRA prueba y no por lo que hace ésta. Se sincroniza, se limpia, y
+           recién ahí se mide. */
+        Sala.aplicar(ajeno);
+        Sala.porQueSePerdio();
+
+        Sala.aplicar(ajeno);                   // nadie cambió nada desde la anterior
+        const avisoSinCambios = Sala.porQueSePerdio();
+
+        Modelo.guardar_catalogo('asunto_bitacora', { nombre: 'Iba escribiendo esto' });
+        Sala.aplicar(ajeno);                   // ahora sí tapa algo mío
+        const avisoConCambios = Sala.porQueSePerdio();
+
+        push({
+          nombre: '🔴 Cuando lo de otro equipo tapa lo mío, el sistema lo dice',
+          intento: 'Aplicar lo que llega de la sala dos veces: sin haber cambiado nada, y habiendo cambiado algo',
+          esperado: 'La primera vez no avisa; la segunda sí',
+          paso: !avisoSinCambios && !!avisoConCambios,
+          detalle: avisoSinCambios
+            ? 'Avisó sin que hubiera nada que perder: va a gritar en cada sincronización'
+            : (!avisoConCambios
+              ? 'Pisó lo que estaba escrito acá y no dijo nada'
+              : 'Avisa sólo cuando hay algo que se perdió')
+        });
+
+        push({
+          nombre: '🔶 El aviso se lee una vez y se olvida',
+          intento: 'Volver a preguntar por el aviso que ya se leyó',
+          esperado: 'Ya no está: si no, reaparece en cada repintado',
+          paso: Sala.porQueSePerdio() === null,
+          detalle: 'Igual que `porQueSeResembro` del modelo'
+        });
+      })();
 
       restaurarSesion();
       return res;

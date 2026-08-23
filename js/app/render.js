@@ -273,6 +273,11 @@ function render() {
   // que vengan, en vez de tener que acordarse de llamarlo en cada vista.
   marcarEtiquetas();
   mejorarTablas();
+  /* Y por la misma razón otra vez: amarrar cada `<label>` con su campo vale
+     para las quince pantallas y para las que vengan. Se pasa `document` y no
+     `c` porque los campos de la barra y de los diálogos viven fuera del
+     contenido. Son 118 controles: cuesta menos que pintar la tabla. */
+  Acceso.etiquetar(document);
 
   const f = ESTADO_BARRA[ui.vista];
   pintarBarraEstado(f ? f() : '');

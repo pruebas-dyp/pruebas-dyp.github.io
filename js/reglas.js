@@ -659,7 +659,110 @@ const Reglas = (function () {
 
   const hoyEnChile = () => soloDia(new Date());
 
+  /* ── LA CLAVE NO SE GUARDA ─────────────────────────────────────────────
+     SIS-1, 23-08-2026.
+
+     Antes la clave se guardaba tal cual en `persona.clave`. Eso viaja: el
+     documento entero sube a la sala compartida, y la sala se lee sin cuenta
+     con la llave publicable, que está escrita en `js/sala.js` y publicada. Un
+     GET devolvía las catorce cuentas con su clave legible.
+
+     🔴 Y lo que hay que decir sin adornarlo: esto NO da seguridad. El código
+     corre en el navegador, el algoritmo está acá abajo a la vista, y la clave
+     de demostración es una sola y conocida — sacar su huella y compararla es
+     cosa de un minuto para cualquiera. La seguridad de verdad llega con la
+     autenticación del servidor, que es el hito H1.
+
+     ⚠️ Lo que SÍ arregla, y por eso vale hacerlo igual: cuando una persona
+     cambia su clave por una suya —de las que la gente reutiliza en otras
+     partes— esa clave ya no queda escrita en un documento que cualquiera baja.
+     Antes sí quedaba. Eso es daño real y es el que se cierra hoy.
+
+     La huella lleva el id de la persona adentro, así que dos cuentas con la
+     misma clave no dan la misma huella y mirar la lista no delata quién
+     comparte clave con quién. */
+
+  /* SHA-256, escrito acá porque el proyecto no tiene ni va a tener dependencias
+     y porque `crypto.subtle` es asíncrono: meterlo obligaría a volver asíncrono
+     el ingreso entero y todas sus pantallas. Es el algoritmo estándar y está
+     comprobado contra los vectores conocidos en `pruebas.js`, no supuesto. */
+  const SHA_K = [
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+  ];
+
+  function sha256(texto) {
+    /* El texto entra como bytes UTF-8: sin esto, «Muñoz» y «Munoz» darían la
+       misma huella en unos navegadores y distinta en otros. */
+    const bytes = [];
+    for (const ch of String(texto)) {
+      let c = ch.codePointAt(0);
+      if (c < 0x80) bytes.push(c);
+      else if (c < 0x800) bytes.push(0xc0 | (c >> 6), 0x80 | (c & 63));
+      else if (c < 0x10000) bytes.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+      else bytes.push(0xf0 | (c >> 18), 0x80 | ((c >> 12) & 63), 0x80 | ((c >> 6) & 63), 0x80 | (c & 63));
+    }
+
+    const bits = bytes.length * 8;
+    bytes.push(0x80);
+    while (bytes.length % 64 !== 56) bytes.push(0);
+    // El largo va al final en 64 bits. Los 32 de arriba quedan en cero: no
+    // vamos a hashear textos de dos mil millones de bytes.
+    bytes.push(0, 0, 0, 0, (bits >>> 24) & 255, (bits >>> 16) & 255, (bits >>> 8) & 255, bits & 255);
+
+    let h0 = 0x6a09e667, h1 = 0xbb67ae85, h2 = 0x3c6ef372, h3 = 0xa54ff53a;
+    let h4 = 0x510e527f, h5 = 0x9b05688c, h6 = 0x1f83d9ab, h7 = 0x5be0cd19;
+    const gira = (x, n) => (x >>> n) | (x << (32 - n));
+    const w = new Array(64);
+
+    for (let i = 0; i < bytes.length; i += 64) {
+      for (let t = 0; t < 16; t++) {
+        w[t] = (bytes[i + t * 4] << 24) | (bytes[i + t * 4 + 1] << 16) |
+               (bytes[i + t * 4 + 2] << 8) | bytes[i + t * 4 + 3];
+      }
+      for (let t = 16; t < 64; t++) {
+        const s0 = gira(w[t - 15], 7) ^ gira(w[t - 15], 18) ^ (w[t - 15] >>> 3);
+        const s1 = gira(w[t - 2], 17) ^ gira(w[t - 2], 19) ^ (w[t - 2] >>> 10);
+        w[t] = (w[t - 16] + s0 + w[t - 7] + s1) | 0;
+      }
+      let a = h0, b = h1, c = h2, d = h3, e = h4, f = h5, g = h6, h = h7;
+      for (let t = 0; t < 64; t++) {
+        const S1 = gira(e, 6) ^ gira(e, 11) ^ gira(e, 25);
+        const ch = (e & f) ^ (~e & g);
+        const t1 = (h + S1 + ch + SHA_K[t] + w[t]) | 0;
+        const S0 = gira(a, 2) ^ gira(a, 13) ^ gira(a, 22);
+        const maj = (a & b) ^ (a & c) ^ (b & c);
+        const t2 = (S0 + maj) | 0;
+        h = g; g = f; f = e; e = (d + t1) | 0;
+        d = c; c = b; b = a; a = (t1 + t2) | 0;
+      }
+      h0 = (h0 + a) | 0; h1 = (h1 + b) | 0; h2 = (h2 + c) | 0; h3 = (h3 + d) | 0;
+      h4 = (h4 + e) | 0; h5 = (h5 + f) | 0; h6 = (h6 + g) | 0; h7 = (h7 + h) | 0;
+    }
+
+    return [h0, h1, h2, h3, h4, h5, h6, h7]
+      .map((x) => (x >>> 0).toString(16).padStart(8, '0')).join('');
+  }
+
+  /* La huella que se guarda en `persona.clave_hash`. Lleva el id adentro para
+     que dos personas con la misma clave no compartan huella. */
+  const claveHash = (persona_id, clave) => sha256('dyp:' + String(persona_id) + ':' + String(clave));
+
+  /* Comparar por acá y no con `===` suelto en tres archivos distintos: si
+     mañana esto cambia —y cambia en H1—, cambia en un solo lugar. */
+  const claveCalza = (persona, clave) =>
+    !!persona && !!persona.clave_hash && persona.clave_hash === claveHash(persona.id, clave);
+
+
   return {
+    // claves
+    sha256, claveHash, claveCalza,
     // fechas
     soloDia, hoyEnChile,
     // parámetros

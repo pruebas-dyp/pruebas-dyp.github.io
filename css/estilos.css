@@ -1860,3 +1860,25 @@ table.grid td.abre-ot:hover { text-decoration: underline; }
    pintar de rojo algo que se arregla solo en el latido siguiente. */
 .barra-estado .celda.sala-viva { color: var(--verde, #15803d); font-weight: 600; }
 .barra-estado .celda.sala-viva svg { color: inherit; }
+
+/* ───────── Solo para lectores de pantalla ─────────
+   El texto que se anuncia pero no se dibuja. SIS-3, 23-08-2026.
+
+   No se usa `display:none` ni `visibility:hidden`: las dos sacan el nodo del
+   arbol de accesibilidad y entonces no se anuncia nada, que es justo lo
+   contrario de lo que esto viene a hacer. La receta es sacarlo de la vista
+   dejandolo en el arbol. */
+.solo-lectores {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* El credito a Arttmize en la barra de estado: se ve, no grita. SIS-3. */
+.barra-estado .celda a { color: inherit; text-decoration: none; opacity: .72; }
+.barra-estado .celda a:hover,
+.barra-estado .celda a:focus-visible { opacity: 1; text-decoration: underline; }

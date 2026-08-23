@@ -818,7 +818,11 @@ const Semilla = (function () {
            MARCHA. Una clave compartida y escrita en el código no es una clave:
            es un cartel. Queda marcada `clave_inicial`, así que el sistema pide
            cambiarla al entrar y lo dice en la ficha de cada cuenta. */
-        clave: CLAVE_DEMO,
+        /* 🔴 SE SIEMBRA LA HUELLA, NO LA CLAVE (SIS-1, 23-08-2026). El
+           documento entero sube a la sala compartida y la sala se lee sin
+           cuenta: mientras acá decía `clave: CLAVE_DEMO`, un GET devolvía las
+           catorce claves legibles. El porqué completo está en `Reglas`. */
+        clave_hash: Reglas.claveHash(id, CLAVE_DEMO),
         clave_inicial: true,
         nombres: x.nombre, apellidos: x.apellidos || '', cargo: x.cargo,
         correo: corto + '@dyp.cl',
@@ -1676,7 +1680,10 @@ const Semilla = (function () {
   })();
 
   return {
-    generar, CATALOGO_PERMISOS, INVENTARIO_ESTADOS, INVENTARIO_POR_OMISION, SELLO,
+    /* CLAVE_DEMO sale para que la pantalla de ingreso la pueda MOSTRAR. Antes
+       la sacaba de `persona.clave`, que ya no existe: la clave compartida es
+       una propiedad de la demostración, no de cada persona. */
+    generar, CLAVE_DEMO, CATALOGO_PERMISOS, INVENTARIO_ESTADOS, INVENTARIO_POR_OMISION, SELLO,
     TOTAL_TORRE, CON_REPUESTO_PENDIENTE, FUERA_DE_TALLER, SIN_ETAPA,
     TRABAJADORES, EQUIPO_DEMO, TOTAL_HISTORICO, ULTIMA_OT
   };

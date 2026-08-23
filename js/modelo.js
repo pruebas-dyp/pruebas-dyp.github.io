@@ -61,6 +61,21 @@ const Modelo = (function () {
   let version = 0;          // sube en cada mutación: invalida los memos
   const memo = {};
 
+  /* 🔴 DOS CONTADORES, PORQUE SON DOS PREGUNTAS DISTINTAS (SIS-2, 23-08-2026).
+
+     `version` sube en cada mutación y también al entrar, al salir y al cambiar
+     de cuenta — y ahí hace bien, porque cambian los permisos y hay que botar
+     los memos. Pero la sala compartida estaba usando ESE número para decidir
+     si tenía algo que mandar, y entrar al sistema no cambia ningún dato.
+
+     Resultado: cada entrada y cada salida subía el documento entero —2,4 MB— a
+     la sala, y cada otro dispositivo conectado se lo bajaba. El contador de la
+     sala iba en 508 sin que nadie hubiera trabajado tanto.
+
+     `versionGuardada` sube SÓLO cuando el documento guardado cambió, que es lo
+     único que a la sala le importa. */
+  let versionGuardada = 0;
+
   /* ── Persistencia ─────────────────────────────────────────────────────── */
 
   // OJO con esta: JSON.stringify llama a Date.prototype.toJSON ANTES que al
@@ -79,6 +94,8 @@ const Modelo = (function () {
   function guardar() {
     try {
       localStorage.setItem(CLAVE, JSON.stringify({ modificado, sello: Semilla.SELLO, db }, aJSON));
+      // Acá y sólo acá cambia el documento guardado, que es lo que la sala manda.
+      versionGuardada++;
       return true;
     } catch (e) {
       /* Cuota llena o file:// sin almacenamiento: el borrador sigue andando
@@ -143,6 +160,16 @@ const Modelo = (function () {
         .some((p) => /-\d{3}$/.test(String(p.numero_or || '')));
       if (conFormatoViejo) return ['OR con el correlativo viejo (23368-18868-001)'];
 
+      /* 🔴 SIS-1, 23-08-2026. La clave dejó de guardarse en texto y pasó a
+         guardarse como huella en `clave_hash`. El SELLO no se entera —mira las
+         cuentas y sus módulos, no sus campos— así que una base guardada antes
+         de hoy conserva `clave` y no tiene `clave_hash`: el ingreso la compara
+         contra una huella que no existe y NO ENTRA NADIE, sin ningún aviso.
+         Por eso esta comprobación existe y por eso va acá. */
+      const conClaveEnTexto = (g.db.persona || [])
+        .some((p) => p.usuario && (p.clave !== undefined || p.clave_hash === undefined));
+      if (conClaveEnTexto) return ['las claves guardadas en texto, de antes de SIS-1'];
+
       return null;
     } catch (e) { return ['(base ilegible)']; }
   }
@@ -205,6 +232,9 @@ const Modelo = (function () {
     if (!g) return false;
     db = g.db; modificado = !!g.modificado;
     version++; limpiarMemo(); alinearSeqEvento();
+    // El documento cambió, aunque no lo haya cambiado nadie de acá: lo escribió
+    // la sala. Sube igual, y `Sala.aplicar` anota acto seguido que ya está allá.
+    versionGuardada++;
     pila.length = 0;   // la pila de deshacer es de esta pestaña y ya no aplica
     return true;
   }
@@ -233,7 +263,13 @@ const Modelo = (function () {
     const guardarReal = guardar;
     try {
       db = Semilla.generar(); modificado = false; version++; limpiarMemo();
-      guardar = function () { return true; };
+      /* El simulacro no escribe en el navegador —para eso existe la caja de
+         arena— pero DICE que guardó, y entonces tiene que mover el contador
+         igual que el de verdad. Si no, adentro de la caja `versionGuardada`
+         queda clavado y cualquier prueba sobre la sala mide una mentira.
+         (SIS-2, 23-08-2026: la primera versión no lo hacía y la prueba de
+         «cambiar un dato sí sube» fallaba sin que hubiera nada roto.) */
+      guardar = function () { versionGuardada++; return true; };
       return fn();
     } finally {
       guardar = guardarReal;
@@ -845,13 +881,53 @@ const Modelo = (function () {
      ═══════════════════════════════════════════════════════════════════════ */
 
   /* Idempotencia (regla 15). El doble clic no crea dos: la segunda llamada
-     con la misma llave devuelve lo mismo que la primera, sin escribir. */
+     con la misma llave devuelve lo mismo que la primera, sin escribir.
+
+     🔴 ESTABA ESCRITA Y ENCHUFADA EN UN SOLO LUGAR (SIS-3, 23-08-2026).
+
+     De todas las acciones que crean algo, sólo `crear_ot_desde_recepcion`
+     pasaba por acá. Comprobado en el navegador con la orden 23267: dos clics
+     seguidos dejaban DOS bitácoras idénticas y DOS presupuestos. No es teoría.
+
+     Y había además una tercera copia de la misma idea: `Reglas.operacionYaHecha`,
+     documentada como «Regla 15 · Idempotencia», exportada, y sin un solo uso en
+     todo el proyecto. Dos lugares resolviendo lo mismo por caminos distintos es
+     el patrón que este proyecto viene arrastrando. Ahora la pregunta se hace en
+     un solo lado y esta función la usa.
+
+     ⚠️ Se resuelve como manda la casa: **no deshabilitando el botón**. Si la
+     persona aprieta dos veces, la segunda devuelve LO MISMO que la primera —no
+     un error, no un cartel—. Para quien mira, apretó una vez y salió bien, que
+     es exactamente lo que cree que pasó. */
+
+  /* La ventana. Sólo cuenta como repetición lo que llega dentro de unos
+     segundos: escribir el mismo mensaje en la misma orden UN RATO DESPUÉS es
+     una decisión de la persona, no un accidente del mouse, y el sistema no está
+     para adivinar cuál de las dos quiso.
+
+     Y hay una segunda razón para que exista la ventana: esta tabla viaja a la
+     sala dentro del documento. Sin poda, una lista que sólo crece es peso
+     muerto cruzando la red en cada sincronización. */
+  const VENTANA_DOBLE_CLIC = 6000;   // ms
+
   function conLlave(llave, fn) {
     if (!llave) return fn();
-    const previo = db.operacion.find((o) => o.llave === llave);
-    if (previo) return Object.assign({ ok: true, motivo: '', repetida: true }, previo.resultado);
+
+    const ahoraMs = Date.now();
+    if (db.operacion.length) {
+      db.operacion = db.operacion.filter((o) => (ahoraMs - (o.ms || 0)) < VENTANA_DOBLE_CLIC);
+    }
+
+    if (Reglas.operacionYaHecha(db, llave)) {
+      const previo = db.operacion.find((o) => o.llave === llave);
+      return Object.assign({ ok: true, motivo: '', repetida: true }, previo.resultado);
+    }
+
     const r = fn();
-    if (r.ok) { db.operacion.push({ llave, resultado: r, at: ahora() }); guardar(); }
+    /* Sólo se recuerda lo que salió bien. Un rechazo repetido tiene que volver
+       a rechazar: si la persona corrige el motivo y aprieta otra vez, esa
+       segunda SÍ tiene que hacerse. */
+    if (r.ok) { db.operacion.push({ llave, resultado: r, at: ahora(), ms: ahoraMs }); guardar(); }
     return r;
   }
 
@@ -2045,6 +2121,17 @@ const Modelo = (function () {
      contraria: el botón se aprieta siempre y la regla rechaza EXPLICANDO el
      motivo — un TypeError no explica nada. Las cinco firmas del motor que
      desestructuran quedaron iguales, no sólo ésta. */
+  /* ⚠️ ESTA NO LLEVA LLAVE DERIVADA, y la razón importa (SIS-3, 23-08-2026).
+
+     El primer intento fue `conLlave('presupuesto:' + ot_id + ':' + id_reparacion)`,
+     y está mal: cuando no se pasa `id_reparacion` el sistema lo asigna solo, así
+     que la llave quedaba igual para todas las OR de la misma orden. Y «un
+     vehículo tiene una sola OT y puede tener varias OR» es textual del cliente:
+     dos presupuestos sobre la misma orden son legítimos. Lo cazó la prueba de
+     las líneas de presupuesto, que dejó de encontrar la segunda OR.
+
+     El doble clic acá se ataja donde de verdad ocurre, que es el clic, y está
+     en `js/app/acciones.js`. */
   function crear_presupuesto(ot_id, { id_reparacion, lineas } = {}) {
     const o = db.orden_trabajo.find((x) => x.id === ot_id);
     if (!o) return { ok: false, motivo: 'La orden de trabajo no existe.' };
@@ -2765,6 +2852,15 @@ const Modelo = (function () {
   /* ── Bitácora y alertas ───────────────────────────────────────────────── */
 
   function escribir_bitacora(ot_id, { asunto_id, mensaje, destinatario_id } = {}) {
+    /* Regla 15. La llave se arma acá, con los argumentos, y no la pasa quien
+       llama: así vale igual desde la ficha, desde el expediente o desde donde
+       venga mañana. El mismo mensaje, en la misma orden, del mismo asunto y
+       dentro de unos segundos es un doble clic — no dos anotaciones. */
+    return conLlave('bitacora:' + ot_id + ':' + asunto_id + ':' + String(mensaje || '').trim(), () =>
+      _escribir_bitacora(ot_id, { asunto_id, mensaje, destinatario_id }));
+  }
+
+  function _escribir_bitacora(ot_id, { asunto_id, mensaje, destinatario_id } = {}) {
     const permiso = Reglas.puedeEscribirBitacora(db, { ot_id, asunto_id, mensaje });
     if (!permiso.ok) return permiso;
     db.bitacora.push({
@@ -3201,7 +3297,7 @@ const Modelo = (function () {
     // El mismo mensaje para usuario inexistente y clave equivocada: decir
     // "ese usuario no existe" le regala a cualquiera la lista de quién trabaja
     // acá. Es la única parte de esto que ya está bien hecha.
-    if (!p || p.clave !== clave)
+    if (!p || !Reglas.claveCalza(p, clave))
       return { ok: false, motivo: 'Usuario o clave incorrectos.' };
     if (!p.activo)
       return { ok: false, motivo: 'La cuenta de ' + p.nombres + ' está desactivada. ' +
@@ -3254,11 +3350,15 @@ const Modelo = (function () {
   function cambiar_clave(persona_id, actual, nueva) {
     const p = db.persona.find((x) => x.id === persona_id);
     if (!p) return { ok: false, motivo: 'Esa persona no existe.' };
-    if (p.clave !== actual) return { ok: false, motivo: 'La clave actual no coincide.' };
+    if (!Reglas.claveCalza(p, actual)) return { ok: false, motivo: 'La clave actual no coincide.' };
     const n = String(nueva || '');
     if (n.length < 6) return { ok: false, motivo: 'La clave nueva tiene que tener al menos 6 caracteres.' };
     if (n === actual) return { ok: false, motivo: 'La clave nueva es igual a la anterior.' };
-    p.clave = n;
+    /* 🔴 Acá está el daño que SIS-1 cierra de verdad. La clave de demostración
+       es pública y da lo mismo; la que escribe una persona acá es SUYA, y de
+       las que se reutilizan en otras partes. Antes quedaba escrita tal cual en
+       el documento que cualquiera baja de la sala. */
+    p.clave_hash = Reglas.claveHash(p.id, n);
     p.clave_inicial = false;
     tocado();
     return { ok: true, motivo: '' };
@@ -3289,7 +3389,9 @@ const Modelo = (function () {
         id: p.id, nombre: nombreDe(p), cargo: p.cargo || rol.nombre,
         rol: rol.nombre, rol_id: rol.id,
         usuario: p.usuario || null, ficha: p.ficha || null,
-        claveDemo: p.clave_inicial ? p.clave : null,
+        // La clave que la pantalla de ingreso MUESTRA. Sale de la semilla, no
+        // de la persona: desde SIS-1 la persona sólo guarda la huella.
+        claveDemo: p.clave_inicial ? Semilla.CLAVE_DEMO : null,
         etapas: db.persona_etapa.filter((h) => h.persona_id === p.id)
           .map((h) => (db.etapa.find((e) => e.id === h.etapa_id) || {}).nombre).filter(Boolean)
       };
@@ -3636,7 +3738,19 @@ const Modelo = (function () {
   /* El orden importa: permiso por fuera —lo rechazado ahí no pasó y no se
      registra—, deshacer en medio, y el registro pegado a la operación. */
   return conPermiso(conDeshacer(conRegistro({
-    iniciar, reiniciar, sembrar, estaModificado, porQueSeResembro, base, sandbox, version: () => version,
+    iniciar, reiniciar, sembrar, estaModificado, porQueSeResembro, base, sandbox,
+    // Dos contadores con dos nombres, para que nadie vuelva a agarrar el que
+    // no era: este sube en cada mutacion Y al cambiar de cuenta, y sirve para
+    // botar los memos. El de la sala es `versionGuardada`.
+    versionMemo: () => version,
+    // La que mira la sala: sube sólo si cambió el documento guardado, no al
+    // entrar ni al salir. El porqué está arriba, junto a las dos variables.
+    versionGuardada: () => versionGuardada,
+    // Cuánto pesa lo que sube a la sala. Es el número que hace la conversación
+    // de almacenamiento, y el que avisa antes de que el techo llegue solo.
+    pesoGuardado: () => {
+      try { const s = localStorage.getItem(CLAVE); return s ? s.length : 0; } catch (e) { return 0; }
+    },
     recargarDeDisco, CLAVE,
     deshacer, puedeDeshacer, proximoDeshacer,
     // consultas

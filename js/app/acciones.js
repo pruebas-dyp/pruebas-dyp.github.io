@@ -333,6 +333,14 @@ function pintarBarraEstado(extra) {
       ico('base') + esc(sala.rotulo) + '</span>' +
     '<span class="celda">' + ico('usuario') + esc(quienMira()) + '</span>' +
     '<span class="celda">Automotora DyP</span>' +
+    /* 🔷 EL CRÉDITO DE LA CASA (SIS-3, 23-08-2026). No existía: cero
+       apariciones de arttmize.com en todo el sistema publicado.
+
+       Va discreto y va acá abajo a propósito. La marca del sitio es la del
+       cliente —el índigo, el logo, el nombre— y este crédito no le compite:
+       es una línea en la barra de estado, del tamaño de las demás. */
+    '<span class="celda"><a href="https://arttmize.com" target="_blank" rel="noopener noreferrer" ' +
+      'title="Sistema desarrollado por Arttmize SpA">Por Arttmize</a></span>' +
     '<span class="celda" title="Sello de la publicación que estás viendo. Si no es el ' +
       'de la última, el navegador tiene la copia vieja: Ctrl+F5.">' +
       'Versión ' + esc(selloVersion()) + '</span>' +
@@ -648,6 +656,64 @@ function ejecutarAccion(accion) {
    POR QUÉ. Nunca deshabilitamos el botón: se aprieta, y si no corresponde se
    explica. */
 
+/* ───────────────── El doble clic no cuenta dos veces ─────────────────
+   SIS-3, 23-08-2026.
+
+   🔴 EL PROBLEMA, COMPROBADO Y NO SUPUESTO. Se probó en el navegador sobre la
+   orden 23267: dos llamadas seguidas a escribir bitácora dejaban DOS
+   anotaciones idénticas, y dos a crear presupuesto dejaban DOS OR. La regla 15
+   —«doble clic en cualquier botón que cree algo no crea dos»— estaba escrita
+   desde el principio y enchufada en UN solo lugar, la recepción.
+
+   Dónde se ataja cada cosa, que son dos problemas distintos:
+
+   · Cuando el contenido identifica la intención —el mismo mensaje, en la misma
+     orden, del mismo asunto— la llave se arma con los argumentos y el atajo
+     vive en el motor (`conLlave`, en `js/modelo.js`). Vale venga de donde
+     venga la llamada.
+
+   · Cuando la misma acción repetida es LEGÍTIMA —dos OR sobre la misma orden lo
+     son, textual del cliente— el motor no puede distinguir un doble clic de
+     una decisión. Ahí lo único que sabe la diferencia es el reloj del clic, y
+     por eso se ataja acá.
+
+   ⚠️ NO deshabilita ningún botón, que es regla de la casa. El botón sigue
+   respondiendo; lo que se descarta es el segundo disparo del MISMO botón dentro
+   de la ventana. Para quien mira, apretó y salió bien. */
+const VENTANA_REPIQUE = 600;   // ms
+const ultimoDisparo = new Map();
+
+/* ⚠️ SE INDEXA POR EL NOMBRE DEL BOTÓN, NO POR EL NODO, y esto no es un detalle:
+   el primer intento usó un `WeakMap` con el elemento de llave y NO ATAJABA NADA.
+   Cada acción llama a `render()`, que vuelve a armar el HTML entero, así que el
+   botón que recibe el segundo clic es un nodo NUEVO y el mapa no lo conocía.
+
+   Se descubrió probándolo en el navegador —tres clics seguidos en «Agregar OR»
+   creaban tres OR— y no se podía descubrir de otra forma: el arnés de consola
+   no tiene DOM y ahí el guardia se veía perfecto. */
+const nombreDeBoton = (b) => b.id || b.getAttribute('data-crea') || b.textContent.trim();
+
+document.addEventListener('click', (ev) => {
+  const b = ev.target && ev.target.closest && ev.target.closest('button');
+  if (!b) return;
+  /* Sólo los que hacen algo irreversible. Un botón de filtro, de pestaña o de
+     abrir un panel se puede apretar veinte veces seguidas sin que pase nada
+     malo, y atajarlo se sentiría como que la pantalla no responde. */
+  if (!b.matches('[data-crea]')) return;
+
+  const ahora = Date.now();
+  const llave = nombreDeBoton(b);
+  const previo = ultimoDisparo.get(llave) || 0;
+  if (ahora - previo < VENTANA_REPIQUE) {
+    ev.stopImmediatePropagation();
+    ev.preventDefault();
+    return;
+  }
+  ultimoDisparo.set(llave, ahora);
+  // El mapa no crece para siempre: se botan las entradas fuera de la ventana.
+  ultimoDisparo.forEach((t, k) => { if (ahora - t > VENTANA_REPIQUE) ultimoDisparo.delete(k); });
+}, true);   // en captura: hay que llegar ANTES que el oyente del botón
+
 function avisar(resultado, textoOk, opciones) {
   const caja = document.getElementById('avisos') || (function () {
     const c = document.createElement('div');
@@ -662,6 +728,12 @@ function avisar(resultado, textoOk, opciones) {
     '<span>' + esc(resultado.ok ? (textoOk || 'Listo.') : resultado.motivo) + '</span>' +
     '<button class="cerrar" type="button" aria-label="Cerrar">&times;</button>';
   caja.appendChild(a);
+  /* Y se dice en voz alta. El `role="status"` de arriba no alcanza por sí solo:
+     el nodo se crea YA con su texto adentro, y varios lectores de pantalla no
+     anuncian el contenido de una región que aparece completa — anuncian lo que
+     cambia dentro de una que ya estaba. Por eso el anuncio va a una región fija
+     que vive desde el arranque. (SIS-3, 23-08-2026: el sistema tenía cero.) */
+  Acceso.anunciar(resultado.ok ? (textoOk || 'Listo.') : resultado.motivo, !resultado.ok);
   const quitar = () => a.remove();
   a.querySelector('.cerrar').addEventListener('click', quitar);
   /* Los rechazos se quedan más rato: hay que poder leerlos. Y `persistente` no

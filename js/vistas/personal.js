@@ -43,7 +43,7 @@ function personalListado() {
     <input type="search" id="per-q" placeholder="Ficha, cuenta o RUT" value="${esc(p.busqueda)}">
     <label><input type="checkbox" id="per-bajas" ${p.verBajas ? 'checked' : ''}> Mostrar desactivadas</label>
     <span style="flex:1"></span>
-    ${Modelo.puede('personal.editar') ? '<button class="btn secundario" id="per-nuevo">Nueva cuenta</button>' : ''}
+    ${Modelo.puede('personal.editar') ? '<button class="btn secundario" id="per-nuevo" data-crea>Nueva cuenta</button>' : ''}
   </div>
 
   <div class="grid-envoltorio"><table class="grid">

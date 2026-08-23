@@ -224,7 +224,7 @@ function vPresupuestoOT(o) {
           ? '<button class="btn secundario" id="presu-pt" ' +
             'title="Declarar el vehículo como pérdida total. Cierra la orden.">Pérdida total</button>'
           : ''}
-        <button class="btn" id="presu-nuevo">Agregar OR</button>
+        <button class="btn" id="presu-nuevo" data-crea>Agregar OR</button>
       </div>
     </div>
     <div class="cuerpo">
@@ -631,7 +631,7 @@ function vPresupuestoDetalle(o, pr) {
          mismo que ya pasa solo enseña a desconfiar de lo automático — el
          usuario lo aprieta «por si acaso» y nunca sabe cuál de los dos
          caminos movió la pieza. */''}
-    <button class="btn secundario" id="presu-version">Crear versión nueva</button>
+    <button class="btn secundario" id="presu-version" data-crea>Crear versión nueva</button>
     ${Modelo.puede('presupuesto.montos')
       ? '<button class="btn secundario" id="presu-pdf" data-pr="' + esc(pr.id) + '">' +
         ico('imprimir') + 'Ver el documento</button>'

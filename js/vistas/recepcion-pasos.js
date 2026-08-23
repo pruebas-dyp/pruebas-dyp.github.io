@@ -345,7 +345,7 @@ function recDanos() {
           '<td class="celda-obs-inv">' + recObsInv(it, v) + '</td></tr>';
       }).join('')}</tbody>
     </table></div>
-    <div class="pie-nota">🔶 Dejó de ser un sí/no. <strong>Sin verificar no es lo mismo que no presente</strong>:
+    <div class="pie-nota">Dejó de ser un sí/no. <strong>Sin verificar no es lo mismo que no presente</strong>:
       lo primero es que nadie alcanzó a mirarlo, lo segundo es que se revisó y no estaba. Y
       <strong>dañado no es lo mismo que faltante</strong>: son dos reclamos distintos. Lo que nadie toca
       queda en <em>sin verificar</em>, nunca en <em>no presente</em>.</div>

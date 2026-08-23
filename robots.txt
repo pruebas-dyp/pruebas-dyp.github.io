@@ -1,0 +1,11 @@
+# Automotora DyP - modelo borrador. No es un sitio publico: es una demostracion
+# para un cliente. El index.html ya lleva <meta name="robots" content="noindex">,
+# pero eso solo cubre esa pagina y no los archivos .js que la acompanan.
+#
+# ADVERTENCIA HONESTA: esto le habla a los buscadores que quieran escucharlo. No
+# es un control de acceso y no impide que nadie con la direccion baje cualquier
+# archivo. El repositorio que sirve este sitio es PUBLICO, porque GitHub Pages
+# en plan gratuito lo exige. Cerrar eso de verdad es cambiar de hosting.
+
+User-agent: *
+Disallow: /
