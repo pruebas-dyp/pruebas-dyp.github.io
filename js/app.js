@@ -513,7 +513,14 @@ const HERRAMIENTAS_DEMO = [
      pantallas a la vez. El rótulo dice en qué estado va a quedar, no en cuál
      está: un botón que dice «Sala compartida» cuando ya está encendida obliga
      a adivinar qué pasa al apretarlo. */
-  { texto: 'sala', icono: 'base', accion: 'sala', pie: 'sala' }
+  { texto: 'sala', icono: 'base', accion: 'sala', pie: 'sala' },
+  /* La salida de emergencia de la sala. La sala se escribe sin identificarse,
+     asi que puede quedar adentro algo que no sirve; hasta el 22-08-2026 la
+     unica forma de salir era abrir la consola del navegador, que en medio de
+     una reunion no es una salida. */
+  { texto: 'Reponer la sala con los datos de demostración', icono: 'refrescar',
+    accion: 'reponer-sala',
+    pie: 'Deja este equipo como recién sembrado y pisa lo que haya en la sala' }
 ];
 
 /* El rótulo del interruptor se arma al abrir el cuadro, porque depende de cómo
@@ -990,6 +997,23 @@ function ejecutarAccion(accion) {
      allá —la sala manda sobre el equipo—, así que se avisa con todas las
      letras: si alguien tenía media recepción cargada acá y en la sala hay otra
      cosa, es mejor que lo sepa antes y no después. */
+  if (accion === 'reponer-sala') {
+    if (typeof Sala === 'undefined') return;
+    const encendida = Sala.estado().encendida;
+    const aviso = encendida
+      ? 'Este equipo vuelve a los datos de demostración y los SUBE a la sala, pisando lo que haya.'
+        + '\n\n' + 'Los demás dispositivos conectados van a ver lo mismo en unos segundos.'
+      : 'Este equipo vuelve a los datos de demostración.'
+        + '\n\n' + 'La sala está apagada, así que no sube nada.';
+    if (!confirm(aviso + '\n\n' + '¿Continuar?')) return;
+    Sala.reponer();
+    ir('torre');
+    return dialogo('Sala repuesta',
+      '<p>El sistema volvió a la semilla: ' + Modelo.metricas().enTorre + ' vehículos en la torre.' +
+      (encendida ? ' Se está subiendo a la sala.' : ' La sala está apagada: no se subió nada.') +
+      '</p>');
+  }
+
   if (accion === 'sala') {
     if (typeof Sala === 'undefined') return avisar({ ok: false, motivo: 'La sala no está disponible.' });
     const s = Sala.estado();
@@ -2926,57 +2950,28 @@ function pararEnLaOrden(numeroOT) {
    El navegador avisa del cambio con el evento `storage`, que llega solo a las
    OTRAS pestañas. Se relee y se repinta lo que esté a la vista. */
 window.addEventListener('storage', (ev) => {
-  /* La SESIÓN también viaja entre pestañas, y esto faltaba.
+  /* 🔶 LA SESION YA NO VIAJA ENTRE PESTAÑAS, Y ES A PROPOSITO (22-08-2026).
 
-     La sesión es una sola para todo el navegador, pero cada pestaña se queda
-     con la que tenía al abrirse. Si en la torre se cierra sesión y entra otra
-     persona, la pestaña de una orden abierta seguía mostrando —y dejando
-     operar— como la anterior hasta que alguien la recargara a mano.
+     Acá había una rama que atendía el cambio de sesión: si en una pestaña se
+     cerraba sesión o entraba otra persona, las demás se ponían al día. Vivía de
+     que la sesión estuviera en `localStorage`, que es del navegador entero.
 
-     Desde adentro eso se ve como "la información no viaja": se mira la misma
-     orden desde dos pestañas con dos cuentas distintas, y una no la ve porque
-     cada rol alcanza órdenes distintas. Y es peor que un problema de vista: la
-     pestaña vieja conserva los permisos de quien ya se fue. */
-  if (ev.key === Modelo.CLAVE_SESION) return realinearSesion();
+     Desde hoy la sesión está en `sessionStorage` —porque en `localStorage`
+     sobrevivía a cerrar el navegador y el siguiente entraba como el anterior,
+     sin clave—. `sessionStorage` es por pestaña y no emite este evento, así que
+     esa rama no volvería a dispararse nunca: se saca en vez de dejarla ahí
+     pareciendo que hace algo.
 
+     Lo que se perdió: dos pestañas ya no comparten sesión. Lo que se ganó: cada
+     pestaña tiene la suya, que es lo que corresponde. Los DATOS sí siguen
+     viajando —eso es lo de abajo— y esa era la mitad que de verdad importaba.
+
+     `Modelo.sesionGuardada()` y `sesionAlDia()` quedan exportadas sin llamador
+     acá. No se tocan: las usa la comprobación de sesión del arranque. */
   if (ev.key !== Modelo.CLAVE) return;
   if (!Modelo.recargarDeDisco()) return;
   if (ui.registroOT) modoRegistro(ui.registroOT); else render();
 });
-
-function realinearSesion() {
-  if (Modelo.sesionAlDia()) return;
-
-  // Cerraron sesión en otra pestaña: acá también se cierra.
-  if (!Modelo.sesionGuardada()) {
-    Modelo.cerrar_sesion();
-    document.querySelectorAll('.velo, .velo-impreso, .desplegable').forEach((v) => v.remove());
-    if (ui.registroOT) {
-      // La ventana de una orden no tiene menú donde dibujar el ingreso: se
-      // dice qué pasó y se ofrece volver, que es lo único que corresponde.
-      document.getElementById('contenido').innerHTML =
-        '<div class="panel"><div class="cuerpo"><div class="vacio">' + ico('candado') +
-        '<div class="titulo">Se cerró la sesión</div>' +
-        '<div class="texto">Cerraron la sesión en otra pestaña. Vuelve al sistema para entrar de nuevo.</div>' +
-        '<a class="btn" href="index.html">Volver al sistema</a></div></div></div>';
-      return;
-    }
-    pintarMenu(); ir('mitrabajo'); pantallaIngreso();
-    return;
-  }
-
-  // Entró otra persona: esta pestaña se pone al día con ella.
-  if (!Modelo.retomar_sesion()) return;
-  const p = Modelo.personaActual();
-  if (ui.registroOT) { modoRegistro(ui.registroOT); } else {
-    pintarMenu();
-    // Si la cuenta nueva no alcanza el módulo donde estábamos, `ir` lo rechaza
-    // y explica; se parte de lo suyo, que es lo que corresponde al entrar.
-    ir(PERMISO_DE_MODULO[ui.vista] && !Modelo.puede(PERMISO_DE_MODULO[ui.vista]) ? 'mitrabajo' : ui.vista);
-  }
-  avisar({ ok: true, motivo: '' }, 'Esta pestaña se puso al día: ahora está la sesión de ' +
-    ((p || {}).cargo || Modelo.rolActual().nombre) + '.');
-}
 
 /* Las teclas que la barra de herramientas promete. Si el botón dice F2, F2
    tiene que hacerlo: un atajo rotulado que no responde es lo mismo que un

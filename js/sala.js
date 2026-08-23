@@ -33,8 +33,13 @@ const Sala = (function () {
 
   const URL_BASE = 'https://qhhofnveqggoklnxqpig.supabase.co/rest/v1/sala_demo';
   /* Llave pública. Va en el navegador a propósito: es la que identifica al
-     proyecto, no una contraseña. Lo que protege la base son sus políticas,
-     y acá están abiertas porque los datos son de demostración. */
+     proyecto, no una contraseña. Lo que protege la base son sus políticas.
+
+     Desde el 22-08-2026 esas políticas están ACOTADAS y no abiertas: se lee
+     cualquier fila —el celular tiene que poder, sin cuenta—, pero escribir y
+     actualizar sólo alcanzan la fila `demo`, y borrar no tiene política, que
+     con RLS activo significa que no borra. Antes se podía escribir cualquier
+     fila con sólo leer esta línea. */
   const LLAVE = 'sb_publishable_dcOznm8bTszeiPxz87hWcQ_XC-1EoUK';
 
   const SALA      = 'demo';   // una sola sala, para que todos caigan en la misma
@@ -122,8 +127,59 @@ const Sala = (function () {
      El borrador de una recepción a medio llenar vive en OTRA clave del
      navegador, así que no se pierde: quien esté escribiendo una recepción
      cuando llega un cambio de afuera conserva lo suyo. */
+  /* 🔴 LO QUE LLEGA DE LA SALA SE REVISA ANTES DE ADOPTARLO (22-08-2026).
+
+     Acá había un `if (!fila || !fila.db) return false` y nada más: cualquier
+     documento que estuviera en la tabla se escribía como la base completa del
+     sistema. Un `db: {}` dejaba el sistema en blanco en todos los navegadores
+     conectados, en menos de un latido.
+
+     Y la tabla se escribe SIN identificarse: la dirección y la llave están en
+     este mismo archivo, publicado. Que la llave sea pública está bien —es la
+     publishable de Supabase, identifica al proyecto, no autentica—, pero
+     entonces la única defensa es la política de la tabla y esta revisión.
+
+     No valida el contenido, que sería reimplementar el modelo acá. Valida la
+     FORMA: que traiga las tablas sin las cuales el sistema no es el sistema.
+     Con eso, lo que puede entrar deja de ser cualquier cosa.
+
+     ⚠️ OJO CON EL NIVEL, que es donde se equivocó el primer intento: lo que
+     viaja NO es la base, es el ENVOLTORIO que el modelo guarda —
+     `{ modificado, sello, db }`— y las tablas están un piso más abajo, en
+     `.db`. Validar en el nivel de arriba rechaza TODO, incluida la base buena,
+     y la sala deja de sincronizar en silencio. Lo cazó el criterio de
+     aceptación de COD-1, que obliga a probar que la buena entra y no sólo que
+     la mala se rechaza. */
+  const TABLAS_MINIMAS = ['persona', 'orden_trabajo', 'etapa', 'estado', 'rol', 'permiso'];
+
+  function esBaseCreible(envoltorio) {
+    if (!envoltorio || typeof envoltorio !== 'object' || Array.isArray(envoltorio))
+      return 'no es un objeto';
+    const db = envoltorio.db;
+    if (!db || typeof db !== 'object' || Array.isArray(db))
+      return 'no trae el envoltorio { modificado, sello, db } que guarda el modelo';
+    const faltan = TABLAS_MINIMAS.filter((t) => !Array.isArray(db[t]));
+    if (faltan.length) return 'le faltan tablas: ' + faltan.join(', ');
+    /* Vacías tampoco: una base sin personas ni etapas no deja entrar a nadie
+       ni mostrar nada, y es exactamente lo que deja un documento en blanco.
+
+       Se leen con `|| []` y no directo: esta función revisa lo que manda un
+       tercero, así que no puede LANZAR — tiene que devolver el motivo. Sin la
+       guarda, tocar el orden de las comprobaciones de arriba la hacía reventar
+       con «cannot read properties of undefined», y una defensa que se cae con
+       una excepción deja de defender. */
+    if (!(db.persona || []).length) return 'no trae ninguna persona';
+    if (!(db.etapa || []).length) return 'no trae ninguna etapa';
+    return null;
+  }
+
   function aplicar(fila) {
     if (!fila || !fila.db) return false;
+    const malo = esBaseCreible(fila.db);
+    if (malo) {
+      ultimoError = 'La sala trajo algo que no es una base del sistema: ' + malo;
+      return false;
+    }
     aplicando = true;
     try {
       localStorage.setItem(Modelo.CLAVE, JSON.stringify(fila.db));
@@ -237,5 +293,27 @@ const Sala = (function () {
     encender();
   }
 
-  return { iniciar, encender, apagar, alternar, estado, empujar, latido };
+  /* 🔴 LA SALIDA DE EMERGENCIA (22-08-2026).
+
+     La sala se escribe sin identificarse. Si alguien deja adentro algo que no
+     sirve —o si dos dispositivos se pisan y queda un estado raro—, hasta ahora
+     la unica forma de salir era abrir la consola del navegador. En medio de
+     una reunion con el cliente eso no es una salida.
+
+     Repone la semilla en este equipo y la sube, pisando lo que haya. Es
+     deliberadamente destructivo hacia la sala: para eso existe. */
+  function reponer() {
+    Modelo.reiniciar();
+    ultimoError = null;
+    versionEnviada = -1;          // fuerza la subida en el proximo latido
+    if (!encendida) return { ok: true, motivo: '' };
+    empujar();
+    return { ok: true, motivo: '' };
+  }
+
+  /* `aplicar` sale para poder PROBARLO: la revision de lo que llega de la sala
+     es lo unico que separa el sistema de un documento cualquiera puesto por un
+     tercero, y una defensa que no se puede probar no se sabe si esta. */
+  return { iniciar, encender, apagar, alternar, estado, empujar, latido, reponer, aplicar,
+           esBaseCreible };
 })();

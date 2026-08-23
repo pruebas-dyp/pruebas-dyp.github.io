@@ -111,10 +111,10 @@ function vAsignarEtapas(o) {
         const a = enc(e.codigo);
         return `
         <article class="tarea${a.esperandoValidacion ? ' esperando' : ''}${a.finalizada ? ' cerrada' : ''}">
-          <div class="franja" style="background:${e.color}"></div>
+          <div class="franja" style="background:${esc(e.color)}"></div>
           <div class="tarea-cuerpo">
             <div class="tarea-alto">
-              <span class="etapa"><i class="punto" style="background:${e.color}"></i>${esc(e.nombre)}</span>
+              <span class="etapa"><i class="punto" style="background:${esc(e.color)}"></i>${esc(e.nombre)}</span>
               <span class="plazo ${a.finalizada ? 'listo' : (a.esperandoValidacion ? 'espera' : '')}">${a.finalizada
                 ? 'cerrada' : (a.esperandoValidacion ? 'esperando visto bueno' : 'en curso')}</span>
             </div>
@@ -162,12 +162,12 @@ function vAsignarEtapas(o) {
         const gente = gentePara(e.codigo);
         return `
         <label class="tarea elegible" for="asig-${esc(e.codigo)}">
-          <div class="franja" style="background:${e.color}"></div>
+          <div class="franja" style="background:${esc(e.color)}"></div>
           <div class="tarea-cuerpo">
             <div class="tarea-alto">
               <span class="etapa">
                 <input type="checkbox" id="asig-${esc(e.codigo)}" data-asignar="${esc(e.codigo)}">
-                <i class="punto" style="background:${e.color}"></i>${esc(e.nombre)}</span>
+                <i class="punto" style="background:${esc(e.color)}"></i>${esc(e.nombre)}</span>
               ${e.opcional
                 ? '<span class="plazo" title="Un tapabarro o un espejo no pasa por mecánica">no siempre</span>'
                 : ''}

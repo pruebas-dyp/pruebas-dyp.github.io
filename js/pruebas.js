@@ -1781,6 +1781,145 @@ const Pruebas = (function () {
         });
       })();
 
+      /* ══ COD-1 · Las tres defensas de seguridad del 22-08-2026 ═════════
+         Las tres son invisibles: no cambian ni una pantalla. Si alguien las
+         deshace sin querer, nada se ve distinto — sólo vuelve a estar abierto
+         lo que se cerró. Por eso van medidas. */
+
+      /* 🔴 1 · LO QUE LLEGA DE LA SALA SE REVISA ANTES DE ADOPTARLO.
+
+         La sala se escribe sin identificarse: la direccion y la llave estan en
+         `sala.js`, publicado. Antes, cualquier documento que estuviera en esa
+         tabla se adoptaba como la base completa del sistema — un `{}` dejaba
+         todas las pantallas conectadas en blanco.
+
+         Se prueban las dos mitades, y la primera importa mas: que la base
+         BUENA entre. El primer intento de este arreglo validaba un nivel mas
+         arriba de donde estan las tablas y rechazaba TODO, incluida la buena:
+         la sala dejaba de sincronizar en silencio. */
+      (function () {
+        const haySala = typeof Sala !== 'undefined' && typeof Sala.esBaseCreible === 'function';
+        const buena = { modificado: false, sello: 'x', db: db };
+        const malas = [
+          ['un documento vacio',            {}],
+          ['sin el envoltorio del modelo',  { modificado: false, sello: 'x' }],
+          ['sin las tablas minimas',        { db: { persona: [{}] } }],
+          /* Trae persona Y etapa, asi que las dos comprobaciones de «vacio» lo
+             dejan pasar: sólo cae por las tablas que faltan. Es el caso que
+             cuida ESA comprobacion, y sin el se podia borrar sin que nada se
+             pusiera rojo. Es tambien un caso real: un documento truncado. */
+          ['truncado a medias',             { db: { persona: [{ id: 'x' }], etapa: [{ id: 'e' }] } }],
+          ['sin ninguna persona',           { db: Object.assign({}, db, { persona: [] }) }],
+          ['un arreglo en vez de objeto',   [1, 2, 3]],
+          ['nulo',                          null]
+        ];
+        const aceptaBuena = haySala && Sala.esBaseCreible(buena) === null;
+        /* Las malas se prueban llamando a `Sala.aplicar()` y NO a
+           `esBaseCreible()`: lo que hay que cuidar es que la revision este
+           ENCHUFADA. Probando solo el juicio, borrar la llamada dentro de
+           `aplicar` dejaba esta prueba en verde y la sala abierta otra vez.
+           Medido rompiendolo a proposito el 22-08-2026. */
+        const foto = () => Modelo.base().persona.length + String.fromCharCode(124) + Modelo.base().orden_trabajo.length;
+        const antes = foto();
+        /* Se llama a `aplicar()` de verdad y no a `esBaseCreible()`: lo que hay
+           que cuidar es que la revision este ENCHUFADA.
+
+           No hace falta deshacer nada DESPUES, y ese es justamente el punto: si
+           la revision funciona, ninguna de estas seis toca la base. La foto de
+           antes y la de despues lo comprueban. Si alguna se cuela, la base
+           queda con lo que trajo y las pruebas siguientes se van a caer — feo,
+           pero correcto: eso es exactamente lo que pasaria en el navegador de
+           alguien.
+
+           Y una excepcion cuenta como que SE COLO, no como aprobado: adoptar
+           algo que revienta a mitad de camino es peor que rechazarlo. */
+        const pasanMalas = haySala
+          ? malas.filter(([, m]) => {
+              try { return Sala.aplicar({ db: m, version: 9001 }) !== false; }
+              catch (e) { return true; }
+            }).map(([r]) => r)
+          : ['(no se pudo probar)'];
+
+        const despues = foto();
+        const baseIntacta = antes === despues;
+        push({
+          nombre: '🔴 La sala no adopta cualquier cosa, pero si adopta la base buena',
+          intento: 'Ofrecerle a la sala la base real y ' + malas.length + ' documentos que no lo son',
+          esperado: 'La buena entra; las ' + malas.length + ' malas rebotan con su motivo',
+          paso: haySala && aceptaBuena && !pasanMalas.length && baseIntacta,
+          detalle: !haySala ? 'No existe Sala.esBaseCreible(): sala.js no cargo'
+            : (!aceptaBuena
+                ? 'RECHAZA LA BASE BUENA: la sala deja de sincronizar y nadie se entera. Motivo: ' +
+                  Sala.esBaseCreible(buena)
+                : (pasanMalas.length ? 'Se colaron: ' + pasanMalas.join(', ')
+                  : (!baseIntacta ? 'Una mala reboto pero igual dejo la base tocada'
+                    : 'Entra la buena y rebotan las ' + malas.length + ' por aplicar()')))
+        });
+      })();
+
+      /* 🔴 2 · LA SESION NO VIVE EN `localStorage`.
+
+         Estaba ahi, y `localStorage` sobrevive a cerrar el navegador: quien
+         prendiera despues ese computador entraba como la ultima persona que lo
+         uso, sin clave. En el meson de recepcion de un taller, donde el equipo
+         lo usan tres personas al dia, ese es el caso normal.
+
+         La prueba mira el ALMACENAMIENTO, no el codigo: da igual como se
+         escriba mientras la sesion no quede ahi. */
+      (function () {
+        const CLAVE = Modelo.CLAVE_SESION;
+        let previo = null;
+        try { previo = localStorage.getItem(CLAVE); } catch (e) { previo = null; }
+        try { localStorage.removeItem(CLAVE); } catch (e) { /* sin almacenamiento */ }
+
+        const p = db.persona.find((x) => x.usuario === 'gabriel.diaz@dyp.cl');
+        const r = p ? Modelo.iniciar_sesion(p.usuario, p.clave) : { ok: false, motivo: 'sin cuenta' };
+        let quedo = null;
+        try { quedo = localStorage.getItem(CLAVE); } catch (e) { quedo = null; }
+        try { if (previo !== null) localStorage.setItem(CLAVE, previo); } catch (e) { /* nada */ }
+
+        push({
+          nombre: '🔴 La sesion no queda guardada en el navegador entero',
+          intento: 'Entrar con una cuenta y mirar si el id quedo en localStorage',
+          esperado: 'No queda: la sesion vive en sessionStorage y muere con la pestaña',
+          paso: r.ok && quedo === null,
+          detalle: !r.ok ? 'No dejo entrar: ' + r.motivo
+            : (quedo !== null
+              ? 'La sesion quedo en localStorage (' + quedo + '): sobrevive a cerrar el navegador'
+              : 'No quedo en localStorage')
+        });
+      })();
+
+      /* 🔴 3 · EL COLOR DE UN CATALOGO SE LIMPIA EN EL MOTOR.
+
+         El color se pinta dentro de un atributo `style`. La vista lo escapa,
+         pero eso depende de que cada pantalla se acuerde; el motor no depende
+         de nadie. Y hasta el 22-08-2026 el valor por omision se aplicaba SOLO
+         al crear: al EDITAR una etapa el color entraba tal cual. */
+      (function () {
+        const et = db.etapa[2];
+        const ataques = ['#fff" onmouseover="alert(1)', '"><script>alert(1)</script>',
+                         'javascript:alert(1)', '#GGGGGG', 'red', ''];
+        const colaron = [];
+        ataques.forEach((mal) => {
+          Modelo.guardar_catalogo('etapa', { id: et.id, nombre: et.nombre, color: mal });
+          const q = db.etapa.find((e) => e.id === et.id).color;
+          if (!/^#[0-9a-f]{6}$/i.test(q)) colaron.push(mal.slice(0, 24) + ' -> ' + q);
+        });
+        Modelo.guardar_catalogo('etapa', { id: et.id, nombre: et.nombre, color: '#a3e635' });
+        const sobrevive = db.etapa.find((e) => e.id === et.id).color === '#a3e635';
+        push({
+          nombre: '🔴 Un color que no es un color no entra al catalogo',
+          intento: 'Guardar ' + ataques.length + ' colores invalidos y despues uno legitimo',
+          esperado: 'Los invalidos quedan en el color por omision; el legitimo se conserva',
+          paso: !colaron.length && sobrevive,
+          detalle: colaron.length ? 'Se colaron: ' + colaron.join(' · ')
+            : (!sobrevive ? 'El color legitimo tambien se descarto: la validacion es demasiado dura'
+              : 'Los ' + ataques.length + ' invalidos se limpiaron y el legitimo quedo')
+        });
+      })();
+
+
       restaurarSesion();
       return res;
     });

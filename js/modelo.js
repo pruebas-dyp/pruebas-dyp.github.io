@@ -2860,10 +2860,35 @@ const Modelo = (function () {
   const catalogo = (tabla) => (db[tabla] || []).slice()
     .sort((a, b) => (a.orden || 0) - (b.orden || 0) || String(a.nombre).localeCompare(String(b.nombre), 'es'));
 
+  /* 🔴 EL COLOR SE VALIDA ACA Y NO EN LA VISTA (22-08-2026).
+
+     El color de una etapa se pinta en un atributo `style` de la pantalla de
+     asignar. Hasta hoy entraba sin revisar: se le ponia el valor por omision si
+     venia vacio y nada mas, y ademas SOLO en la rama de «catalogo nuevo» — al
+     EDITAR una etapa existente el color entraba tal cual, sin ningun filtro.
+
+     Con el formulario de Configuracion no pasaba nada, porque es un
+     `<input type="color">` y solo produce `#rrggbb`. Pero desde el 22-08-2026
+     hay una segunda via de entrada que no pasa por ningun formulario —la sala
+     compartida— y ahi puede venir cualquier cosa.
+
+     Se valida en el MOTOR y no en la vista a proposito: asi deja de depender de
+     que cada pantalla se acuerde de escapar. La vista escapa igual, que son las
+     dos capas. */
+  const COLOR_HEX = /^#[0-9a-f]{6}$/i;
+  const COLOR_OMISION = '#64748b';
+
+  function colorLimpio(valor) {
+    const v = String(valor == null ? '' : valor).trim();
+    return COLOR_HEX.test(v) ? v.toLowerCase() : COLOR_OMISION;
+  }
+
   function guardar_catalogo(tabla, fila) {
     const esNuevo = !fila.id;
     const permiso = Reglas.puedeGuardarCatalogo(db, tabla, fila, { esNuevo });
     if (!permiso.ok) return permiso;
+    /* Antes de las dos ramas, para que valga igual al crear y al editar. */
+    if ('color' in fila) fila = Object.assign({}, fila, { color: colorLimpio(fila.color) });
     if (esNuevo) {
       const nueva = Object.assign({
         id: nuevoId(tabla.slice(0, 3)), vigente: true,
@@ -2874,7 +2899,7 @@ const Modelo = (function () {
         aplica_siempre: fila.aplica_siempre !== false,
         exige_precedencia: !!fila.exige_precedencia,
         requiere_repuestos_completos: !!fila.requiere_repuestos_completos,
-        color: fila.color || '#64748b'
+        color: colorLimpio(fila.color)
       });
       if (tabla === 'estado') Object.assign(nueva, {
         es_final: !!fila.es_final, cierra_orden: !!fila.cierra_orden,
@@ -3142,6 +3167,40 @@ const Modelo = (function () {
      cerrar, y que una cuenta desactivada no entre. */
   const CLAVE_SESION = 'dyp-sesion';
 
+  /* 🔴 LA SESION VIVE EN `sessionStorage`, NO EN `localStorage` (22-08-2026).
+
+     Estaba en `localStorage`, que sobrevive a cerrar el navegador: quien
+     prendiera despues ese computador entraba como la ultima persona que lo
+     uso, sin clave y con sus permisos. En una oficina con un equipo por
+     persona da lo mismo; en el meson de recepcion de un taller, donde el
+     computador lo usan tres personas en el dia, es el caso normal.
+
+     `sessionStorage` muere con la pestaña, que es la regla de la casa.
+
+     LO QUE SE PERDIO AL CAMBIAR, y se acepta a proposito: `sessionStorage` es
+     por pestaña y NO emite el evento `storage` entre pestañas, asi que dos
+     pestañas abiertas ya no se enteran de que en la otra se cerro sesion.
+     Antes se sincronizaban (`app.js`, `realinearSesion`). Se acepta porque el
+     caso que eso resolvia —dos cuentas distintas en dos pestañas del mismo
+     navegador— es un caso que no deberia existir, y ahora directamente no
+     existe: cada pestaña tiene su propia sesion.
+
+     Si algun dia hace falta recuperarlo, `BroadcastChannel` lo hace sin
+     volver a `localStorage`. */
+  const guardaSesion = (function () {
+    try {
+      const s = window.sessionStorage;
+      s.setItem('dyp-prueba', '1'); s.removeItem('dyp-prueba');
+      return s;
+    } catch (e) {
+      /* Sin `sessionStorage` —modo privado de algunos navegadores, `file://`—
+         no se cae de vuelta a `localStorage`: se queda sin sesion guardada. Un
+         F5 obliga a entrar de nuevo, que es molesto pero no deja la puerta
+         abierta. */
+      return null;
+    }
+  })();
+
   function iniciar_sesion(usuario, clave) {
     const u = String(usuario || '').trim().toLowerCase();
     if (!u) return { ok: false, motivo: 'Falta el usuario.' };
@@ -3161,7 +3220,7 @@ const Modelo = (function () {
 
     const r = fijar_persona_actual(p.id);
     if (!r.ok) return r;
-    try { localStorage.setItem(CLAVE_SESION, p.id); } catch (e) { /* sin almacenamiento */ }
+    try { if (guardaSesion) guardaSesion.setItem(CLAVE_SESION, p.id); } catch (e) { /* sin almacenamiento */ }
     return { ok: true, motivo: '', persona: p.id, claveInicial: !!p.clave_inicial };
   }
 
@@ -3169,7 +3228,7 @@ const Modelo = (function () {
     persona_actual = null;
     rol_actual = 'ro-6';
     version++; limpiarMemo();
-    try { localStorage.removeItem(CLAVE_SESION); } catch (e) { /* nada */ }
+    try { if (guardaSesion) guardaSesion.removeItem(CLAVE_SESION); } catch (e) { /* nada */ }
     return { ok: true, motivo: '' };
   }
 
@@ -3177,7 +3236,7 @@ const Modelo = (function () {
      nadie: la recepcionista tiene el formulario a medio llenar. */
   function retomar_sesion() {
     let id = null;
-    try { id = localStorage.getItem(CLAVE_SESION); } catch (e) { return false; }
+    try { id = guardaSesion ? guardaSesion.getItem(CLAVE_SESION) : null; } catch (e) { return false; }
     if (!id) return false;
     const p = db.persona.find((x) => x.id === id);
     if (!p || !p.activo) { cerrar_sesion(); return false; }
@@ -3197,7 +3256,7 @@ const Modelo = (function () {
      porque cada rol alcanza órdenes distintas. Con esto la aplicación puede
      comparar y realinearse. */
   const sesionGuardada = () => {
-    try { return localStorage.getItem(CLAVE_SESION); } catch (e) { return null; }
+    try { return guardaSesion ? guardaSesion.getItem(CLAVE_SESION) : null; } catch (e) { return null; }
   };
   const sesionAlDia = () => sesionGuardada() === persona_actual;
 
