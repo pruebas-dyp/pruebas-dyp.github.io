@@ -1092,6 +1092,55 @@ function ejecutarAccion(accion) {
       Modelo.metricas().conRepuestoPendiente + ' con repuesto pendiente.</p>');
   }
 
+  /* 🔶 LOS ARNESES NO VIAJAN CON EL SISTEMA (COD-5, 22-08-2026).
+
+     `pruebas.js` y `flujo.js` estaban declarados en `index.html` como cualquier
+     otro archivo: 162 KB —el 11% de todo lo que baja el navegador— que el
+     cliente descargaba en cada carga y no usaba nunca.
+
+     Y no era solo peso. Esos dos archivos le entregan al cliente el detalle de
+     cada error que arreglamos, con nombre y fecha. Es cierto todo lo que dicen
+     y esta corregido, pero no es algo que tenga que encontrar leyendo el fuente
+     de su propia demostracion.
+
+     Se cargan cuando alguien los pide, desde el menu Archivo. Con `node` siguen
+     corriendo igual: el arnes los nombra a mano.
+
+     El sello sale de la etiqueta de `app.js` y no se escribe a mano: lo pone el
+     script de publicar, y sin el mismo sello el navegador serviria una copia
+     vieja de los arneses contra el codigo nuevo. */
+  const arnesCargado = () => typeof Pruebas !== 'undefined' && typeof Flujo !== 'undefined';
+  let arnesEnCamino = null;
+
+  function cargarArneses() {
+    if (arnesCargado()) return Promise.resolve(true);
+    if (arnesEnCamino) return arnesEnCamino;
+    const et = document.querySelector('script[src*="js/app.js"]');
+    const m = et && et.getAttribute('src').match(/[?&]v=([^&"]+)/);
+    const sello = m ? '?v=' + m[1] : '';
+    const uno = (ruta) => new Promise((listo, falla) => {
+      const s = document.createElement('script');
+      s.src = ruta + sello;
+      s.onload = () => listo(true);
+      s.onerror = () => falla(new Error('No se pudo cargar ' + ruta));
+      document.head.appendChild(s);
+    });
+    arnesEnCamino = uno('js/pruebas.js').then(() => uno('js/flujo.js'));
+    return arnesEnCamino;
+  }
+
+  /* Se pide el arnes y se vuelve a entrar por la misma puerta. Si no carga se
+     DICE: un boton del menu que no hace nada es peor que no tenerlo. */
+  function conArnes(cual) {
+    cargarArneses().then(() => ejecutarAccion(cual)).catch((e) => {
+      avisar({ ok: false, motivo: 'No se pudieron cargar las pruebas: ' + (e && e.message) +
+        '. Se abren solo con conexion al servidor del modelo.' });
+    });
+  }
+
+  if (['pruebas', 'flujo', 'cifras'].indexOf(accion) >= 0 && !arnesCargado())
+    return conArnes(accion);
+
   if (accion === 'pruebas') {
     const r = Pruebas.correr();
     const pasaron = r.filter((x) => x.paso).length;

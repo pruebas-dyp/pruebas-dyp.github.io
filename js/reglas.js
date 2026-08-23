@@ -660,7 +660,33 @@ const Reglas = (function () {
     };
   }
 
+  /* 🔴 LA FECHA DE HOY, EN CHILE Y NO EN LONDRES (22-08-2026).
+
+     Vive acá y no dentro de la semilla porque `reglas.js` carga segundo: lo
+     ven el motor, la semilla, los arneses y las vistas. Mientras estuvo
+     escondido en un solo archivo, el que necesitaba una fecha en otro lado
+     volvía a escribir `toISOString()` — y eso fue exactamente lo que pasó.
+
+     `toISOString()` pasa a UTC. Chile está en UTC-4, así que desde las 20:00
+     hora local devuelve MAÑANA:
+
+       21:30 en Chile  ->  toISOString() dice 2026-08-23  ·  acá son las 22
+       19:00 en Chile  ->  toISOString() dice 2026-08-22  ·  acá son las 22
+
+     Se arma con las partes locales, que es lo que además espera un
+     `<input type="date">`. */
+  const soloDia = (d) => {
+    const f = (d instanceof Date) ? d : new Date(d);
+    return f.getFullYear() + '-' +
+      String(f.getMonth() + 1).padStart(2, '0') + '-' +
+      String(f.getDate()).padStart(2, '0');
+  };
+
+  const hoyEnChile = () => soloDia(new Date());
+
   return {
+    // fechas
+    soloDia, hoyEnChile,
     // parámetros
     parametro, metaDias, kpiReparacion, autoAsignacion, exigeValidacion,
     // estados

@@ -186,12 +186,12 @@ const Semilla = (function () {
      medianoche. Acá se reparte entre las 8:00 y las 17:59.
 
      `dias()` queda para las CUENTAS de días, donde la hora estorba. */
-  /* Una fecha a `aaaa-mm-dd`, que es lo que guarda un <input type="date"> y
-     por lo tanto lo que tiene que guardar el compromiso de una etapa. Se arma
-     con las partes locales y NO con `toISOString()`, que pasa a UTC y en Chile
-     devuelve el día anterior toda la tarde. */
-  const soloDia = (d) => d.getFullYear() + '-' +
-    String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  /* La fecha a `aaaa-mm-dd` sale de `Reglas`, que carga antes que este
+     archivo. Estuvo acá hasta el 22-08-2026, y ese fue el problema: la
+     advertencia de no usar `toISOString()` vivia en este comentario, donde no
+     la veia quien escribia una fecha en otro archivo — y en `flujo.js` se
+     volvio a escribir el error. Ahora hay un solo lugar. */
+  const soloDia = (d) => Reglas.soloDia(d);
 
   const diasHora = (n) => {
     const d = dias(n);

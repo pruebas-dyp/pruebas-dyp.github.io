@@ -546,7 +546,11 @@ const Flujo = (function () {
         });
         const enTorreAntes = Modelo.torre().length;
         const histAntes = (Modelo.historico({ patente: 'FLUJ01' }) || []).length;
-        const hoyISO = new Date().toISOString().slice(0, 10);
+        /* Con `toISOString()` esto devolvia MAÑANA despues de las 20:00 hora
+           de Chile, y la comprobacion pasaba o fallaba segun a que hora se
+           corriera. La trampa estaba escrita en `semilla.js` desde antes y se
+           repitio igual acá: por eso el helper subio a `Reglas`. */
+        const hoyISO = Reglas.hoyEnChile();
         const r = Modelo.registrar_entrega(otA.ot_id, { estado: 'entrega_cliente', fecha: hoyISO });
         const sigueEnTorre = Modelo.torre().some((f) => f.id === otA.ot_id);
         const histDespues = (Modelo.historico({ patente: 'FLUJ01' }) || []).length;

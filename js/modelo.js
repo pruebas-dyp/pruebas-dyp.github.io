@@ -106,8 +106,22 @@ const Modelo = (function () {
       localStorage.setItem(CLAVE, JSON.stringify({ modificado, sello: Semilla.SELLO, db }, aJSON));
       return true;
     } catch (e) {
-      // Cuota llena o file:// sin almacenamiento: el borrador sigue andando
-      // en memoria, solo que no recuerda al cerrar.
+      /* Cuota llena o file:// sin almacenamiento: el borrador sigue andando
+         en memoria, solo que no recuerda al cerrar.
+
+         🔶 LOS CUATRO `console.warn` DE ESTE ARCHIVO SE QUEDAN, y queda
+         dicho para no volver a discutirlo (COD-2, 22-08-2026). Son los unicos
+         cuatro del proyecto y los cuatro son diagnostico de almacenamiento o de
+         version de esquema: ninguno imprime el dato de una persona, que es lo
+         que los volveria un problema.
+
+         Se quedan porque cuando algo falla en el navegador del cliente son lo
+         unico que hay. Los dos de resiembra ademas repiten en la consola lo
+         que el sistema ya dice en pantalla —`resembradoPorVersion`—, asi que
+         sirven para diagnosticar por telefono sin pedirle nada a nadie.
+
+         Si algun dia se sacan, que sea envolviendolos en una guarda de
+         depuracion y no borrandolos: el diagnostico que dan es real. */
       console.warn('No se pudo guardar el estado:', e && e.message);
       return false;
     }

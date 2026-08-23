@@ -1920,6 +1920,68 @@ const Pruebas = (function () {
       })();
 
 
+      /* 🔴 LA FECHA DE HOY ES LA DE CHILE, NO LA DE LONDRES (COD-2, 22-08-2026).
+
+         `toISOString()` pasa a UTC. Chile esta en UTC-4, asi que desde las
+         20:00 hora local devuelve MAÑANA. En `flujo.js` se registraba una
+         entrega con fecha del dia siguiente y la comprobacion pasaba o fallaba
+         segun a que hora se corriera.
+
+         Lo importante de este caso no es la linea: es que LA TRAMPA YA ESTABA
+         ESCRITA en el proyecto —un comentario en `semilla.js` avisaba de esto
+         mismo— y el error se repitio igual tres archivos mas alla. De ahi salio
+         la regla: una advertencia que importa no se guarda en un comentario, se
+         guarda en una prueba que falle cuando alguien la ignore.
+
+         Esta es esa prueba. Fija las horas en vez de depender del reloj del
+         equipo, o solo fallaria entre las 20:00 y la medianoche. */
+      (function () {
+        const hayHelper = typeof Reglas !== 'undefined' &&
+                          typeof Reglas.soloDia === 'function' &&
+                          typeof Reglas.hoyEnChile === 'function';
+        /* Cuatro instantes con su desfase escrito, para no depender de la zona
+           horaria del equipo que corre las pruebas. */
+        const casos = [
+          ['2026-08-22T21:30:00-04:00', '2026-08-22'],   // de noche: UTC ya dice 23
+          ['2026-08-22T23:59:00-04:00', '2026-08-22'],   // el filo del dia
+          ['2026-08-22T19:00:00-04:00', '2026-08-22'],   // antes del corte
+          ['2026-01-01T22:15:00-03:00', '2026-01-01']    // en horario de verano
+        ];
+        const malos = [];
+        let cazaAlViejo = false;
+        if (hayHelper) {
+          casos.forEach(([iso, esperado]) => {
+            const d = new Date(iso);
+            const dio = Reglas.soloDia(d);
+            if (dio !== esperado) malos.push(iso + ' dio ' + dio + ' y debia dar ' + esperado);
+            /* Y que el metodo viejo SI se equivoque en al menos uno: si no, la
+               prueba no estaria probando nada —seria verde en las dos formas—. */
+            if (d.toISOString().slice(0, 10) !== esperado) cazaAlViejo = true;
+          });
+        }
+        /* `hoyEnChile()` tiene que dar lo mismo que mirar el reloj local. */
+        const ahora = new Date();
+        const coincideHoy = hayHelper && Reglas.hoyEnChile() ===
+          (ahora.getFullYear() + '-' +
+           String(ahora.getMonth() + 1).padStart(2, '0') + '-' +
+           String(ahora.getDate()).padStart(2, '0'));
+
+        push({
+          nombre: '🔴 La fecha de hoy es la de Chile y no la de UTC',
+          intento: 'Pedir el dia de ' + casos.length + ' instantes, dos de ellos despues de las 20:00',
+          esperado: 'El dia local en los cuatro, y hoyEnChile() igual al reloj del equipo',
+          paso: hayHelper && !malos.length && coincideHoy && cazaAlViejo,
+          detalle: !hayHelper ? 'No existe Reglas.soloDia/hoyEnChile: el helper no esta donde todos lo ven'
+            : (malos.length ? 'Se corrio el dia: ' + malos.join(' · ')
+              : (!coincideHoy ? 'hoyEnChile() no coincide con el reloj local'
+                : (!cazaAlViejo
+                    ? 'OJO: en esta zona horaria toISOString() acierta, asi que esta prueba no ' +
+                      'distingue el arreglo del error. Hay que revisarla.'
+                    : 'Los ' + casos.length + ' dan el dia local; toISOString() habria fallado')))
+        });
+      })();
+
+
       restaurarSesion();
       return res;
     });
