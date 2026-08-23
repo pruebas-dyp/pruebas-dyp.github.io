@@ -81,15 +81,7 @@ function vExpediente() {
   const o = ex.orden;
   const r = ex.resumen;
 
-  // Los hechos se agrupan por día: es como se lee una historia, y es como se
-  // discute con una compañía ("el 12 pasó esto").
-  const porDia = [];
-  ex.hechos.forEach((h) => {
-    const clave = fCorta(h.fecha);
-    const ultimo = porDia[porDia.length - 1];
-    if (ultimo && ultimo.clave === clave) ultimo.hechos.push(h);
-    else porDia.push({ clave, fecha: h.fecha, hechos: [h] });
-  });
+  const porDia = hechosPorDia(ex.hechos);
 
   return buscador + `
   <div class="panel">

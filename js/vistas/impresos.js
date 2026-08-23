@@ -731,14 +731,7 @@ function impresoExpediente(o) {
 
   const r = ex.resumen;
 
-  // Agrupado por día, igual que en pantalla: es como se lee y como se discute.
-  const porDia = [];
-  ex.hechos.forEach((h) => {
-    const clave = fCorta(h.fecha);
-    const ultimo = porDia[porDia.length - 1];
-    if (ultimo && ultimo.clave === clave) ultimo.hechos.push(h);
-    else porDia.push({ clave, fecha: h.fecha, hechos: [h] });
-  });
+  const porDia = hechosPorDia(ex.hechos);
 
   return cabeceraImpreso(o, 'Expediente del vehículo') + `
   <h2>Identificación</h2>
