@@ -175,7 +175,12 @@ function vHistorico() {
       <div style="display:flex;gap:8px">
         <button class="btn${h.todos ? '' : ' secundario'}" id="h-todos">Ver todos</button>
         <button class="btn secundario" id="h-estadisticas">Ver estadísticas</button>
-        <button class="btn secundario" id="h-reporteria">${ico('consolidado')}Reportería</button>
+        ${/* El botón sólo se dibuja para quien puede entrar. Que no se dibuje NO
+             es lo que protege la pantalla —eso lo hace `vReporteria` por su
+             cuenta— pero un botón que rebota enseña a desconfiar del sistema. */''}
+        ${Modelo.puede('reporteria.ver')
+          ? '<button class="btn secundario" id="h-reporteria">' + ico('consolidado') + 'Reportería</button>'
+          : ''}
       </div></div>
     <div class="cuerpo">
       <div class="desc" style="margin-bottom:9px">Cada parámetro es independiente de los otros,

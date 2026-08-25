@@ -16,7 +16,7 @@
 const GRUPOS_PERMISOS = [
   { nombre: 'Qué pantallas abre',
     codigos: ['torre.ver', 'historico.ver', 'taller.ver', 'repuesto.ver', 'espera.ver',
-      'consolidado.ver', 'personal.ver', 'configuracion'] },
+      'consolidado.ver', 'reporteria.ver', 'personal.ver', 'configuracion'] },
   { nombre: 'La ficha del vehículo',
     codigos: ['ficha.completa', 'documento.ver', 'documento.cargar', 'foto.ver', 'foto.cargar',
       'datos.rut_completo'] },
@@ -220,7 +220,10 @@ function personalFicha() {
       <div class="nota">Esta cuenta tiene el rol <strong>${esc(x.rolNombre || '—')}</strong>, que
       alcanza <strong>todo el sistema</strong> y no se le puede recortar. Si se pudiera, bastaría
       con desmarcarle «Administrar los catálogos» para que nadie pudiera volver a entrar a
-      Configuración, y la única salida sería reiniciar el sistema y perder todo.</div>` : `
+      Configuración, y la única salida sería reiniciar el sistema y perder todo.
+      <br><br>Lo único que sí se marca y se desmarca acá son los permisos
+      <strong>reservados</strong>: ésos no los da ningún rol —tampoco éste— y van cuenta por
+      cuenta.</div>` : `
       <div class="pie-nota" style="margin:0 0 9px">Marcado ${x.permisos.length} de
       ${TODOS_PERMISOS.length}. Nace copiado del rol <strong>${esc(x.rolNombre || '—')}</strong>
       y desde ahí se mueve uno por uno: el rol es la plantilla, no la jaula.</div>`}
@@ -230,13 +233,21 @@ function personalFicha() {
           if (!items.length) return '';
           return '<div class="permiso-grupo"><div class="permiso-grupo-tit">' + esc(g.nombre) + '</div>' +
             items.map((p) => {
-              const tiene = x.accesoTotal || x.permisos.indexOf(p.codigo) >= 0;
-              return '<label class="inv-item' + (tiene ? ' marcado' : '') + '">' +
+              /* ⚠️ Un permiso RESERVADO no lo da ningún rol, ni el de acceso
+                 total: se marca acá, cuenta por cuenta. Así que en una cuenta
+                 total va DESMARCADO si no se le dio, y sigue siendo editable —
+                 al revés de todos los demás, que van marcados y bloqueados. */
+              const tiene = p.reservado
+                ? x.permisos.indexOf(p.codigo) >= 0
+                : (x.accesoTotal || x.permisos.indexOf(p.codigo) >= 0);
+              const editable = puedeEditar && (p.reservado || !x.accesoTotal);
+              return '<label class="inv-item' + (tiene ? ' marcado' : '') +
+                (p.reservado ? ' reservado' : '') + '">' +
                 '<input type="checkbox" data-per-permiso="' + esc(p.codigo) + '"' +
-                (tiene ? ' checked' : '') +
-                (puedeEditar && !x.accesoTotal ? '' : ' disabled') + '>' +
-                '<span>' + esc(p.descripcion) + '<br><span class="cod">' + esc(p.codigo) +
-                '</span></span></label>';
+                (tiene ? ' checked' : '') + (editable ? '' : ' disabled') + '>' +
+                '<span>' + esc(p.descripcion) +
+                (p.reservado ? ' <span class="et ambar">reservado</span>' : '') +
+                '<br><span class="cod">' + esc(p.codigo) + '</span></span></label>';
             }).join('') + '</div>';
         }).join('')}
       </div>

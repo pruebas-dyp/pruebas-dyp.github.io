@@ -386,7 +386,7 @@ const MENUS = {
   Reportes: [
     { texto: 'Consolidado', icono: 'consolidado', accion: 'ir:consolidado' },
     { texto: 'Histórico', icono: 'historico', accion: 'ir:historico' },
-    { texto: 'Reportería (gráficos)', icono: 'consolidado', accion: 'reporteria' }
+    { texto: 'Reportería (gráficos)', icono: 'consolidado', accion: 'reporteria', permiso: 'reporteria.ver' }
   ]
 };
 
@@ -416,7 +416,10 @@ function abrirMenu(elemento, items) {
   caja.className = 'desplegable';
   caja.style.left = Math.round(elemento.getBoundingClientRect().left) + 'px';
   caja.style.top = Math.round(elemento.getBoundingClientRect().bottom) + 'px';
-  caja.innerHTML = items.map((i) =>
+  /* Un ítem con `permiso` sólo se dibuja para quien lo tiene. Es el mismo
+     criterio que el botón de la Reportería en el Histórico: la pantalla se
+     defiende sola, pero una opción que rebota enseña a desconfiar del menú. */
+  caja.innerHTML = items.filter((i) => !i.permiso || Modelo.puede(i.permiso)).map((i) =>
     '<button type="button" data-accion="' + i.accion + '">' + ico(i.icono) + esc(i.texto) + '</button>').join('');
   document.body.appendChild(caja);
   caja.addEventListener('click', (ev) => {
@@ -440,6 +443,14 @@ function ejecutarAccion(accion) {
      día pasa a ser un módulo propio, esto es una línea menos, no una línea
      distinta. */
   if (accion === 'reporteria') {
+    /* Rebota acá además de en la pantalla. Son dos puertas distintas: ésta
+       evita que el Histórico quede con `vista = 'reporteria'` guardado en el
+       estado, que es lo que haría que el panel se abriera solo la próxima vez
+       que la cuenta entre al Histórico. */
+    if (!Modelo.puede('reporteria.ver')) {
+      return avisar({ ok: false, motivo: 'La Reportería está reservada: muestra la venta y la ' +
+        'rentabilidad del taller. Se habilita cuenta por cuenta en Personal.' });
+    }
     historicoEstado().vista = 'reporteria';
     return ir('historico');
   }

@@ -2554,6 +2554,149 @@ const Pruebas = (function () {
         });
       })();
 
+
+      /* 🔴 LA REPORTERÍA LA VEN DOS CUENTAS, Y NADIE MÁS (23-08-2026, Marco).
+
+         «Que el panel de Reportería solo lo pueda ver administración y Gabriel
+         Díaz. NADIE MÁS. SUMAMENTE IMPORTANTE.» Al preguntarle quién es
+         «administración» —en este sistema son dos cosas distintas— contestó:
+         «Gabriel Díaz + Administración (Arttmize) de momento».
+
+         ⚠️ LA PRUEBA RECORRE LAS CATORCE CUENTAS Y ENTRA COMO CADA UNA. No mira
+         la tabla ni la lista de la semilla: entra y pregunta. Es la única forma
+         de que esto no se rompa en silencio, y lo que se juega es la venta y la
+         rentabilidad del taller.
+
+         Alejandra es el caso que importa: comparte el rol Administración con
+         Gabriel, así que cualquier permiso que venga del ROL le llega a ella
+         también. Si esta prueba se pone verde con ella adentro, el arreglo no
+         sirvió. */
+      (function () {
+        const ESPERADOS = ['gabriel.diaz@dyp.cl', 'administrador@dyp.cl'];
+        const bd = Modelo.base();
+        const cuentas = bd.persona.filter((p) => p.usuario);
+        const sesionPrevia = (Modelo.personaActual() || {}).id || null;
+
+        const ven = [];
+        cuentas.forEach((p) => {
+          Modelo.fijar_persona_actual(p.id);
+          if (Modelo.puede('reporteria.ver')) ven.push(p.usuario);
+        });
+        Modelo.fijar_persona_actual(sesionPrevia);
+
+        const sobran = ven.filter((u) => ESPERADOS.indexOf(u) < 0);
+        const faltan = ESPERADOS.filter((u) => ven.indexOf(u) < 0);
+
+        push({
+          nombre: '🔴 La Reportería la ven exactamente dos cuentas',
+          intento: 'Entrar como cada una de las ' + cuentas.length + ' cuentas y preguntar por `reporteria.ver`',
+          esperado: ESPERADOS.join(' y ') + ', y nadie más',
+          paso: sobran.length === 0 && faltan.length === 0,
+          detalle: sobran.length
+            ? 'La ven cuentas que NO deben: ' + sobran.join(', ')
+            : (faltan.length ? 'NO la ven cuentas que sí deben: ' + faltan.join(', ')
+              : 'La ven las dos, y las otras ' + (cuentas.length - 2) + ' no')
+        });
+      })();
+
+      /* 🔴 Y EL CASO QUE ROMPE TODO SI SE HACE MAL: el rol de acceso total.
+
+         Va aparte de la de arriba a propósito. Aquella dice QUIÉNES la ven;
+         ésta dice POR QUÉ el mecanismo aguanta: un permiso reservado no lo
+         otorga ningún rol, ni el que alcanza todo el sistema. Si esa regla se
+         cae, la prueba de arriba se cae con ella pero sin explicar la causa. */
+      (function () {
+        const bd = Modelo.base();
+        const sesionPrevia = (Modelo.personaActual() || {}).id || null;
+        const totales = bd.persona.filter((p) => {
+          const pr = bd.persona_rol.find((x) => x.persona_id === p.id);
+          return p.usuario && pr && (bd.rol.find((r) => r.id === pr.rol_id) || {}).total;
+        });
+        const sinDarselo = totales.filter((p) =>
+          (Modelo.permisosDePersona(p.id) || []).indexOf('reporteria.ver') < 0);
+        const laVen = [];
+        sinDarselo.forEach((p) => {
+          Modelo.fijar_persona_actual(p.id);
+          if (Modelo.puede('reporteria.ver')) laVen.push(p.usuario);
+          // y lo demás sí lo tiene: acceso total sigue siendo acceso total
+        });
+        Modelo.fijar_persona_actual(sesionPrevia);
+
+        push({
+          nombre: '🔴 Ni el acceso total abre un permiso reservado',
+          intento: 'Entrar como las cuentas de acceso total a las que NO se les dio la Reportería',
+          esperado: 'Ninguna la ve, aunque su rol alcance todo lo demás',
+          paso: sinDarselo.length > 0 && laVen.length === 0,
+          detalle: !sinDarselo.length
+            ? 'Todas las cuentas totales la tienen dada: el caso no se pudo probar'
+            : (laVen.length
+              ? 'La ven por el rol: ' + laVen.join(', ') + '. El permiso reservado no está funcionando'
+              : 'Las ' + sinDarselo.length + ' quedan afuera: ' +
+                sinDarselo.map((p) => p.nombres).join(', '))
+        });
+      })();
+
+      /* 🔶 Y EL ACCESO TOTAL SIGUE SIENDO TOTAL EN TODO LO DEMÁS.
+
+         Sin esta, la de arriba se aprueba rompiendo el rol total entero. */
+      (function () {
+        const bd = Modelo.base();
+        const sesionPrevia = (Modelo.personaActual() || {}).id || null;
+        const p = bd.persona.find((x) => {
+          const pr = bd.persona_rol.find((y) => y.persona_id === x.id);
+          return x.usuario && pr && (bd.rol.find((r) => r.id === pr.rol_id) || {}).total;
+        });
+        if (!p) return;
+        Modelo.fijar_persona_actual(p.id);
+        const noReservados = bd.permiso.filter((x) => !x.reservado).map((x) => x.codigo);
+        const leFaltan = noReservados.filter((c) => !Modelo.puede(c));
+        Modelo.fijar_persona_actual(sesionPrevia);
+
+        push({
+          nombre: '🔶 El acceso total sigue alcanzando todo lo no reservado',
+          intento: 'Entrar como ' + p.nombres + ' y pedir los ' + noReservados.length + ' permisos no reservados',
+          esperado: 'Los tiene todos',
+          paso: leFaltan.length === 0,
+          detalle: leFaltan.length
+            ? 'Le faltan ' + leFaltan.length + ': ' + leFaltan.slice(0, 4).join(', ')
+            : 'Los ' + noReservados.length + ', como corresponde'
+        });
+      })();
+
+      /* 🔴 LA PANTALLA SE DEFIENDE SOLA, NO EL BOTÓN.
+
+         Esconder el botón es una cortesía visual: quien llegue por el menú, por
+         la dirección, o con el estado del Histórico ya guardado en «reporteria»,
+         entra igual. La única comprobación que sirve es la que hace la pantalla
+         antes de dibujarse. */
+      (function () {
+        if (typeof vReporteria !== 'function') return;
+        const bd = Modelo.base();
+        const sesionPrevia = (Modelo.personaActual() || {}).id || null;
+        const sinPermiso = bd.persona.find((p) => p.usuario &&
+          (Modelo.permisosDePersona(p.id) || []).indexOf('reporteria.ver') < 0 &&
+          !(bd.rol.find((r) => r.id === (bd.persona_rol.find((x) => x.persona_id === p.id) || {}).rol_id) || {}).total);
+        if (!sinPermiso) return;
+
+        Modelo.fijar_persona_actual(sinPermiso.id);
+        let html = '';
+        try { html = vReporteria(); } catch (e) { html = '(reventó: ' + e.message + ')'; }
+        Modelo.fijar_persona_actual(sesionPrevia);
+
+        const dice = (s) => html.indexOf(s) >= 0;
+        push({
+          nombre: '🔴 La pantalla de Reportería rebota sola, sin depender del botón',
+          intento: 'Pintar `vReporteria()` entrando como ' + sinPermiso.nombres + ', que no la tiene',
+          esperado: 'Devuelve el cartel de reservada, y ningún dato de venta',
+          paso: dice('no está disponible para esta cuenta') && !dice('Venta del período'),
+          detalle: dice('reventó')
+            ? html
+            : (!dice('no está disponible para esta cuenta')
+              ? 'Pintó la Reportería completa: la pantalla no se está defendiendo'
+              : 'Devuelve el cartel y no dibuja ninguna cifra')
+        });
+      })();
+
       /* 🔴 3 · EL COLOR DE UN CATALOGO SE LIMPIA EN EL MOTOR.
 
          El color se pinta dentro de un atributo `style`. La vista lo escapa,

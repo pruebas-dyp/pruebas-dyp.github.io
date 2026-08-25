@@ -3170,23 +3170,52 @@ const Modelo = (function () {
      desmarcar todo devolviera los permisos del rol, quitarle todo a alguien
      tendría el efecto contrario al que se ve en la pantalla. Lista vacía es
      lista vacía. */
+  /* ── LOS PERMISOS RESERVADOS ───────────────────────────────────────────
+     23-08-2026. Un permiso reservado es el que **ningún rol otorga**, ni
+     siquiera uno de acceso total: se da a una cuenta con nombre y apellido,
+     desde Personal, y a nadie más.
+
+     Existe porque Marco pidió que la Reportería —venta, márgenes y
+     rentabilidad— la vieran sólo dos personas, y las dos comparten el rol
+     Administración con una tercera. Cualquier permiso que venga del rol le
+     llega a los tres; no había forma de cumplirlo sin esto.
+
+     ⚠️ Y hay que decirlo donde se lee «acceso total», porque el nombre promete
+     otra cosa: acceso total significa **todo el sistema menos lo reservado**.
+     Son dos permisos hoy y se cuentan solos desde el catálogo, así que agregar
+     otro es marcarlo allá y nada más. */
+  const esReservado = (codigo) =>
+    !!(db.permiso.find((p) => p.codigo === codigo) || {}).reservado;
+
   function permisosDePersona(persona_id) {
     const p = persona_id ? db.persona.find((x) => x.id === persona_id) : null;
     if (!p) return null;
-    /* El rol total devuelve el catálogo completo, pase lo que pase con las
-       filas. Es la misma garantía de antes, y es la que sostiene que el
-       sistema siga siendo administrable. */
-    const pr = db.persona_rol.find((x) => x.persona_id === persona_id);
-    if (pr && esRolTotal(pr.rol_id)) return db.permiso.map((x) => x.codigo);
-    return (db.persona_permiso || [])
+
+    const propios = (db.persona_permiso || [])
       .filter((x) => x.persona_id === persona_id).map((x) => x.permiso_codigo);
+
+    /* El rol total devuelve el catálogo completo —menos lo reservado— pase lo
+       que pase con las filas. Es la misma garantía de antes y es la que
+       sostiene que el sistema siga siendo administrable: aunque a la tabla le
+       faltaran filas, el administrador entra igual.
+
+       Lo reservado se suma aparte, y sólo si está dado explícitamente. */
+    const pr = db.persona_rol.find((x) => x.persona_id === persona_id);
+    if (pr && esRolTotal(pr.rol_id)) {
+      return db.permiso.filter((x) => !x.reservado).map((x) => x.codigo)
+        .concat(propios.filter((c) => esReservado(c)));
+    }
+    return propios;
   }
 
   /* El rol total pasa siempre. Y si NO hay persona en la sesión —el selector
      de rol de la demostración— manda el rol, como antes: ahí no hay nadie de
      quien leer permisos propios. */
   const puede = (codigo) => {
-    if (rolActual().total === true) return true;
+    /* ⚠️ El atajo del rol total NO alcanza a lo reservado. Si alcanzara, esta
+       línea sola echaría abajo todo lo demás: Alejandra comparte el rol
+       Administración con Gabriel y vería la Reportería igual. */
+    if (rolActual().total === true && !esReservado(codigo)) return true;
     const propios = permisosDePersona(persona_actual);
     return (propios || permisosDe(rol_actual)).indexOf(codigo) >= 0;
   };
@@ -3216,8 +3245,12 @@ const Modelo = (function () {
     if (!db.permiso.some((x) => x.codigo === permiso_codigo))
       return { ok: false, motivo: 'Ese permiso no existe en el catálogo.' };
 
+    /* Una cuenta de acceso total no se recorta… salvo en lo RESERVADO, que su
+       rol no le daba de entrada. Ahí sí se marca y se desmarca: es justamente
+       el caso de la Reportería, que Gabriel tiene y Alejandra no, teniendo las
+       dos el mismo rol. */
     const pr = db.persona_rol.find((x) => x.persona_id === persona_id);
-    if (pr && esRolTotal(pr.rol_id)) {
+    if (pr && esRolTotal(pr.rol_id) && !esReservado(permiso_codigo)) {
       const rol = db.rol.find((r) => r.id === pr.rol_id) || {};
       return { ok: false, motivo: 'La cuenta de ' + p.nombres + ' tiene el rol ' +
         (rol.nombre || '—') + ', que alcanza todo el sistema y no se le puede recortar. ' +

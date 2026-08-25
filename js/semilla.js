@@ -109,7 +109,9 @@ const Semilla = (function () {
      rol. Subirlo hace que toda base guardada de antes se vuelva a sembrar, que
      es exactamente lo que hace falta: sin la tabla nueva, nadie podría hacer
      nada. Ese es todo el trabajo de este número. */
-  const FORMA_DATOS = 11;
+  /* 12: la Reportería pasa a ser un permiso RESERVADO, que ningún rol otorga,
+     y nace dado a dos cuentas con nombre. */
+  const FORMA_DATOS = 12;
   // TEMPARIO_HORA ($10.000, reglas §C.15) se eliminó el 13-08-2026 junto con
   // el tempario entero. La cifra queda medida en `reglas`, no en el sistema.
 
@@ -161,8 +163,23 @@ const Semilla = (function () {
     ['datos.rut_completo',   'Ver el RUT, domicilio y teléfono sin enmascarar'],
     ['exportar',             'Exportar tablas a Excel'],
     ['configuracion',        'Administrar los catálogos del sistema'],
-    ['consolidado.ver',      'Ver el consolidado y la rentabilidad']
+    ['consolidado.ver',      'Ver el consolidado y la rentabilidad'],
+    /* 🔴 RESERVADO. La Reportería muestra la venta, los márgenes y la
+       rentabilidad del taller, y Marco lo pidió con todas sus letras el
+       23-08-2026: «quiero que el panel de Reportería solo lo pueda ver
+       administración y Gabriel Díaz. NADIE MÁS. SUMAMENTE IMPORTANTE».
+
+       Ser RESERVADO significa que **ningún rol lo otorga**, ni siquiera uno de
+       acceso total: se da a una cuenta con nombre y apellido, en Personal, y a
+       nadie más. Sin eso no se podía cumplir lo que pidió — Gabriel y Alejandra
+       comparten el rol Administración, así que cualquier permiso que venga del
+       rol le llega a los dos. */
+    ['reporteria.ver',       'Ver la Reportería: venta, márgenes y rentabilidad', true]
   ];
+
+  /* Los permisos que no se heredan de ningún rol. Se leen desde el catálogo
+     para que agregar uno sea agregar una línea arriba y nada más. */
+  const PERMISOS_RESERVADOS = CATALOGO_PERMISOS.filter((p) => p[2]).map((p) => p[0]);
 
   /* ── Los cuatro estados del inventario de recepción ────────────────────
      🔶 DEJÓ DE SER UN SÍ/NO el 15-08-2026, por pedido del cliente.
@@ -624,7 +641,8 @@ const Semilla = (function () {
        Esto es literalmente lo que se pidió al decir "escalable".
        ═══════════════════════════════════════════════════════════════════ */
 
-    const permiso = CATALOGO_PERMISOS.map(([codigo, descripcion]) => ({ codigo, descripcion }));
+    const permiso = CATALOGO_PERMISOS.map(([codigo, descripcion, reservado]) =>
+      ({ codigo, descripcion, reservado: !!reservado }));
 
     /* ── ALCANCE: sobre QUÉ ÓRDENES ─────────────────────────────────────────
        El permiso dice qué PANTALLAS abre alguien. El alcance dice sobre qué
@@ -1666,6 +1684,27 @@ const Semilla = (function () {
       if (!r || r.total) return;
       (M[r.codigo] || []).forEach((codigo) =>
         persona_permiso.push({ persona_id: pr.persona_id, permiso_codigo: codigo }));
+    });
+
+    /* 🔴 LA REPORTERÍA, CON NOMBRE Y APELLIDO (23-08-2026, Marco).
+
+       «Que el panel de Reportería solo lo pueda ver administración y Gabriel
+       Díaz. NADIE MÁS.» Y al preguntarle quién es «administración», porque en
+       este sistema son dos cosas distintas —el ROL, que tienen Gabriel,
+       Alejandra y Arttmize; y el CARGO, que tienen Nancy, Sheila y Sandra—
+       contestó: «Gabriel Díaz + Administración (Arttmize) de momento».
+
+       Así que son DOS cuentas, y van escritas acá una por una. No sale de
+       ningún rol a propósito: `reporteria.ver` es un permiso RESERVADO y
+       ningún rol lo otorga, ni el de acceso total. Si saliera del rol
+       Administración, Alejandra lo tendría sola.
+
+       «De momento» es literal: esto se mueve desde `Personal → la ficha`, sin
+       tocar el código. */
+    const VEN_REPORTERIA = ['pe-t-2', 'pe-t-14'];   // Gabriel Díaz · Arttmize
+    VEN_REPORTERIA.forEach((persona_id) => {
+      if (persona.some((p) => p.id === persona_id))
+        persona_permiso.push({ persona_id, permiso_codigo: 'reporteria.ver' });
     });
 
     return {

@@ -10,6 +10,32 @@
    ─────────────────────────────────────────────────────────────────────── */
 
 function vReporteria() {
+  /* 🔴 LA PUERTA VA ACÁ, NO EN EL BOTÓN (23-08-2026, Marco: «que el panel de
+     Reportería solo lo pueda ver administración y Gabriel Díaz. NADIE MÁS.
+     SUMAMENTE IMPORTANTE»).
+
+     Esconder el botón no es una regla: es una cortesía visual. Quien tenga la
+     dirección, o quien llegue por el menú Reportes, entra igual. La única
+     comprobación que sirve es la que hace la PANTALLA antes de dibujarse, y por
+     eso está en la primera línea de la función y no en quien la llama.
+
+     ⚠️ Y sigue valiendo lo de siempre: esto corre en el navegador, así que la
+     fila igual llegó. Ocultarla es modelar la regla, no garantizarla — la
+     garantía es RLS en la base, que es el hito H1. No decimos «cumple» donde
+     corresponde decir «está modelado, falta la base». */
+  if (!Modelo.puede('reporteria.ver')) {
+    const yo = Modelo.personaActual();
+    return `
+    <div class="vacio" style="padding:34px">
+      ${ico('candado', 'g')}
+      <div class="titulo">La Reportería no está disponible para esta cuenta</div>
+      <div class="texto">Muestra la venta, los márgenes y la rentabilidad del taller, y está
+      reservada. ${yo ? 'Entraste como <strong>' + esc((yo.nombres + ' ' + (yo.apellidos || '')).trim()) +
+        '</strong>.' : ''}
+      Se habilita cuenta por cuenta en <strong>Personal</strong>, en la ficha de cada persona.</div>
+    </div>`;
+  }
+
   const r = repEstado();
   const lista = repUniverso();
   const meta = Modelo.metricas().metaDias;
