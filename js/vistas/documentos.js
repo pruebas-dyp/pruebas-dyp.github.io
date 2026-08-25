@@ -71,7 +71,6 @@ function documentosDeOT(o) {
      despacho que llega con la pieza; el jefe de taller mira el expediente y no
      lo toca. Antes bastaba con `documento.ver` para las dos cosas. */
   const cargaDocs = Modelo.puede('documento.cargar');
-  const destinatarios = Modelo.destinatarios();
   const presus = o.presupuestos || [];
   const pedidos = (o.repuestos || []).filter((r) => r.fechaSolicitud);
 
@@ -168,15 +167,17 @@ function documentosDeOT(o) {
             la misma lista dos veces en la misma pantalla, y la de abajo no
             dejaba abrirlos. Se sacó entera: nada se perdió, todo subió. */''}
 
-      <fieldset class="bloque" style="margin-top:11px"><legend>Enviar por correo</legend>
-        <div class="rejilla-campos">
-          <div class="campo"><label>Para</label>
-            <select id="doc-dest">${destinatarios.map((p) => '<option value="' + esc(p.id) + '">' +
-              esc(p.nombre) + '</option>').join('')}</select>
-            <span class="ayuda">Catálogo cerrado, no un campo libre</span></div>
-          <div class="campo"><label>&nbsp;</label><button class="btn" id="doc-enviar">Enviar y registrar</button></div>
-        </div>
-      </fieldset>
+      ${/* 🔷 ACÁ VIVÍA «ENVIAR POR CORREO», Y SE SACÓ (23-08-2026, Marco).
+
+            Era un botón que no mandaba ningún correo: escribía una anotación en
+            la bitácora que decía «envío de N documentos» y avisaba «en
+            producción, acá sale el correo». Un botón que dice que hizo algo que
+            no hizo enseña a no confiar en la pantalla, que es exactamente lo
+            que este modelo borrador viene evitando en todo lo demás.
+
+            El sistema no manda correo por ninguna parte —está medido en la
+            auditoría de sistema— y el día que mande, ese trabajo trae SPF, DKIM,
+            DMARC y consentimiento separado. No es un botón: es una tanda. */''}
     </div>
   </div>`;
 }
@@ -266,15 +267,4 @@ function pDocumentos() {
       .then(() => ejecutar(() => Modelo.eliminar_media(b.dataset.docQuitar), 'Documento quitado.'));
   }));
 
-  const enviar = document.getElementById('doc-enviar');
-  if (enviar) enviar.addEventListener('click', () => {
-    const dest = document.getElementById('doc-dest').value;
-    const n = Modelo.mediaDe(d.otId).filter((m) => m.momento === 'documento').length;
-    if (!n) return avisar({ ok: false, motivo: 'No hay documentos que enviar.' });
-    // El envío queda como mensaje de bitácora: quién, a quién, qué y cuándo.
-    ejecutar(() => Modelo.escribir_bitacora(d.otId, {
-      asunto_id: 'as-1', destinatario_id: dest,
-      mensaje: 'Envío de ' + plural(n, 'documento', 'documentos') + ' por correo.'
-    }), 'Envío registrado en la bitácora. En producción, acá sale el correo.');
-  });
 }

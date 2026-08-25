@@ -2771,7 +2771,8 @@ const Modelo = (function () {
       recepcion_id: recepcion_id || f.recepcion_id || null,
       ot_id: f.ot_id || ((ot_ids && ot_ids.length === 1) ? ot_ids[0] : null),
       subido_por: f.subido_por || persona_actual || null,
-      subido_at: f.subido_at || HOY
+      // La hora de verdad, no la medianoche del dia. Ver `media.js`.
+      subido_at: f.subido_at || ahora()
     })));
 
     // Registra en todas las órdenes alcanzadas, no en una: por eso lo hace por
@@ -3739,6 +3740,10 @@ const Modelo = (function () {
      registra—, deshacer en medio, y el registro pegado a la operación. */
   return conPermiso(conDeshacer(conRegistro({
     iniciar, reiniciar, sembrar, estaModificado, porQueSeResembro, base, sandbox,
+    /* El día del sistema junto al reloj del computador. Sale porque `media.js`
+       lo necesita: un documento que se carga AHORA tiene que quedar con la hora
+       de ahora, no con la medianoche del día. (23-08-2026) */
+    ahora,
     // Dos contadores con dos nombres, para que nadie vuelva a agarrar el que
     // no era: este sube en cada mutacion Y al cambiar de cuenta, y sirve para
     // botar los memos. El de la sala es `versionGuardada`.

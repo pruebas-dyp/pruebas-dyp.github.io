@@ -1882,3 +1882,60 @@ table.grid td.abre-ot:hover { text-decoration: underline; }
 .barra-estado .celda a { color: inherit; text-decoration: none; opacity: .72; }
 .barra-estado .celda a:hover,
 .barra-estado .celda a:focus-visible { opacity: 1; text-decoration: underline; }
+
+/* ───────── El valor a cobrar, al cierre del presupuesto ─────────
+   SIS/correcciones 23-08-2026. Los tres numeros ya existian como tres filas de
+   una tabla de ocho; aca cierran la pantalla, que es donde se miran justo antes
+   de mandarle el presupuesto a la compania. Cada uno lleva su cuenta debajo. */
+.panel-cobro {
+  margin-top: 14px;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  background: var(--panel);
+  overflow: hidden;
+}
+.panel-cobro .cobro-titulo {
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--borde);
+  background: var(--fondo-2);
+  font-weight: 700; font-size: 12.5px;
+  letter-spacing: .01em;
+}
+.panel-cobro .cobro-titulo .cod { margin-left: auto; font-weight: 600; }
+.panel-cobro .cobro-cifras {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--borde);
+}
+.panel-cobro .cobro-caja {
+  display: flex; flex-direction: column; gap: 3px;
+  padding: 12px 14px;
+  background: var(--panel);
+}
+.panel-cobro .cobro-rot {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--gris-2);
+}
+.panel-cobro .cobro-val {
+  font-size: 21px; font-weight: 700; line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+/* La cuenta con sus cifras puestas: se lee, no compite con el numero. */
+.panel-cobro .cobro-cuenta {
+  font-size: 11px; color: var(--gris-2); line-height: 1.45;
+  font-variant-numeric: tabular-nums;
+}
+.panel-cobro .cobro-caja.total { background: var(--fondo-2); }
+.panel-cobro .cobro-caja.total .cobro-val { color: var(--marca-clara, var(--texto)); font-size: 24px; }
+.panel-cobro .cobro-pie {
+  padding: 9px 14px;
+  border-top: 1px solid var(--borde);
+  font-size: 11.5px; color: var(--gris-2); line-height: 1.5;
+}
+/* En el telefono los tres van uno debajo del otro: en una columna de 375 px,
+   tres numeros de 21 px al lado se cortan. */
+@media (max-width: 700px) {
+  .panel-cobro .cobro-cifras { grid-template-columns: 1fr; }
+}

@@ -602,9 +602,12 @@ function pFichaOT(o) {
   /* El módulo se abre YA PARADO en esta orden. Antes llevaba al listado y
      había que volver a buscar la patente: dos clics para llegar al mismo
      lugar, con el número de la orden en la mano. */
+  /* Por `abrirNuestra` y no por `window.open` a secas: con `noopener` la
+     pestaña nueva nacía sin sesión y había que entrar de nuevo. El porqué
+     completo está en `js/app/render.js`, junto a la función. */
   document.querySelectorAll('[data-irvista]').forEach((b) => b.addEventListener('click', () => {
-    window.open('index.html#vista=' + encodeURIComponent(b.dataset.irvista) +
-      '&ot=' + encodeURIComponent(b.dataset.irot || ''), '_blank', 'noopener');
+    abrirNuestra('index.html#vista=' + encodeURIComponent(b.dataset.irvista) +
+      '&ot=' + encodeURIComponent(b.dataset.irot || ''));
   }));
 
   if (f.tab === 'etapas') pEtapas(o);

@@ -573,8 +573,40 @@ const urlFicha = (numero, tab, modo) => 'index.html#ot=' + encodeURIComponent(nu
   (tab ? '&tab=' + encodeURIComponent(tab) : '') +
   (modo ? '&modo=' + encodeURIComponent(modo) : '');
 
+/* 🔴 ABRIR UNA PESTAÑA NUESTRA NO PUEDE ECHAR A NADIE (23-08-2026, Marco).
+
+   Esto decía `window.open(url, '_blank', 'noopener')` y cerraba la sesión: el
+   doble clic en una orden abría la ficha pidiendo entrar de nuevo.
+
+   El porqué exacto, que no se adivina: desde COD-1 la sesión vive en
+   `sessionStorage`, y el navegador **le da una copia** del `sessionStorage` a
+   la pestaña que abre… **salvo con `noopener`**. Con esa bandera la pestaña
+   nueva nace en otro grupo de contextos y su almacenamiento arranca VACÍO.
+   O sea que la bandera que uno pone «por seguridad» era la que echaba al
+   usuario.
+
+   `noopener` existe para que un destino ajeno no pueda tocar `window.opener`.
+   Acá el destino es nuestra propia página, en el mismo origen: no hay tercero
+   del que protegerse. Se mantiene, y con razón, en el enlace a arttmize.com de
+   la barra de estado, que sí sale del sitio.
+
+   ⚠️ Cualquier `window.open` que se agregue a este sistema tiene que pasar por
+   acá. Hay una prueba que recorre el código y falla si aparece otro suelto. */
+/* ⚠️ Y NADA MÁS QUE ESO, a propósito.
+
+   La primera versión agregaba `w.opener = null` después de abrir, para cortar
+   el puntero de vuelta sin perder la copia del `sessionStorage`. En teoría es
+   seguro —el navegador ya copió el almacenamiento al crear la pestaña— pero
+   toca justo el mecanismo que se está arreglando, y no se pudo comprobar en un
+   navegador de verdad. En este proyecto «en teoría» ya salió caro varias veces.
+   Se saca: el destino es nuestra propia página, así que no hay tercero del que
+   proteger el `opener`. */
+function abrirNuestra(url) {
+  return window.open(url, '_blank');
+}
+
 function abrirFicha(numero, tab, modo) {
-  window.open(urlFicha(numero, tab, modo), '_blank', 'noopener');
+  abrirNuestra(urlFicha(numero, tab, modo));
 }
 
 /* ───────────── Doble clic para abrir la orden ─────────────

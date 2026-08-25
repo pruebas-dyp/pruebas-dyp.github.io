@@ -13,10 +13,26 @@ const PROCESOS = [
   { codigo: 'externo', nombre: 'Externo', ayuda: 'Trabajo a terceros. Se cobra su precio, sin horas' }
 ];
 
+/* ⚠️ RELLENA LO QUE FALTE, NO SÓLO CUANDO NO HAY NADA (23-08-2026).
+
+   Esto era `ui.presupuesto = ui.presupuesto || { … }`, y con eso alcanzaba
+   mientras nadie tocara el estado desde afuera. Pero basta con que alguien
+   escriba `ui.presupuesto = { otId: 'ot-1' }` —sin el `linea` de adentro— para
+   que la pantalla reviente entera con «cannot read properties of undefined
+   (reading 'descripcion')», y una pantalla en blanco no dice qué le falta.
+
+   Pasó dos veces el 23-08-2026: una escribiendo una prueba, otra navegando a
+   mano. Las dos veces se veía como si el presupuesto estuviera roto. */
 function presuEstado() {
-  ui.presupuesto = ui.presupuesto || { otId: null, presupuestoId: null, busqueda: '',
-    linea: { proceso: '', descripcion: '' } };
-  return ui.presupuesto;
+  const p = ui.presupuesto || {};
+  if (!p.linea || typeof p.linea !== 'object') p.linea = { proceso: '', descripcion: '' };
+  if (typeof p.linea.proceso !== 'string') p.linea.proceso = '';
+  if (typeof p.linea.descripcion !== 'string') p.linea.descripcion = '';
+  if (typeof p.busqueda !== 'string') p.busqueda = '';
+  if (!('otId' in p)) p.otId = null;
+  if (!('presupuestoId' in p)) p.presupuestoId = null;
+  ui.presupuesto = p;
+  return p;
 }
 
 function vPresupuesto() {
@@ -198,14 +214,17 @@ function vPresupuestoOT(o) {
   return `
   <div class="panel">
     <div class="cab">
-      ${/* El título es el del original: `Editar presupuesto N° <OR>-<versión> -
-           <PATENTE>`, y debajo el siniestro con su glosa. Se entra acá desde
-           `Editar Presupuesto` del listado con una OR ya elegida, así que el
-           encabezado tiene que decir CUÁL se está editando — si dice solo el
-           número de orden, con varias OR no se sabe en cuál se está. */''}
+      ${/* El título dice CUÁL OR se está editando: si dijera sólo el número de
+           orden, con varias OR no se sabría en cuál se está.
+
+           🔷 SIN EL `-001` DEL FINAL (23-08-2026, Marco). Ese sufijo era la
+           VERSIÓN rellenada a tres dígitos, y se leía como el correlativo viejo
+           de la OR —el que se sacó el 15-08—. «El 001 no debiese estar, ya que
+           no se repite la OR asociada a una OT»: la OR sola ya identifica el
+           presupuesto, y agregarle un número atrás sugiere que hay más de uno
+           con ese mismo número. */''}
       <div><h2>${ico('presupuesto', 'g')}${actual
-        ? 'Editar presupuesto N° ' + esc(actual.numeroOR) + '-' +
-          String(actual.version).padStart(3, '0') + ' · ' + esc(o.patente)
+        ? 'Editar presupuesto N° ' + esc(actual.numeroOR) + ' · ' + esc(o.patente)
         : 'Generar presupuesto · Orden N° ' + o.numeroOT}</h2>
         <div class="desc">${o.siniestro
           ? esc(o.siniestro) + ' · ' + esc(o.origenIngresoNombre || '') + ' · '
@@ -235,10 +254,15 @@ function vPresupuestoOT(o) {
              no se borra —se anula o se versiona—, porque la discusión con la
              compañía tiene que quedar completa. Ahí la × no se dibuja en vez
              de dibujarse y rebotar: el estado de la pestaña ya lo explica. */''}
+        ${/* La pestaña dice la OR y nada más. El `· v1` que llevaba al lado se
+             sacó el 23-08-2026 por lo mismo que el título: con una sola versión
+             es ruido. Sigue apareciendo cuando esa OR tiene más de una, que es
+             cuando de verdad hace falta para no confundirlas. */''}
         ${o.presupuestos.map((x) => '<span class="chip-or' +
           (actual && x.id === actual.id ? ' activo' : '') + '">' +
           '<button class="chip" data-presu-ver="' + esc(x.id) + '">OR ' + esc(x.numeroOR) +
-            ' · v' + x.version + '</button>' +
+            (o.presupuestos.filter((y) => y.numeroOR === x.numeroOR).length > 1
+              ? ' · v' + x.version : '') + '</button>' +
           (Modelo.puede('presupuesto.crear') && x.estado === 'borrador'
             ? '<button class="quitar-or" data-presu-borrar="' + esc(x.id) +
               '" title="Eliminar la OR ' + esc(x.numeroOR) + '">&times;</button>' : '') +
@@ -345,8 +369,17 @@ function cabBloquePresu(n, titulo, quePaga, subtotal, $) {
 
 function grillaPresupuesto(o, pr, editable, $) {
   const p = presuEstado();
+  /* ⚠️ EL IVA SALE DE CONFIGURACIÓN, NO DE UN 19 ESCRITO ACÁ (23-08-2026).
+
+     Estaba puesto a mano en esta línea mientras el impreso lo leía del
+     parámetro (`impresos.js`). O sea: dos lugares calculando lo mismo por
+     caminos distintos, que es el patrón que este proyecto viene arrastrando.
+     El día que alguien cambiara el IVA en Configuración, la pantalla y el
+     documento que se le manda a la compañía habrían dicho cosas distintas. */
+  const ivaPct = Number(Reglas.parametro(Modelo.base(), 'iva', 19)) || 0;
+  const veMontos = Modelo.puede('presupuesto.montos');
   const t = pr.totales ||
-    Reglas.totalesPresupuesto(pr.lineas, pr.tempario, o.deducible, 19);
+    Reglas.totalesPresupuesto(pr.lineas, pr.tempario, o.deducible, ivaPct);
   /* Los tres bloques son INDEPENDIENTES y se separan por `bloque`. La OP de
      una línea de mano de obra clasifica ESE trabajo —cambiar, reparar,
      mandar afuera— y no pone nada en las otras dos tablas: Repuestos y
@@ -583,11 +616,53 @@ function grillaPresupuesto(o, pr, editable, $) {
         ${fila('Subtotal neto', $(t.subtotalNeto), true)}
         ${fila('Deducible neto', t.deducible ? '&minus; ' + $(t.deducible) : $(0), false, 'de la póliza')}
         ${fila('Total neto', $(t.neto), true)}
-        ${fila('IVA 19%', $(t.iva))}
+        ${fila('IVA ' + ivaPct + '%', $(t.iva))}
         ${fila('Total', $(t.total), true)}
       </tbody></table></div>
     </fieldset>
-  </div>`;
+  </div>
+
+  ${/* 🔷 EL VALOR A COBRAR, EN UN PANEL PROPIO (23-08-2026, Marco): «en la
+       generación final de presupuesto debemos tener un panel final del valor a
+       cobrar sobre ese presupuesto, separado por Neto, el IVA a cobrar y el
+       total con IVA».
+
+       Los tres números ya estaban, pero como tres filas más de una tabla de
+       ocho, entre la mano de obra y el deducible. El que arma el presupuesto
+       necesita ver **cuánto se cobra** sin leer una tabla, y es lo último que
+       mira antes de mandarlo a la compañía. Por eso cierra la pantalla y por
+       eso los tres van grandes.
+
+       Cada uno lleva su fórmula con las cifras puestas, que es como se muestran
+       los números en esta casa: quien lo mire tiene que poder rehacer la cuenta
+       sin preguntarle a nadie de dónde salió. */''}
+  <section class="panel-cobro">
+    <div class="cobro-titulo">${ico('presupuesto', 'g')}Valor a cobrar por esta OR
+      <span class="cod">${esc(pr.numeroOR)}</span></div>
+    <div class="cobro-cifras">
+      <div class="cobro-caja">
+        <span class="cobro-rot">Neto</span>
+        <span class="cobro-val">${$(t.neto)}</span>
+        <span class="cobro-cuenta">Mano de obra ${$(t.manoObra)} + repuestos ${$(t.repuestos)}
+          + T.O.T. ${$(t.tot)}</span>
+      </div>
+      <div class="cobro-caja">
+        <span class="cobro-rot">IVA ${ivaPct}%</span>
+        <span class="cobro-val">${$(t.iva)}</span>
+        <span class="cobro-cuenta">${$(t.neto)} &times; ${ivaPct}% = ${$(t.iva)}</span>
+      </div>
+      <div class="cobro-caja total">
+        <span class="cobro-rot">Total con IVA</span>
+        <span class="cobro-val">${$(t.total)}</span>
+        <span class="cobro-cuenta">${$(t.neto)} + ${$(t.iva)} = ${$(t.total)}</span>
+      </div>
+    </div>
+    ${t.deducible ? `<div class="cobro-pie">El deducible de la póliza —${$(t.deducible)}— no se
+      resta acá: el presupuesto cotiza lo que cuesta reparar, y quién paga cada parte es una
+      conversación aparte con la compañía.</div>` : ''}
+    ${veMontos ? '' : `<div class="cobro-pie">Estás mirando como <strong>${esc(Modelo.rolActual().nombre)}</strong>:
+      este rol ve las líneas del presupuesto pero no los valores.</div>`}
+  </section>`;
 
   /* Los proveedores que ya se usaron, para que quien escribe no invente una
      quinta forma del mismo nombre. Es la sugerencia, no una jaula: un
@@ -619,7 +694,18 @@ function vPresupuestoDetalle(o, pr) {
     <span class="et ${ESTADO_PRESUPUESTO[pr.estado] ? ESTADO_PRESUPUESTO[pr.estado].clase : 'gris'}">
       ${esc(ESTADO_PRESUPUESTO[pr.estado] ? ESTADO_PRESUPUESTO[pr.estado].txt : pr.estado)}</span>
     <span class="cod">OR ${esc(pr.numeroOR)}</span>
-    <span class="et gris">versión ${pr.version}</span>
+    ${/* 🔷 LA VERSIÓN SÓLO SE MUESTRA SI HAY MÁS DE UNA (23-08-2026, Marco):
+         «siempre la OR —la cual no se repite— es básicamente la versión del
+         presupuesto». En el caso normal, que es una OR con un presupuesto, el
+         «versión 1» no dice nada y compite con el número que sí importa.
+
+         ⚠️ No se saca del todo, y la razón es concreta: el botón «Crear versión
+         nueva» existe y hace un presupuesto v2 con la MISMA OR. Si se escondiera
+         siempre, dos presupuestos distintos se verían idénticos en pantalla y no
+         habría forma de saber cuál se está mirando. Se muestra recién cuando
+         hace falta para distinguirlos. */''}
+    ${o.presupuestos.filter((x) => x.numeroOR === pr.numeroOR).length > 1
+      ? '<span class="et gris">versión ' + pr.version + '</span>' : ''}
     <span style="flex:1"></span>
     ${editable ? '<button class="btn" data-presu-estado="enviado">Enviar a la compañía</button>' : ''}
     ${pr.estado === 'enviado' ? '<button class="btn" data-presu-estado="aprobado">Marcar aprobado</button>' +

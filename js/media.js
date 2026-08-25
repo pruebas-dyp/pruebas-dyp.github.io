@@ -21,6 +21,24 @@ const Media = (function () {
   const objetivoBytes = () => Number(par('foto_objetivo_kb', 350)) * 1024;
   const comprimeSiempre = () => par('comprimir_fotos', 'si') !== 'no';
 
+  /* 🔴 LA FECHA DE UN ARCHIVO ES LA DE AHORA, NO LA DEL DÍA A MEDIANOCHE.
+     23-08-2026, Marco: «cuando uno carga una foto o un documento al panel de
+     Documentos, la fecha que sale no se está linkeando con la fecha actual».
+
+     Eran dos cosas a la vez y las dos se arreglaron. `HOY` estaba clavado en el
+     12-08-2026 —el día del levantamiento— así que TODO nacía con esa fecha; eso
+     se corrigió en `semilla.js`. Y aun con `HOY` bien, `HOY` es el día **a
+     medianoche**: dos documentos cargados con horas de diferencia salían con la
+     misma hora, 00:00, y en la lista de un expediente no se podía saber cuál
+     entró primero.
+
+     `Modelo.ahora()` junta el día del sistema con el reloj del computador, que
+     es lo que usa el resto del motor para todo lo que alguien escribe. Con la
+     guarda por si `Modelo` no está —el arnés de consola carga `media.js` sin él. */
+  const cuando = () => {
+    try { return Modelo.ahora(); } catch (e) { return new Date(HOY.getTime()); }
+  };
+
   let _bd = null;
 
   function abrir() {
@@ -120,7 +138,7 @@ const Media = (function () {
         bytes: r.blob.size,
         ancho: r.ancho, alto: r.alto,
         sin_comprimir: !!r.sinComprimir,
-        creado_at: HOY
+        creado_at: cuando()
       }));
     });
   }
@@ -163,7 +181,7 @@ const Media = (function () {
       nombre: (ficha && ficha.nombre) || 'firma.png',
       mime: blob.type, bytes_original: blob.size, bytes: blob.size,
       ancho: (ficha && ficha.ancho) || null, alto: (ficha && ficha.alto) || null,
-      creado_at: HOY
+      creado_at: cuando()
     }));
   }
 

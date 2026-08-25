@@ -5,16 +5,37 @@
 
    Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/semilla.js */
 
-/* Fecha de referencia del modelo borrador. Es la del levantamiento, para que
-   los días calculados cuadren con lo que se midió en el sistema real.
+/* Fecha de referencia del modelo borrador: TODO lo que el sistema calcula en
+   días —los tres relojes, la antigüedad de cada orden, las esperas— se mide
+   contra esto, y todo lo que alguien escribe nace con esta fecha.
+
+   🔴 ERA EL 12-08-2026, CLAVADO (corregido el 23-08-2026, Marco). Ese es el día
+   del levantamiento, y se puso ahí para que los días cuadraran con lo que se
+   midió en el sistema real. Pero quedó fijo, así que el sistema creía que hoy
+   era el 12 de agosto para siempre: quien cargaba un documento lo veía fechado
+   once días atrás, y las anotaciones de bitácora nacían con la fecha del
+   levantamiento en vez de la de hoy.
+
+   Ahora es HOY de verdad, a medianoche. Lo que se midió no se pierde: la
+   semilla arma sus datos RELATIVOS a esta fecha —«ingresó hace cinco días»— así
+   que el taller entero viaja con el calendario y las cifras de control siguen
+   cuadrando. Se comprueba con «Comprobar cifras de la demostración».
 
    Va como `let` y no como `const` a propósito: los tres relojes solo se
    pueden demostrar de verdad si se puede adelantar el calendario. «Datos de
-   demostración» → Adelantar la fecha del sistema mueve esto, y todo lo demás se recalcula
-   solo, porque ningún contador guarda días: todos se derivan de las fechas.
-   Es el paso 14 del guion de prueba. */
-let HOY = new Date(2026, 7, 12);
-const HOY_ORIGINAL = new Date(2026, 7, 12);
+   demostración» → Adelantar la fecha del sistema mueve esto, y todo lo demás se
+   recalcula solo, porque ningún contador guarda días: todos se derivan de las
+   fechas. Es el paso 14 del guion de prueba.
+
+   ⚠️ A medianoche y no `new Date()` a secas: `HOY` es el DÍA, y hay comparaciones
+   que cuentan días completos. La hora de verdad la pone `Modelo.ahora()`, que
+   junta este día con el reloj del computador. */
+const inicioDelDia = (function () {
+  const r = new Date();
+  return new Date(r.getFullYear(), r.getMonth(), r.getDate());
+})();
+let HOY = new Date(inicioDelDia.getTime());
+const HOY_ORIGINAL = new Date(inicioDelDia.getTime());
 
 const Semilla = (function () {
 

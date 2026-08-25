@@ -2174,6 +2174,189 @@ const Pruebas = (function () {
               : 'La vieja se fue y quedaron ' + ahora + ' dentro de la ventana')
         });
       })();
+
+      /* 🔴 ABRIR UNA PESTAÑA NUESTRA NO PUEDE ECHAR A NADIE (23-08-2026, Marco).
+
+         El doble clic en una orden la abre en una pestaña nueva, y ahí el
+         sistema pedía entrar de nuevo. La causa no se adivina mirando: desde
+         COD-1 la sesión vive en `sessionStorage`, y el navegador **le da una
+         copia** a la pestaña que abre… **salvo con `noopener`**. Con esa
+         bandera la pestaña nace en otro grupo de contextos y su almacenamiento
+         arranca vacío.
+
+         La prueba mira lo que se le pasa a `window.open` de verdad, no una
+         función auxiliar que decida bien por su cuenta: si mañana alguien
+         vuelve a escribir el `noopener`, esto falla. */
+      (function () {
+        if (typeof abrirFicha !== 'function') {
+          push({ nombre: '🔴 Abrir una pestaña nuestra conserva la sesión',
+            intento: 'Llamar a abrirFicha', esperado: 'sin noopener',
+            paso: false, detalle: 'abrirFicha no está cargada (falta js/app/render.js)' });
+          return;
+        }
+        const real = window.open;
+        const llamadas = [];
+        window.open = function () { llamadas.push([].slice.call(arguments)); return null; };
+        try { abrirFicha(23298); } catch (e) { /* da igual: lo que importa son los argumentos */ }
+        window.open = real;
+
+        const rasgos = llamadas.length ? String(llamadas[0][2] || '') : '(no llamó)';
+        push({
+          nombre: '🔴 Abrir una pestaña nuestra conserva la sesión',
+          intento: 'Abrir la ficha de una orden y mirar con qué se llama a window.open',
+          esperado: 'Se abre en _blank y SIN `noopener`, que es lo que vacía el sessionStorage',
+          paso: llamadas.length === 1 && rasgos.indexOf('noopener') < 0,
+          detalle: !llamadas.length ? 'No abrió ninguna pestaña'
+            : (rasgos.indexOf('noopener') >= 0
+              ? 'Va con `noopener`: la pestaña nueva nace sin sesión y pide entrar de nuevo'
+              : 'Sin `noopener` (' + (rasgos || 'sin rasgos') + '): la sesión viaja')
+        });
+      })();
+
+      /* 🔴 LO QUE SE ESCRIBE HOY QUEDA FECHADO HOY (23-08-2026, Marco).
+
+         `HOY` estaba clavado en el 12-08-2026 —el día del levantamiento— así que
+         un documento cargado hoy salía fechado once días atrás, y lo mismo toda
+         anotación de bitácora.
+
+         ⚠️ LA PRUEBA MIRA UN REGISTRO ESCRITO DE VERDAD, y no la constante.
+         El primer intento comparaba `HOY` contra el reloj y dejaba pasar el caso
+         «alguien adelantó el calendario a propósito». Con esa salida de escape,
+         volver a clavar la fecha en el 12 de agosto NO se cazaba: se comprobó
+         rompiéndolo. Lo que importa no es cuánto vale la constante, es con qué
+         fecha nace lo que una persona escribe. */
+      (function () {
+        const bd = Modelo.base();
+        const ot = bd.orden_trabajo.find((o) => !Reglas.esTerminal(bd, o.estado));
+        const antes = bd.bitacora.length;
+        Modelo.escribir_bitacora(ot.id, { asunto_id: bd.asunto_bitacora[0].id,
+          mensaje: 'Con que fecha nace esto ' + Date.now() });
+        const escrita = Modelo.base().bitacora[Modelo.base().bitacora.length - 1];
+        const f = escrita && escrita.fecha instanceof Date ? escrita.fecha : null;
+
+        const hoy = new Date();
+        const mismoDia = f && f.getFullYear() === hoy.getFullYear()
+          && f.getMonth() === hoy.getMonth() && f.getDate() === hoy.getDate();
+        const traeHora = f && (f.getHours() || f.getMinutes() || f.getSeconds());
+
+        push({
+          nombre: '🔴 Lo que se escribe hoy queda fechado hoy',
+          intento: 'Escribir una anotación y mirar con qué fecha quedó',
+          esperado: 'El día de hoy de verdad, y con la hora del reloj',
+          paso: !!mismoDia && !!traeHora,
+          detalle: !f ? 'La anotación no quedó con una fecha'
+            : (!mismoDia
+              ? 'Quedó fechada el ' + f.toLocaleDateString('es-CL') + ' y hoy es ' +
+                hoy.toLocaleDateString('es-CL') + ': la fecha del sistema está clavada'
+              : (!traeHora ? 'Quedó a medianoche: no lleva la hora del reloj'
+                : 'Fechada hoy, ' + f.toLocaleTimeString('es-CL')))
+        });
+      })();
+      /* 🔶 EL IVA DEL PRESUPUESTO SALE DE CONFIGURACIÓN (23-08-2026).
+
+         La pantalla lo tenía escrito a mano —un `19` en la llamada— mientras el
+         documento impreso lo leía del parámetro. Dos lugares calculando lo mismo
+         por caminos distintos: el día que alguien cambiara el IVA, la pantalla y
+         lo que se le manda a la compañía habrían dicho cosas distintas. */
+      (function () {
+        if (typeof grillaPresupuesto !== 'function') {
+          push({ nombre: '🔶 El IVA del presupuesto sale de Configuración', intento: 'Pintar la grilla',
+            esperado: 'usa el parámetro', paso: false, detalle: 'la vista no está cargada' });
+          return;
+        }
+        const bd = Modelo.base();
+        const previo = Reglas.parametro(bd, 'iva', 19);
+        const o = Modelo.torre().find((x) => (x.presupuestos || []).length);
+        if (!o) {
+          push({ nombre: '🔶 El IVA del presupuesto sale de Configuración', intento: 'Buscar una OR',
+            esperado: 'usa el parámetro', paso: false, detalle: 'ninguna orden tiene presupuesto' });
+          return;
+        }
+        const pr = o.presupuestos[0];
+        // Se mueve el parámetro a un número que NO puede venir de ninguna otra parte.
+        Modelo.guardar_parametro('iva', 7);
+        const conSiete = grillaPresupuesto(o, Object.assign({}, pr, { totales: null }), false, (n) => String(n));
+        Modelo.guardar_parametro('iva', previo);
+
+        push({
+          nombre: '🔶 El IVA del presupuesto sale de Configuración, no de un 19 escrito a mano',
+          intento: 'Poner el IVA en 7% y volver a pintar la grilla del presupuesto',
+          esperado: 'Dice «IVA 7%» y ya no dice «IVA 19%»',
+          paso: conSiete.indexOf('IVA 7%') >= 0 && conSiete.indexOf('IVA 19%') < 0,
+          detalle: conSiete.indexOf('IVA 19%') >= 0
+            ? 'Sigue diciendo 19% con el parámetro en 7: está escrito a mano en la vista'
+            : (conSiete.indexOf('IVA 7%') < 0 ? 'No encontré el rótulo del IVA en la grilla'
+              : 'La pantalla sigue el parámetro, igual que el impreso')
+        });
+      })();
+
+      /* 🔶 EL PANEL DE COBRO CIERRA EL PRESUPUESTO (23-08-2026, Marco).
+
+         «Debemos tener un panel final del valor a cobrar sobre ese presupuesto,
+         separado por Neto, el IVA a cobrar y el total con IVA.» */
+      (function () {
+        if (typeof grillaPresupuesto !== 'function') return;
+        const o = Modelo.torre().find((x) => (x.presupuestos || []).length);
+        if (!o) return;
+        const html = grillaPresupuesto(o, o.presupuestos[0], false, (n) => String(n));
+        const tiene = (s) => html.indexOf(s) >= 0;
+        const posicion = html.indexOf('class="panel-cobro"');
+
+        push({
+          nombre: '🔶 El presupuesto cierra con el valor a cobrar, separado en tres',
+          intento: 'Pintar la grilla y buscar el panel con Neto, IVA y Total con IVA',
+          esperado: 'Están los tres, y el panel va al final',
+          paso: tiene('class="panel-cobro"') && tiene('Valor a cobrar') && tiene('>Neto<')
+            && tiene('Total con IVA') && posicion > html.length * 0.5,
+          detalle: !tiene('class="panel-cobro"') ? 'No está el panel de cobro'
+            : (!tiene('Total con IVA') ? 'Falta el total con IVA'
+              : (posicion <= html.length * 0.5 ? 'El panel no está al final: es lo último que se mira'
+                : 'Neto, IVA y Total con IVA, cerrando la pantalla'))
+        });
+      })();
+
+      /* 🔶 EL NÚMERO DE OR VA SOLO, SIN NADA ATRÁS (23-08-2026, Marco).
+
+         El título decía «Editar presupuesto N° 23489-18089-001»: ese `-001` era
+         la VERSIÓN rellenada a tres dígitos, y se leía como el correlativo viejo
+         de la OR —el que se sacó el 15-08—. «No debiese estar, ya que no se
+         repite la OR asociada a una OT.»
+
+         Se pinta la pantalla de verdad y se busca ahí. Comparar un texto armado
+         acá adentro no probaría nada: probaría que sé escribir una expresión
+         regular. */
+      (function () {
+        if (typeof vPresupuestoOT !== 'function') return;
+        const o = Modelo.torre().find((x) => (x.presupuestos || []).length);
+        if (!o) return;
+        const pr = o.presupuestos[0];
+        const previo = ui.presupuesto;
+        ui.presupuesto = { otId: o.id, presupuestoId: pr.id };
+        let html = '';
+        try { html = vPresupuestoOT(o); } catch (e) { html = '(no se pudo pintar: ' + e.message + ')'; }
+        ui.presupuesto = previo;
+
+        // El numero de OR es solo digitos y un guion: no hay nada que escapar.
+        const conSufijo = new RegExp(String(pr.numeroOR) + '-[0-9]{3}');
+        const dice = (s) => html.indexOf(s) >= 0;
+        const unaSolaVersion = o.presupuestos.filter((x) => x.numeroOR === pr.numeroOR).length === 1;
+
+        push({
+          nombre: '🔶 El número de OR va solo: sin el -001 y sin «versión 1»',
+          intento: 'Pintar el editor del presupuesto y leer su encabezado',
+          esperado: 'Dice la OR y la patente, y con una sola versión no dice «versión»',
+          paso: !conSufijo.test(html) && dice(String(pr.numeroOR))
+            && (!unaSolaVersion || !dice('versión ' + pr.version)),
+          detalle: conSufijo.test(html)
+            ? 'Sigue apareciendo ' + pr.numeroOR + '-00' + pr.version + ': el sufijo de versión no se sacó'
+            : (!dice(String(pr.numeroOR)) ? 'No aparece el número de OR por ninguna parte'
+              : (unaSolaVersion && dice('versión ' + pr.version)
+                ? 'Con una sola versión sigue diciendo «versión ' + pr.version + '»'
+                : 'La OR ' + pr.numeroOR + ' sola, sin sufijo' +
+                  (unaSolaVersion ? ' y sin rótulo de versión' : ' (esta OR sí tiene varias versiones)')))
+        });
+      })();
+
       /* 🔴 3 · EL COLOR DE UN CATALOGO SE LIMPIA EN EL MOTOR.
 
          El color se pinta dentro de un atributo `style`. La vista lo escapa,
