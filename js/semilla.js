@@ -105,7 +105,11 @@ const Semilla = (function () {
      todas fueran iguales el indicador no distinguiría nada. */
   const ESPERA_VISTO = [0, 0, 0.4, 1, 0, 2, 0.7, 3, 0.2, 1.5, 0, 0.9];
 
-  const FORMA_DATOS = 10;  // 10: vuelve la cuenta de Arttmize para la puesta en marcha
+  /* 11: los permisos pasan a colgar de la PERSONA (`persona_permiso`) y no del
+     rol. Subirlo hace que toda base guardada de antes se vuelva a sembrar, que
+     es exactamente lo que hace falta: sin la tabla nueva, nadie podría hacer
+     nada. Ese es todo el trabajo de este número. */
+  const FORMA_DATOS = 11;
   // TEMPARIO_HORA ($10.000, reglas §C.15) se eliminó el 13-08-2026 junto con
   // el tempario entero. La cifra queda medida en `reglas`, no en el sistema.
 
@@ -1647,13 +1651,30 @@ const Semilla = (function () {
       });
     }
 
+    /* ── LOS PERMISOS DE CADA CUENTA ───────────────────────────────────
+       23-08-2026. Antes colgaban del rol y ahora cuelgan de la PERSONA: es lo
+       que se edita en Personal. La semilla los copia desde el rol de cada uno,
+       así que el sistema arranca comportándose EXACTAMENTE igual que antes —
+       lo que cambia es que ahora se pueden mover uno por uno.
+
+       Las cuentas de rol total no llevan filas: su permiso no sale de acá sino
+       de la marca del rol, y esa garantía no puede depender de que la tabla
+       esté bien sembrada. */
+    const persona_permiso = [];
+    persona_rol.forEach((pr) => {
+      const r = rol.find((x) => x.id === pr.rol_id);
+      if (!r || r.total) return;
+      (M[r.codigo] || []).forEach((codigo) =>
+        persona_permiso.push({ persona_id: pr.persona_id, permiso_codigo: codigo }));
+    });
+
     return {
       // catálogos
       etapa, etapa_prerrequisito, estado, compania, tipo_ingreso, prioridad,
       asunto_bitacora, responsable_pago, motivo_detencion,
       color_vehiculo, marca, modelo, inventario_item, tipo_dano, zona_dano,
       // acceso
-      rol, permiso, rol_permiso, persona, persona_rol, persona_etapa,
+      rol, permiso, rol_permiso, persona, persona_rol, persona_etapa, persona_permiso,
       // parámetros
       parametro,
       // operación

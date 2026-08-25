@@ -6,6 +6,43 @@
 
    Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/personal.js */
 
+/* ── Los 31 permisos, agrupados para poder mirarlos ────────────────────
+   23-08-2026. Puestos en fila son una lista de treinta y una casillas donde no
+   se encuentra nada. Agrupados por lo que la persona HACE con ellos, se leen.
+
+   Los grupos son de presentación y no cambian nada del motor: si mañana se
+   agrega un permiso al catálogo y nadie lo pone en un grupo, igual aparece —
+   al final, en «Otros»— en vez de desaparecer de la pantalla sin avisar. */
+const GRUPOS_PERMISOS = [
+  { nombre: 'Qué pantallas abre',
+    codigos: ['torre.ver', 'historico.ver', 'taller.ver', 'repuesto.ver', 'espera.ver',
+      'consolidado.ver', 'personal.ver', 'configuracion'] },
+  { nombre: 'La ficha del vehículo',
+    codigos: ['ficha.completa', 'documento.ver', 'documento.cargar', 'foto.ver', 'foto.cargar',
+      'datos.rut_completo'] },
+  { nombre: 'Las órdenes',
+    codigos: ['ot.crear', 'ot.editar', 'salida.registrar', 'entrega.registrar',
+      'detencion.gestionar'] },
+  { nombre: 'El trabajo del taller',
+    codigos: ['etapa.asignar', 'etapa.validar', 'etapa.finalizar'] },
+  { nombre: 'Presupuesto y repuestos',
+    codigos: ['presupuesto.ver', 'presupuesto.montos', 'presupuesto.crear', 'presupuesto.abrir',
+      'perdida_total.declarar', 'repuesto.cargar', 'repuesto.devolver'] },
+  { nombre: 'Administrar',
+    codigos: ['personal.editar', 'exportar'] }
+];
+
+/* Los que no quedaron en ningún grupo. Se calcula, no se escribe: un permiso
+   nuevo tiene que aparecer solo. */
+function gruposDePermisos(todos) {
+  const puestos = {};
+  GRUPOS_PERMISOS.forEach((g) => g.codigos.forEach((c) => { puestos[c] = true; }));
+  const sueltos = todos.filter((p) => !puestos[p.codigo]).map((p) => p.codigo);
+  return sueltos.length
+    ? GRUPOS_PERMISOS.concat([{ nombre: 'Otros', codigos: sueltos }])
+    : GRUPOS_PERMISOS;
+}
+
 function personalEstado() {
   ui.personal = ui.personal || { pantalla: 'listado', busqueda: '', personaId: null, verBajas: false };
   return ui.personal;
@@ -83,6 +120,11 @@ function personalListado() {
 }
 
 function personalFicha() {
+  /* Se resuelven una vez y valen para los dos bloques nuevos. */
+  const TODOS_PERMISOS = Modelo.base().permiso;
+  const GRUPOS = gruposDePermisos(TODOS_PERMISOS);
+  const puedeEditar = Modelo.puede('personal.editar');
+
   const p = personalEstado();
   const x = Modelo.personal().find((y) => y.id === p.personaId);
   if (!x) { p.pantalla = 'listado'; return personalListado(); }
@@ -140,6 +182,76 @@ function personalFicha() {
         <div class="campo"><label>&nbsp;</label><button class="btn secundario" id="cl-guardar">Cambiar clave</button></div>
       </div>
     </fieldset>` : ''}
+
+
+    ${/* 🔷 QUÉ VE Y QUÉ HACE, POR PERSONA (23-08-2026, Marco).
+
+         Esto vivía en `Configuración → Roles y permisos`, como una matriz de 31
+         permisos por 8 roles, y se fue de ahí a pedido suyo: «quiero que en el
+         panel de Personal podamos hacer el tema de Roles y Permisos por cada
+         colaborador — qué puede ver, qué puede hacer».
+
+         Y tiene razón, porque es el mismo movimiento que Andrés Guzmán ya había
+         hecho con los MÓDULOS el 17-08: dos personas con el mismo cargo no hacen
+         lo mismo. Nancy y Sandra son las dos de administración y una ve Personal
+         y la otra no. Con la matriz por rol, cada persona que se salía del molde
+         obligaba a inventar un rol nuevo.
+
+         Van los dos bloques juntos y en este orden porque es el orden en que se
+         piensa: primero a qué pantalla entra, después qué puede hacer adentro. */''}
+
+    <fieldset class="bloque"><legend>Qué puede ver</legend>
+      <div class="pie-nota" style="margin:0 0 9px">Los módulos que le aparecen en la barra.
+      Una cuenta sin ninguno entraría al sistema a mirar una pared, así que el sistema no
+      deja dejarla en cero: si la idea es que no entre, se desactiva la cuenta.</div>
+      <div class="inventario">
+        ${Modelo.MODULOS_MENU.map((m) => {
+          const tiene = !Array.isArray(x.modulosCrudos) || x.modulosCrudos.indexOf(m.id) >= 0;
+          return '<label class="inv-item' + (tiene ? ' marcado' : '') + '">' +
+            '<input type="checkbox" data-per-modulo="' + esc(m.id) + '"' +
+            (tiene ? ' checked' : '') + (puedeEditar ? '' : ' disabled') + '>' +
+            '<span>' + esc(m.nombre) + '</span></label>';
+        }).join('')}
+      </div>
+    </fieldset>
+
+    <fieldset class="bloque"><legend>Qué puede hacer</legend>
+      ${x.accesoTotal ? `
+      <div class="nota">Esta cuenta tiene el rol <strong>${esc(x.rolNombre || '—')}</strong>, que
+      alcanza <strong>todo el sistema</strong> y no se le puede recortar. Si se pudiera, bastaría
+      con desmarcarle «Administrar los catálogos» para que nadie pudiera volver a entrar a
+      Configuración, y la única salida sería reiniciar el sistema y perder todo.</div>` : `
+      <div class="pie-nota" style="margin:0 0 9px">Marcado ${x.permisos.length} de
+      ${TODOS_PERMISOS.length}. Nace copiado del rol <strong>${esc(x.rolNombre || '—')}</strong>
+      y desde ahí se mueve uno por uno: el rol es la plantilla, no la jaula.</div>`}
+      <div class="permisos-persona">
+        ${GRUPOS.map((g) => {
+          const items = TODOS_PERMISOS.filter((p) => g.codigos.indexOf(p.codigo) >= 0);
+          if (!items.length) return '';
+          return '<div class="permiso-grupo"><div class="permiso-grupo-tit">' + esc(g.nombre) + '</div>' +
+            items.map((p) => {
+              const tiene = x.accesoTotal || x.permisos.indexOf(p.codigo) >= 0;
+              return '<label class="inv-item' + (tiene ? ' marcado' : '') + '">' +
+                '<input type="checkbox" data-per-permiso="' + esc(p.codigo) + '"' +
+                (tiene ? ' checked' : '') +
+                (puedeEditar && !x.accesoTotal ? '' : ' disabled') + '>' +
+                '<span>' + esc(p.descripcion) + '<br><span class="cod">' + esc(p.codigo) +
+                '</span></span></label>';
+            }).join('') + '</div>';
+        }).join('')}
+      </div>
+      ${puedeEditar ? '' :
+        '<div class="pie-nota">Solo lectura: los accesos los marca Administración.</div>'}
+    </fieldset>
+
+    <fieldset class="bloque"><legend>Sobre qué órdenes trabaja</legend>
+      <div class="dato"><span class="k">Rol</span><span class="v">${esc(x.rolNombre || '—')}</span></div>
+      <div class="dato"><span class="k">Alcance</span><span class="v">${esc(x.alcanceTexto)}</span></div>
+      <div class="pie-nota" style="margin-top:8px">El alcance sigue viniendo del rol y no se
+      edita acá: los permisos dicen qué <strong>pantallas</strong> abre, el alcance dice qué
+      <strong>filas</strong> trae cada pantalla. Un operario con los ${TODOS_PERMISOS.length}
+      permisos marcados y alcance «solo las asignadas» sigue viendo únicamente sus autos.</div>
+    </fieldset>
 
     <fieldset class="bloque"><legend>Qué etapas puede hacer</legend>
       <div class="inventario">
@@ -232,4 +344,23 @@ function pPersonal() {
   document.querySelectorAll('[data-per-etapa]').forEach((cb) => cb.addEventListener('change', () =>
     ejecutar(() => Modelo.fijar_habilidad(p.personaId, cb.dataset.perEtapa, cb.checked),
       cb.checked ? 'Habilidad agregada.' : 'Habilidad quitada.')));
+
+  /* ⚠️ Si el motor rechaza el cambio —la última cuenta que puede entrar a
+     Configuración, o dejar a alguien sin ningún módulo— la casilla ya se movió
+     sola en la pantalla y quedaría mintiendo. Se devuelve a donde estaba.
+     `ejecutar` repinta cuando el cambio SÍ entra, así que sólo hay que
+     ocuparse del caso en que no. */
+  document.querySelectorAll('[data-per-modulo]').forEach((cb) => cb.addEventListener('change', () => {
+    const r = Modelo.fijar_persona_modulo(p.personaId, cb.dataset.perModulo, cb.checked);
+    if (!r.ok) { cb.checked = !cb.checked; return avisar(r); }
+    avisar(r, cb.checked ? 'Módulo habilitado.' : 'Módulo quitado.');
+    render();
+  }));
+
+  document.querySelectorAll('[data-per-permiso]').forEach((cb) => cb.addEventListener('change', () => {
+    const r = Modelo.fijar_persona_permiso(p.personaId, cb.dataset.perPermiso, cb.checked);
+    if (!r.ok) { cb.checked = !cb.checked; return avisar(r); }
+    avisar(r, cb.checked ? 'Permiso otorgado.' : 'Permiso quitado.');
+    render();
+  }));
 }

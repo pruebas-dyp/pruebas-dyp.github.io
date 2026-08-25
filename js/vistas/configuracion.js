@@ -51,12 +51,10 @@ const CONFIG_GRUPOS = [
       { id: 'motivo_detencion', nombre: 'Motivos de detención' },
       { id: 'asunto_bitacora',  nombre: 'Asuntos y alertas' }
     ] },
-  { id: 'sistema', nombre: 'Del sistema',
-    ayuda: 'Quién puede hacer qué, y los parámetros que gobiernan los cálculos',
-    secciones: [
-      { id: 'parametro',        nombre: 'Parámetros' },
-      { id: 'permisos',         nombre: 'Roles y permisos' }
-    ] }
+  /* El grupo «Del sistema» tenía Parámetros y Roles y permisos, y los dos se
+     fueron el 23-08-2026 — el porqué está más abajo, donde vivían las dos
+     funciones. Sin secciones, el grupo entero se va: un encabezado que no
+     abre nada es peor que no tenerlo. */
 ];
 
 // Se conserva la lista plana: el resto del archivo la usa para resolver una
@@ -127,8 +125,7 @@ function vConfiguracion() {
     '" data-cfg-sec="' + s.id + '">' + esc(s.nombre) + '</button>').join('') + '</div>';
 
   const cuerpo = {
-    etapa: cfgEtapas, precedencia: cfgPrecedencias, estado: cfgEstados,
-    parametro: cfgParametros, permisos: cfgPermisos
+    etapa: cfgEtapas, precedencia: cfgPrecedencias, estado: cfgEstados
   }[c.seccion] || (() => cfgGenerico(c.seccion));
 
   return `
@@ -355,91 +352,27 @@ function cfgFormNuevo(tabla, rotulo, campos) {
   </div>`;
 }
 
-/* ───────────────── Parámetros ───────────────── */
+/* ⛔ ACÁ VIVÍAN «PARÁMETROS» Y «ROLES Y PERMISOS», Y SE FUERON (23-08-2026, Marco).
 
-function cfgParametros() {
-  const filas = Modelo.parametros().map((p) => {
-    const control = p.tipo === 'opcion'
-      ? '<select data-cfg-param="' + esc(p.clave) + '">' + p.opciones.map((o) =>
-          '<option value="' + esc(o.valor) + '"' + (o.valor === p.valor ? ' selected' : '') + '>' +
-          esc(o.nombre) + '</option>').join('') + '</select>'
-      : '<input type="number" data-cfg-param="' + esc(p.clave) + '" value="' + esc(p.valor) + '">';
-    return '<tr class="fila"><td><strong>' + esc(p.nombre) + '</strong>' +
-      '<div class="desc" style="font-size:11px;color:var(--gris)">' + esc(p.ayuda) + '</div></td>' +
-      '<td><span class="cod">' + esc(p.clave) + '</span></td>' +
-      '<td style="min-width:340px">' + control + '</td></tr>';
-  }).join('');
+   **Parámetros** — «eliminar Parámetros no me sirve, eso dejalo fijo». Los doce
+   valores siguen existiendo y gobernando los cálculos —la meta de días, el IVA,
+   el correlativo de OT, el tamaño de las fotos—: lo que se fue es la pantalla
+   para editarlos. Quedan como los siembra `semilla.js` y no se tocan desde el sistema.
 
-  return `
-  <div class="grid-envoltorio"><table class="grid">
-    <thead><tr><th>Parámetro</th><th>Clave</th><th>Valor</th></tr></thead>
-    <tbody>${filas}</tbody>
-  </table></div>
-`;
-}
+   ⚠️ La TABLA `parametro` no se puede sacar y no se sacó: `correlativo_ot` se
+   incrementa con cada orden que nace. Lo que desapareció es el formulario.
 
-/* ───────────────── Roles y permisos ───────────────── */
+   **Roles y permisos** — se fue a Personal, que es donde Marco lo quiere: «que
+   en el panel de Personal podamos hacer el tema de Roles y Permisos por cada
+   colaborador — qué puede ver, qué puede hacer».
 
-function cfgPermisos() {
-  const roles = Modelo.roles();
-  const permisos = Modelo.base().permiso;
+   Es el mismo movimiento que Andrés Guzmán ya había hecho con los módulos el
+   17-08: dos personas con el mismo cargo no hacen lo mismo. La matriz por ROL
+   obligaba a inventar un rol nuevo cada vez que alguien se salía del molde.
 
-  /* Las columnas de acceso total van marcadas y bloqueadas. No es que el
-     sistema no quiera dejar editarlas: es que quitarle «Administrar los
-     catálogos» al administrador cierra la puerta por dentro y deja al taller
-     sin nadie que pueda volver a abrirla. El motor lo rechaza igual; acá se
-     muestra para que nadie lo intente y se lleve un mensaje de error. */
-  const filas = permisos.map((p) =>
-    '<tr class="fila"><td><span class="cod">' + esc(p.codigo) + '</span></td>' +
-    '<td>' + esc(p.descripcion) + '</td>' +
-    roles.map((r) => '<td style="text-align:center">' +
-      '<input type="checkbox" data-cfg-perm="' + esc(r.id) + '|' + esc(p.codigo) + '"' +
-      (r.total || Modelo.permisosDe(r.id).indexOf(p.codigo) >= 0 ? ' checked' : '') +
-      (r.total ? ' disabled title="Acceso total: no se puede quitar"' : '') + '></td>').join('') +
-    '</tr>').join('');
-
-  /* El ALCANCE va arriba de la matriz y no dentro, porque no es un permiso más:
-     los permisos dicen qué PANTALLAS abre un rol, el alcance dice qué FILAS
-     trae cada pantalla. Un operario con los veintiséis permisos marcados y
-     alcance "asignado" sigue viendo solo sus autos. */
-  const ALCANCE = {
-    todo: ['Todas las órdenes', 'verde'],
-    asignado: ['Solo las que tiene asignadas', 'ambar'],
-    compania: ['Solo las de su compañía', 'ambar']
-  };
-
-  return `
-  <div class="grid-envoltorio" style="margin-bottom:14px"><table class="grid">
-    <thead><tr><th style="width:22%">Rol</th><th style="width:26%">Alcance</th><th>Sobre qué órdenes trabaja</th>
-      <th class="num" style="width:12%">Permisos</th></tr></thead>
-    <tbody>${roles.map((r) => {
-      const a = ALCANCE[r.alcance || 'todo'] || ALCANCE.todo;
-      return '<tr class="fila"><td><strong>' + esc(r.nombre) + '</strong>' +
-        (r.total ? ' <span class="et verde">acceso total</span>' : '') +
-        (r.externo ? ' <span class="et ambar">externo</span>' : '') + '</td>' +
-        '<td><span class="et ' + a[1] + '">' + esc(r.total ? 'todo' : (r.alcance || 'todo')) + '</span></td>' +
-        '<td>' + esc(r.total ? 'Todas las órdenes, siempre' : a[0]) + '</td>' +
-        '<td class="num">' + Modelo.permisosDe(r.id).length + ' de ' + permisos.length + '</td></tr>';
-    }).join('')}</tbody>
-  </table></div>
-
-  <div class="grid-envoltorio"><table class="grid">
-    <thead><tr><th>Permiso</th><th>Qué habilita</th>
-      ${roles.map((r) => '<th style="text-align:center">' + esc(r.nombre) +
-        (r.total ? '<br><span class="et verde">fijo</span>' : '') +
-        (r.externo ? '<br><span class="et ambar">externo</span>' : '') + '</th>').join('')}
-    </tr></thead>
-    <tbody>${filas}</tbody>
-  </table></div>
-
-  <div class="nota" style="margin-top:12px">${ico('candado')}<span>
-    <strong>Administración y Dueño tienen todo el sistema y su columna no se edita.</strong>
-    Es a propósito: <code>configuracion</code> es una casilla más de esta misma matriz, así que
-    desmarcarla en la fila del administrador dejaría al taller <em>sin nadie</em> que pudiera volver
-    a marcarla, y la única salida sería reiniciar la base. Por lo mismo, tampoco se puede desactivar
-    la última cuenta con acceso total: primero hay que crear otra.
-  </span></div>`;
-}
+   El ROL no desapareció: sigue diciendo el ALCANCE —sobre qué órdenes trabaja—
+   y sigue siendo la plantilla con la que nace una cuenta. Lo que se mueve por
+   persona son los permisos, en `Personal` → la ficha de cada uno. */
 
 /* ───────────────── Cableado ───────────────── */
 
@@ -505,12 +438,4 @@ function pConfiguracion() {
     ejecutar(() => Modelo.quitar_prerrequisito(a, r), 'Precedencia quitada.');
   }));
 
-  document.querySelectorAll('[data-cfg-param]').forEach((i) => i.addEventListener('change', () =>
-    ejecutar(() => Modelo.guardar_parametro(i.dataset.cfgParam, i.value), 'Parámetro guardado.')));
-
-  document.querySelectorAll('[data-cfg-perm]').forEach((i) => i.addEventListener('change', () => {
-    const [rol, perm] = i.dataset.cfgPerm.split('|');
-    ejecutar(() => Modelo.fijar_rol_permiso(rol, perm, i.checked),
-      i.checked ? 'Permiso otorgado.' : 'Permiso quitado.');
-  }));
 }

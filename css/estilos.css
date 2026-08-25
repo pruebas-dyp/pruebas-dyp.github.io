@@ -1939,3 +1939,36 @@ table.grid td.abre-ot:hover { text-decoration: underline; }
 @media (max-width: 700px) {
   .panel-cobro .cobro-cifras { grid-template-columns: 1fr; }
 }
+
+/* ───────── Los permisos de una cuenta, en Personal ─────────
+   23-08-2026. Antes eran una matriz de 31 permisos por 8 roles en
+   Configuracion. Ahora son de cada persona, y puestos en una fila serian 31
+   casillas donde no se encuentra nada: van agrupados por lo que la persona
+   HACE con ellos. */
+.permisos-persona {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(255px, 1fr));
+  gap: 10px;
+}
+.permiso-grupo {
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  padding: 8px 9px 9px;
+  background: var(--fondo-2);
+}
+.permiso-grupo-tit {
+  font-size: 10.5px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em;
+  color: var(--gris-2);
+  margin-bottom: 6px;
+}
+/* La casilla de un permiso lleva dos lineas -que habilita, y su codigo- asi
+   que no puede centrarse como las del inventario, de una linea. */
+.permiso-grupo .inv-item {
+  align-items: flex-start;
+  line-height: 1.35;
+  padding: 5px 6px;
+}
+.permiso-grupo .inv-item input { margin-top: 2px; }
+.permiso-grupo .inv-item .cod { font-size: 10px; opacity: .75; }
+.permiso-grupo .inv-item input:disabled + span { opacity: .6; }

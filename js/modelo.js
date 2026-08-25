@@ -166,6 +166,12 @@ const Modelo = (function () {
          de hoy conserva `clave` y no tiene `clave_hash`: el ingreso la compara
          contra una huella que no existe y NO ENTRA NADIE, sin ningún aviso.
          Por eso esta comprobación existe y por eso va acá. */
+      /* 🔷 23-08-2026. Los permisos pasan a colgar de la persona. Una base de
+         antes no tiene `persona_permiso`, y sin ella nadie puede hacer nada.
+         El SELLO ya la caza por `FORMA_DATOS`, pero esto sabe DECIR qué falta,
+         que es lo que se puede escribir en el aviso de la pantalla. */
+      if (!Array.isArray(g.db.persona_permiso)) return ['los permisos por cuenta (persona_permiso)'];
+
       const conClaveEnTexto = (g.db.persona || [])
         .some((p) => p.usuario && (p.clave !== undefined || p.clave_hash === undefined));
       if (conClaveEnTexto) return ['las claves guardadas en texto, de antes de SIS-1'];
@@ -2651,6 +2657,17 @@ const Modelo = (function () {
      "No se elimina gente, se desactiva, porque si vuelve hay que recargar
       todo y se pierde el registro." RUT y número de ficha son inmutables. */
 
+  const rolDe = (persona_id) =>
+    (db.persona_rol.find((x) => x.persona_id === persona_id) || {}).rol_id || null;
+
+  /* El alcance en palabras. Vive acá y no en la vista porque es la misma frase
+     que tiene que decir cualquier pantalla que lo muestre. */
+  const ALCANCE_TEXTO = {
+    todo: 'Todas las órdenes',
+    asignado: 'Solo las que tiene asignadas',
+    compania: 'Solo las de su compañía'
+  };
+
   function personal() {
     return db.persona.filter((p) => p.tipo === 'trabajador').map((p) => {
       const etapas = db.persona_etapa.filter((e) => e.persona_id === p.id)
@@ -2670,6 +2687,20 @@ const Modelo = (function () {
         modulos: Array.isArray(p.modulos)
           ? MODULOS_MENU.filter((m) => p.modulos.indexOf(m.id) >= 0).map((m) => m.nombre)
           : null,
+        /* La lista CRUDA de ids, además de la de nombres. La ficha necesita
+           saber cuáles están marcados y cuáles no, y para eso los nombres no
+           sirven. (23-08-2026) */
+        modulosCrudos: Array.isArray(p.modulos) ? p.modulos.slice() : null,
+        /* Qué puede HACER esta cuenta. Desde el 23-08-2026 cuelga de la
+           persona y no del rol: es lo que se edita en esta misma ficha. */
+        permisos: permisosDePersona(p.id) || [],
+        rolId: rolDe(p.id),
+        rolNombre: (db.rol.find((r) => r.id === rolDe(p.id)) || {}).nombre || null,
+        accesoTotal: esRolTotal(rolDe(p.id)),
+        /* El alcance NO se edita acá y por eso viaja resuelto a texto: los
+           permisos dicen qué pantallas abre, el alcance qué filas trae. */
+        alcanceTexto: ALCANCE_TEXTO[(db.rol.find((r) => r.id === rolDe(p.id)) || {}).alcance]
+          || 'Todas las órdenes',
         activo: p.activo, etapas
       };
     }).sort((a, b) => (a.ficha || 0) - (b.ficha || 0));
@@ -3120,8 +3151,131 @@ const Modelo = (function () {
      que en `permisosDe`, puesta en el único lugar por donde pasan las 37
      operaciones y las 14 pantallas: aunque a la base le faltaran las filas de
      `rol_permiso`, el administrador entra igual. */
-  const puede = (codigo) => rolActual().total === true ||
-    permisosDe(rol_actual).indexOf(codigo) >= 0;
+  /* ── LOS PERMISOS COLGABAN DEL ROL Y AHORA CUELGAN DE LA PERSONA ───────
+     23-08-2026, Marco: «quiero que en el panel de Personal podamos hacer el
+     tema de Roles y Permisos por cada colaborador — qué puede ver, qué puede
+     hacer».
+
+     Es el mismo movimiento que Andrés Guzmán ya había hecho con los MÓDULOS el
+     17-08: dos personas con el mismo cargo no hacen lo mismo. Nancy y Sandra
+     son las dos de administración y una ve Personal y la otra no. Con los
+     permisos pasa igual, y colgarlos del rol obligaba a inventar un rol nuevo
+     cada vez que una persona se sale un poco del molde.
+
+     Ahora cada cuenta tiene su propia lista, en `persona_permiso`. El ROL
+     sigue existiendo y sirve para dos cosas que no cambian: el ALCANCE —sobre
+     qué órdenes trabaja— y ser la PLANTILLA con la que nace una cuenta.
+
+     ⚠️ Y no hay respaldo al rol si la lista queda vacía. Es a propósito: si
+     desmarcar todo devolviera los permisos del rol, quitarle todo a alguien
+     tendría el efecto contrario al que se ve en la pantalla. Lista vacía es
+     lista vacía. */
+  function permisosDePersona(persona_id) {
+    const p = persona_id ? db.persona.find((x) => x.id === persona_id) : null;
+    if (!p) return null;
+    /* El rol total devuelve el catálogo completo, pase lo que pase con las
+       filas. Es la misma garantía de antes, y es la que sostiene que el
+       sistema siga siendo administrable. */
+    const pr = db.persona_rol.find((x) => x.persona_id === persona_id);
+    if (pr && esRolTotal(pr.rol_id)) return db.permiso.map((x) => x.codigo);
+    return (db.persona_permiso || [])
+      .filter((x) => x.persona_id === persona_id).map((x) => x.permiso_codigo);
+  }
+
+  /* El rol total pasa siempre. Y si NO hay persona en la sesión —el selector
+     de rol de la demostración— manda el rol, como antes: ahí no hay nadie de
+     quien leer permisos propios. */
+  const puede = (codigo) => {
+    if (rolActual().total === true) return true;
+    const propios = permisosDePersona(persona_actual);
+    return (propios || permisosDe(rol_actual)).indexOf(codigo) >= 0;
+  };
+
+  /* ── LA PUERTA QUE NO SE PUEDE CERRAR POR DENTRO ───────────────────────
+     Antes esto se resolvía diciendo que la fila de Administración no se toca.
+     Con los permisos por persona esa protección ya no alcanza, así que se
+     escribe la regla de verdad, que además es más honesta:
+
+       **Siempre tiene que quedar al menos una cuenta activa que pueda entrar
+       a Configuración.**
+
+     Sin esto, alguien le desmarca «Administrar los catálogos» a la última
+     cuenta que lo tenía —con buena o mala intención— y no queda nadie que
+     pueda volver a marcarlo. La única salida sería reiniciar y perder todo. */
+  function cuentasQuePuedenConfigurar(excepto_id, quitando) {
+    return db.persona.filter((p) => {
+      if (!p.usuario || !p.activo) return false;
+      if (p.id === excepto_id && quitando) return false;
+      return (permisosDePersona(p.id) || []).indexOf('configuracion') >= 0;
+    });
+  }
+
+  function fijar_persona_permiso(persona_id, permiso_codigo, activo) {
+    const p = db.persona.find((x) => x.id === persona_id);
+    if (!p) return { ok: false, motivo: 'Esa cuenta no existe.' };
+    if (!db.permiso.some((x) => x.codigo === permiso_codigo))
+      return { ok: false, motivo: 'Ese permiso no existe en el catálogo.' };
+
+    const pr = db.persona_rol.find((x) => x.persona_id === persona_id);
+    if (pr && esRolTotal(pr.rol_id)) {
+      const rol = db.rol.find((r) => r.id === pr.rol_id) || {};
+      return { ok: false, motivo: 'La cuenta de ' + p.nombres + ' tiene el rol ' +
+        (rol.nombre || '—') + ', que alcanza todo el sistema y no se le puede recortar. ' +
+        'Si se pudiera, bastaría con desmarcarle «Administrar los catálogos» para que ' +
+        'nadie pudiera volver a entrar a Configuración.' };
+    }
+
+    /* ⚠️ HOY ESTA GUARDA NO SE ALCANZA, Y SE QUEDA IGUAL.
+
+       Con la nómina actual nunca se llega acá: Administración y Dueño tienen el
+       rol `total`, conservan «configuracion» pase lo que pase, y el `if` de
+       arriba ya rebota antes. Se comprobó con una mutación —sacar esta guarda
+       no hace fallar ninguna prueba— así que está dicho en vez de dejar creer
+       que hay una prueba cuidándola.
+
+       Se queda porque el día que esas dos cuentas se desactiven, o que la
+       nómina cambie y no quede ningún rol total, esto es lo único que separa al
+       taller de quedarse sin nadie que pueda entrar a Configuración. Cuesta
+       cuatro líneas y evita una base perdida. */
+    if (!activo && permiso_codigo === 'configuracion'
+      && !cuentasQuePuedenConfigurar(persona_id, true).length) {
+      return { ok: false, motivo: 'Es la última cuenta que puede entrar a Configuración. ' +
+        'Si se le quita, nadie podría volver a entrar — ni para devolvérselo. ' +
+        'Dáselo antes a otra cuenta.' };
+    }
+
+    db.persona_permiso = db.persona_permiso || [];
+    const existe = db.persona_permiso.some(
+      (x) => x.persona_id === persona_id && x.permiso_codigo === permiso_codigo);
+    if (activo && !existe) db.persona_permiso.push({ persona_id, permiso_codigo });
+    if (!activo && existe) db.persona_permiso = db.persona_permiso.filter(
+      (x) => !(x.persona_id === persona_id && x.permiso_codigo === permiso_codigo));
+    tocado();
+    return { ok: true, motivo: '' };
+  }
+
+  /* Qué MÓDULOS ve la cuenta: la lista que entregó Andrés, ahora editable.
+     `null` significa «todos», que es como nacieron los operarios. */
+  function fijar_persona_modulo(persona_id, modulo, activo) {
+    const p = db.persona.find((x) => x.id === persona_id);
+    if (!p) return { ok: false, motivo: 'Esa cuenta no existe.' };
+    if (!MODULOS_MENU.some((m) => m.id === modulo))
+      return { ok: false, motivo: 'Ese módulo no existe.' };
+
+    const lista = Array.isArray(p.modulos) ? p.modulos.slice() : MODULOS_MENU.map((m) => m.id);
+    const i = lista.indexOf(modulo);
+    if (activo && i < 0) lista.push(modulo);
+    if (!activo && i >= 0) lista.splice(i, 1);
+
+    if (!lista.length) {
+      return { ok: false, motivo: 'Una cuenta sin ningún módulo no puede entrar a ninguna ' +
+        'pantalla: entra al sistema y se queda mirando una pared. Si la idea es que no entre, ' +
+        'se desactiva la cuenta.' };
+    }
+    p.modulos = lista;
+    tocado();
+    return { ok: true, motivo: '' };
+  }
 
   const personaActual = () => (persona_actual ? db.persona.find((p) => p.id === persona_actual) : null) || null;
 
@@ -3767,6 +3921,9 @@ const Modelo = (function () {
     motivosDetencion, prerrequisitos, catalogo, CATALOGOS, parametros, permisosDe,
     rolActual, puede, fijar_rol_actual, velar,
     modulosDe, veModulo, MODULOS_MENU,
+    /* Los permisos por cuenta: lo que se edita en Personal desde el 23-08-2026.
+       `permisosDePersona` los lee, los dos `fijar_` los mueven. */
+    permisosDePersona, fijar_persona_permiso, fijar_persona_modulo,
     personaActual, fijar_persona_actual, sesionesPosibles,
     iniciar_sesion, cerrar_sesion, retomar_sesion, haySesion, cambiar_clave,
     sesionGuardada, sesionAlDia, CLAVE_SESION,

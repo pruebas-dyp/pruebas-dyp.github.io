@@ -2357,6 +2357,203 @@ const Pruebas = (function () {
         });
       })();
 
+
+      /* 🔴 LOS PERMISOS SON DE LA PERSONA, NO DEL ROL (23-08-2026, Marco).
+
+         Antes colgaban del rol y se editaban en una matriz de Configuración.
+         Ahora cada cuenta tiene la suya y se mueve en Personal.
+
+         La prueba mira lo que de verdad importa: que quitarle un permiso a UNA
+         persona no se lo quite a las demás que comparten su rol. Eso es todo lo
+         que este cambio vino a resolver. */
+      (function () {
+        const bd = Modelo.base();
+        const conMismoRol = bd.persona.filter((p) => p.usuario && p.tipo === 'trabajador')
+          .map((p) => ({ p, rol: (bd.persona_rol.find((x) => x.persona_id === p.id) || {}).rol_id }))
+          .filter((x) => x.rol && !(bd.rol.find((r) => r.id === x.rol) || {}).total);
+
+        // Dos cuentas distintas que comparten rol, que es el caso que dolía.
+        let a = null, b = null;
+        conMismoRol.forEach((x) => {
+          if (a && !b && x.rol === a.rol && x.p.id !== a.p.id) b = x;
+          if (!a) a = x;
+        });
+        if (!b) {
+          conMismoRol.forEach((x) => {
+            const otro = conMismoRol.find((y) => y.rol === x.rol && y.p.id !== x.p.id);
+            if (otro && !b) { a = x; b = otro; }
+          });
+        }
+        if (!a || !b) {
+          push({ nombre: '🔴 Quitarle un permiso a una cuenta no se lo quita a las demás',
+            intento: 'Buscar dos cuentas que compartan rol', esperado: 'dos', paso: false,
+            detalle: 'No hay dos cuentas con el mismo rol en la nómina' });
+          return;
+        }
+
+        const codigo = (Modelo.permisosDePersona(a.p.id) || [])
+          .find((c) => c !== 'configuracion' && (Modelo.permisosDePersona(b.p.id) || []).indexOf(c) >= 0);
+        if (!codigo) {
+          push({ nombre: '🔴 Quitarle un permiso a una cuenta no se lo quita a las demás',
+            intento: 'Buscar un permiso que las dos tengan', esperado: 'uno', paso: false,
+            detalle: 'Las dos cuentas no comparten ningún permiso' });
+          return;
+        }
+
+        const r = Modelo.fijar_persona_permiso(a.p.id, codigo, false);
+
+        /* ⚠️ Se pregunta con `Modelo.puede()` ENTRANDO como cada una, y no
+           leyendo la tabla. La primera versión miraba `permisosDePersona` y por
+           eso no cazaba nada: esa función lee la tabla nueva sí o sí, así que
+           daba lo mismo que el motor hubiera vuelto a resolver por el rol. Lo
+           que hay que comprobar es lo que el sistema HACE con la persona
+           sentada adelante. */
+        const comoEl = (persona_id, cod) => {
+          Modelo.fijar_persona_actual(persona_id);
+          return Modelo.puede(cod);
+        };
+        const sesionPrevia = (Modelo.personaActual() || {}).id || null;
+        const aLoPerdio = !comoEl(a.p.id, codigo);
+        const bLoConserva = comoEl(b.p.id, codigo);
+        /* ⚠️ Y se devuelve la sesión donde estaba. Entrar como otra persona no
+           es gratis: cambia los permisos y bota los memos, y la prueba de la
+           sala que corre más abajo daba por sentado quién estaba sentado. */
+        Modelo.fijar_persona_actual(sesionPrevia);
+        Modelo.fijar_persona_permiso(a.p.id, codigo, true);   // se deja como estaba
+
+        push({
+          nombre: '🔴 Quitarle un permiso a una cuenta no se lo quita a las demás',
+          intento: 'Quitarle «' + codigo + '» a una cuenta y mirar a otra del mismo rol',
+          esperado: 'La primera lo pierde, la segunda lo conserva',
+          paso: !!r.ok && aLoPerdio && bLoConserva,
+          detalle: !r.ok ? 'No dejó quitarlo: ' + r.motivo
+            : (!aLoPerdio ? 'No se lo quitó a nadie'
+              : (!bLoConserva
+                ? 'Se lo quitó TAMBIÉN a la otra cuenta: sigue colgando del rol'
+                : 'Cada cuenta tiene la suya'))
+        });
+      })();
+
+      /* 🔴 LA PUERTA NO SE PUEDE CERRAR POR DENTRO (23-08-2026).
+
+         Con la matriz por rol esto se resolvía diciendo que la fila de
+         Administración no se toca. Con los permisos por persona esa proteccion
+         ya no alcanza, y la regla pasa a estar escrita de verdad: siempre tiene
+         que quedar al menos una cuenta activa que pueda entrar a Configuración.
+
+         ⚠️ LA PRUEBA AFIRMA LA GARANTÍA, no fabrica el caso. El primer intento
+         quitaba el permiso a todas menos una para ver si la última rebotaba, y
+         nunca llegaba: las cuentas de acceso total conservan «configuracion»
+         pase lo que pase, así que jamás queda una sola. Eso NO es que el
+         guardia falle — es que el sistema esta protegido por dos lados. Lo que
+         hay que comprobar es el resultado: intentar quitárselo a TODAS y que
+         igual quede alguien que pueda entrar. */
+      (function () {
+        const bd = Modelo.base();
+        const cuentas = bd.persona.filter((p) => p.usuario && p.activo);
+        const antes = cuentas.filter((p) =>
+          (Modelo.permisosDePersona(p.id) || []).indexOf('configuracion') >= 0);
+
+        /* Se intenta quitárselo a TODAS, sin excepción.
+
+           ⚠️ Y se repone SÓLO a las que lo tenían. Quitar un permiso que la
+           cuenta no tiene también devuelve «ok» —no hay nada que hacer— así que
+           usar esa respuesta para saber a quién devolvérselo se lo regala a las
+           catorce. Pasó, y la prueba lo cazó: «14 de 3». */
+        cuentas.forEach((p) => Modelo.fijar_persona_permiso(p.id, 'configuracion', false));
+        const despues = cuentas.filter((p) =>
+          (Modelo.permisosDePersona(p.id) || []).indexOf('configuracion') >= 0);
+        antes.forEach((p) => Modelo.fijar_persona_permiso(p.id, 'configuracion', true));
+        const repuesto = cuentas.filter((p) =>
+          (Modelo.permisosDePersona(p.id) || []).indexOf('configuracion') >= 0);
+
+        push({
+          nombre: '🔴 No se puede dejar al sistema sin nadie que entre a Configuración',
+          intento: 'Intentar quitarle «configuracion» a las ' + cuentas.length + ' cuentas activas',
+          esperado: 'Alguna lo conserva igual',
+          paso: antes.length > 0 && despues.length > 0 && repuesto.length === antes.length,
+          detalle: !despues.length
+            ? 'El sistema quedó sin nadie que pueda volver a entrar a Configuración'
+            : (repuesto.length !== antes.length
+              ? 'La prueba no dejó las cuentas como estaban (' + repuesto.length + ' de ' + antes.length + ')'
+              : 'Quedan ' + despues.length + ' de ' + antes.length + ' que igual entran: ' +
+                despues.map((p) => p.nombres).join(', '))
+        });
+      })();
+      /* 🔶 UNA CUENTA DE ACCESO TOTAL NO SE PUEDE RECORTAR.
+
+         Es la otra mitad de la misma garantía, y va aparte porque se rompe de
+         otra manera: acá el rechazo no depende de cuántas cuentas queden. */
+      (function () {
+        const bd = Modelo.base();
+        const total = bd.persona.find((p) => {
+          const pr = bd.persona_rol.find((x) => x.persona_id === p.id);
+          return p.usuario && pr && (bd.rol.find((r) => r.id === pr.rol_id) || {}).total;
+        });
+        if (!total) return;
+        const r = Modelo.fijar_persona_permiso(total.id, 'configuracion', false);
+        const sigueEntrando = (Modelo.permisosDePersona(total.id) || []).indexOf('configuracion') >= 0;
+
+        push({
+          nombre: '🔶 A una cuenta de acceso total no se le puede quitar nada',
+          intento: 'Quitarle «configuracion» a la cuenta de acceso total',
+          esperado: 'Rebota, y la cuenta sigue entrando',
+          paso: !r.ok && sigueEntrando,
+          detalle: r.ok ? 'Dejó recortarla: la garantía de acceso total no está'
+            : (!sigueEntrando ? 'Rebotó pero igual perdió el permiso'
+              : 'Rebota y conserva el catálogo completo')
+        });
+      })();
+
+      /* 🔶 UNA CUENTA SIN NINGÚN MÓDULO NO ENTRA A NINGUNA PANTALLA.
+
+         Dejarla en cero es lo mismo que desactivarla, pero sin decirlo: la
+         persona entra al sistema y se queda mirando una pared. */
+      (function () {
+        const bd = Modelo.base();
+        const p = bd.persona.find((x) => x.usuario && Array.isArray(x.modulos) && x.modulos.length);
+        if (!p) return;
+        const previos = p.modulos.slice();
+        previos.slice(0, previos.length - 1).forEach((m) => Modelo.fijar_persona_modulo(p.id, m, false));
+        const r = Modelo.fijar_persona_modulo(p.id, p.modulos[0], false);
+        const quedaronLos = p.modulos.length;
+        previos.forEach((m) => Modelo.fijar_persona_modulo(p.id, m, true));
+
+        push({
+          nombre: '🔶 Una cuenta no se puede quedar sin ningún módulo',
+          intento: 'Quitarle los módulos uno por uno hasta el último',
+          esperado: 'El último rebota',
+          paso: !r.ok && quedaronLos === 1,
+          detalle: r.ok ? 'La dejó en cero módulos: entra al sistema y no ve ninguna pantalla'
+            : 'Rebota con el último, y le queda ' + quedaronLos
+        });
+      })();
+
+      /* 🔶 CONFIGURACIÓN YA NO TIENE «PARÁMETROS» NI «ROLES Y PERMISOS».
+
+         Los dos se sacaron el 23-08-2026. La prueba pinta la pantalla de verdad
+         en vez de mirar la constante: lo que importa es que no queden las
+         pestañas, no que la lista esté bien escrita. */
+      (function () {
+        if (typeof vConfiguracion !== 'function') return;
+        const previo = ui.configuracion;
+        let html = '';
+        try { html = vConfiguracion(); } catch (e) { html = '(no pintó: ' + e.message + ')'; }
+        ui.configuracion = previo;
+
+        const dice = (s) => html.indexOf(s) >= 0;
+        push({
+          nombre: '🔶 Configuración ya no tiene Parámetros ni Roles y permisos',
+          intento: 'Pintar Configuración y buscar las dos pestañas',
+          esperado: 'Ninguna de las dos, y las de catálogo siguen',
+          paso: !dice('>Parámetros<') && !dice('>Roles y permisos<') && dice('>Etapas<'),
+          detalle: dice('>Parámetros<') ? 'Sigue la pestaña Parámetros'
+            : (dice('>Roles y permisos<') ? 'Sigue la pestaña Roles y permisos'
+              : (!dice('>Etapas<') ? 'Se llevó también las pestañas de catálogo'
+                : 'Las dos fuera, y los catálogos intactos'))
+        });
+      })();
+
       /* 🔴 3 · EL COLOR DE UN CATALOGO SE LIMPIA EN EL MOTOR.
 
          El color se pinta dentro de un atributo `style`. La vista lo escapa,
