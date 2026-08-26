@@ -167,15 +167,12 @@ function vFichaOT(o) {
      🔴 Y queda una salida a la vista. Nadie puede quedar encerrado: está el
      enlace a la ficha completa acá arriba y el botón `Cancelar` al pie de la
      tabla, que devuelve al Taller. */
-  if (f.soloEtapas && f.tab === 'etapas') {
-    return `
-    <div class="cab-etapas">
-      <div><h2>${ico('taller', 'g')}Orden N° ${o.numeroOT} ·
-        <span class="patente">${esc(o.patente)}</span></h2></div>
-      <button class="btn secundario chico" id="ir-ficha-completa">Ver la ficha completa</button>
-    </div>
-    ${vEtapas(o)}`;
-  }
+  /* ⛔ Sin barra propia arriba: la orden ya se nombra en el título del panel
+     —«Asignar etapas OR 19910»— y la patente en el del historial. Poner otro
+     encabezado encima era repetir la identidad por tercera vez, y el cliente
+     pidió que no se vea nada más que las etapas. La salida a la ficha completa
+     bajó a un enlace de texto, junto al de finalizar. */
+  if (f.soloEtapas && f.tab === 'etapas') return vEtapas(o);
 
   const cuerpo = {
     ficha: fichaResumen, etapas: vEtapas, historial: fichaHistorial,
@@ -680,6 +677,15 @@ function fichaFotos(o) {
 /* ── Cableado de la ficha ──────────────────────────────────────────────── */
 
 function pFichaOT(o) {
+  /* 🔴 EL MARCO SIGUE AL ESTADO, NO A LA DIRECCIÓN. `modoRegistro` esconde la
+     ruta y la barra leyendo el `modo=` del ancla, y eso alcanza para entrar —
+     pero al apretar «Ver la ficha completa» el ancla SIGUE diciendo
+     `modo=asignar`, así que volvían los paneles y las pestañas y el encabezado
+     se quedaba escondido: media pantalla de una y media de la otra.
+     Acá se vuelve a sincronizar con lo que la ficha realmente está mostrando. */
+  document.body.classList.toggle('solo-etapas',
+    !!(fichaEstado().soloEtapas && fichaEstado().tab === 'etapas'));
+
   /* La salida de la pantalla de etapas: devuelve la ficha entera sin cambiar
      de orden ni de pestaña. El que llegó a asignar y quiere ver el resto la
      tiene a un clic, y no hay que explicarle que cierre y vuelva a entrar. */

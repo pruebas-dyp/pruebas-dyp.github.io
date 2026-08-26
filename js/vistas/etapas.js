@@ -29,16 +29,33 @@ function vEtapas(o) {
   const solo = ui.ficha && ui.ficha.soloEtapas;
   const conHistorial = solo && Modelo.puede('ficha.completa');
 
+  /* 🔶 EN LA PANTALLA PROPIA, EL ENCABEZADO ES EL DEL ORIGINAL: el título y
+     debajo un enlace de texto —«Ir a finalizar etapas»—, sin bajada y sin los
+     dos botones de conmutar. Es lo que muestra la captura del sistema real y
+     responde la pregunta abierta 32.
+
+     Dentro de la FICHA se quedan los chips y la bajada: ahí la pantalla es una
+     pestaña más entre otras cinco y el conmutador tiene que verse como lo que
+     es. */
+  const enlaces = solo
+    ? `<div class="enlaces-etapas">
+        ${puedeAsignar ? '<button type="button" class="enlace" data-modoetapa="' +
+          (modo === 'asignar' ? 'finalizar' : 'asignar') + '">Ir a ' +
+          (modo === 'asignar' ? 'finalizar' : 'asignar') + ' etapas</button>' : ''}
+        <button type="button" class="enlace" id="ir-ficha-completa">Ver la ficha completa</button>
+      </div>`
+    : '';
+
   return `
   <div class="${conHistorial ? 'pantalla-etapas' : ''}">
   <div class="panel">
     <div class="cab">
       <div><h2>${ico('taller', 'g')}${modo === 'asignar' ? 'Asignar etapas' : 'Finalizar etapas'}
         OR ${esc(o.presupuestos.length ? o.presupuestos[0].numeroOR : o.numeroOT)}</h2>
-        <div class="desc">${modo === 'asignar'
+        ${solo ? enlaces : `<div class="desc">${modo === 'asignar'
           ? 'Qué etapas aplican a este vehículo. No todas aplican a todos.'
-          : 'Cerrar etapas y fijar la entrega probable. Se pueden cerrar varias de una vez.'}</div></div>
-      ${puedeAsignar ? `<div class="chips">
+          : 'Cerrar etapas y fijar la entrega probable. Se pueden cerrar varias de una vez.'}</div>`}</div>
+      ${!solo && puedeAsignar ? `<div class="chips">
         <button class="chip${modo === 'asignar' ? ' activo' : ''}" data-modoetapa="asignar">Asignar</button>
         <button class="chip${modo === 'finalizar' ? ' activo' : ''}" data-modoetapa="finalizar">Finalizar</button>
       </div>` : ''}

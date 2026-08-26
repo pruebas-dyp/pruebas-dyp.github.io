@@ -362,6 +362,11 @@ function enReporteria() {
 }
 
 function pintarShell() {
+  /* Salir de la pantalla de etapas devuelve el encabezado y la barra: la marca
+     la pone la ventana de la orden y se quita acá, que es por donde pasa
+     cualquier módulo. Sin esto, `Cancelar` dejaba al Taller sin su cabecera. */
+  document.body.classList.remove('solo-etapas');
+
   const m = MODULOS[ui.vista] || { ruta: [], acciones: [] };
   // `|| []` y no `m.ruta` a secas: desde que Recepción no lleva ruta, un módulo
   // puede no traerla, y sin esto la shell entera se cae por un `.slice` de

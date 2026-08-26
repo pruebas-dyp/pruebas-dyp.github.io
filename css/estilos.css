@@ -1105,6 +1105,13 @@ svg.chispa.verde .chispa-punto { fill: var(--verde); }
    🔴 Ni un color escrito a mano: todos salen de las variables del tema. El
    círculo tiene que leerse igual en oscuro y en claro, y un `#fff` acá se ve
    bien en uno de los dos y desaparece en el otro. */
+/* Asignar etapas se ve SOLA: sin ruta, sin título, sin bajada y sin la barra
+   de ocho botones de la ventana de la orden. Es lo que muestra el sistema real
+   y lo que pidió el cliente el 26-08-2026. */
+body.solo-etapas .cab-modulo,
+body.solo-etapas .herramientas { display: none !important; }
+body.solo-etapas .principal { padding-top: 12px; }
+
 /* ───────── Asignar etapas, como pantalla propia ─────────
    Dos columnas: la tabla de etapas a la izquierda y el historial de la orden a
    la derecha. La bitácora va abajo, a ancho completo, y por eso queda FUERA de
@@ -1124,13 +1131,17 @@ svg.chispa.verde .chispa-punto { fill: var(--verde); }
   .pantalla-etapas { grid-template-columns: 1fr; }
 }
 
-/* El encabezado corto que reemplaza al de la ficha: dice qué orden se está
-   tocando —sin eso, la pantalla no dice de qué auto habla— y deja la salida. */
-.cab-etapas {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 10px; flex-wrap: wrap; margin-bottom: 10px;
+/* Los enlaces de texto bajo el título, como el original: «Ir a finalizar
+   etapas» y la salida a la ficha completa. Son botones de verdad —hacen algo
+   dentro de la página, no navegan— con aspecto de enlace, que es lo que el
+   usuario espera de un texto subrayado. */
+.enlaces-etapas { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 3px; }
+.enlaces-etapas .enlace {
+  background: none; border: 0; padding: 0; margin: 0;
+  color: var(--acento); font-size: 11.5px; cursor: pointer;
 }
-.cab-etapas h2 { display: flex; align-items: center; gap: 6px; font-size: 15px; margin: 0; }
+.enlaces-etapas .enlace:hover { text-decoration: underline; }
+.enlaces-etapas .enlace:focus-visible { outline: 2px solid var(--acento); outline-offset: 2px; }
 
 /* La casilla y el nombre de la etapa, en una sola línea clicable. */
 .tabla-etapas .etapa-casilla {
