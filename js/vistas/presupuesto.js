@@ -470,8 +470,27 @@ function grillaPresupuesto(o, pr, editable, $) {
     const sub = COL_HORAS.reduce((s, c) => s + (Number(l[c.campo]) || 0), 0) * pr.tempario;
     return '<tr><td class="num">' + (i + 1) + '</td>' +
       '<td>' + esc(l.descripcion) + '</td>' +
-      '<td class="num"><span class="et ' + (l.proceso === 'cambio' ? 'azul' : 'gris') +
-        '" title="' + esc(l.proceso) + '">' + OP_ROT[l.proceso] + '</span></td>' +
+      /* 🔴 LA OP, CON LA PALABRA Y EDITABLE (26-08-2026, Marco: «que quede
+         como más amplio cada campo, para que tengan una visibilidad más fácil
+         de hacer el trabajo»).
+
+         Acá era una etiqueta de 24 px con UNA LETRA —E, C, R— y había que
+         acordarse de cuál era cuál. En el sistema que usan hoy la OP es un
+         desplegable que dice la palabra: «Cambio», «Reparar», «Externo». Se
+         deja igual.
+
+         Y de paso se puede corregir sin borrar la línea, que es lo que se hacía
+         antes: si se marcó Reparar y era Cambio, había que quitar la línea y
+         escribirla de nuevo. Ahora se cambia la OP y `actualizar_linea_presupuesto`
+         se encarga del repuesto. */
+      '<td>' + (editable
+        ? '<select class="op-linea" data-op="' + esc(l.id) + '" title="Qué se le hace a esta pieza">' +
+          PROCESOS.map((x) => '<option value="' + x.codigo + '"' +
+            (l.proceso === x.codigo ? ' selected' : '') + '>' + esc(x.nombre) + '</option>').join('') +
+          '</select>'
+        : '<span class="et ' + (l.proceso === 'cambio' ? 'azul' : 'gris') + '">' +
+          esc((PROCESOS.find((x) => x.codigo === l.proceso) || {}).nombre || l.proceso) + '</span>') +
+      '</td>' +
       COL_HORAS.map((c) => '<td class="num">' + (editable
         /* `type="text"` con `inputmode="decimal"`, NO `type=number`: el campo
            numerico solo acepta el PUNTO como separador, asi que un "1,20"
@@ -480,7 +499,7 @@ function grillaPresupuesto(o, pr, editable, $) {
            valor en pesos debajo y la casilla vacia arriba: el evaluador
            creeria que se le borraron las horas. El teclado del celular igual
            abre en numeros por el `inputmode`. */
-        ? '<input type="text" inputmode="decimal" style="width:80px" ' +
+        ? '<input type="text" inputmode="decimal" style="width:96px" ' +
           'data-horas="' + esc(l.id) + '" data-campo="' + c.campo + '" ' +
           'value="' + esc(fHoras(l[c.campo])) + '" placeholder="0,00" title="' + esc(c.ayuda) + '">'
         : (fHoras(l[c.campo]) || '—')) +
@@ -497,8 +516,8 @@ function grillaPresupuesto(o, pr, editable, $) {
   <section class="bloque-presu mano-obra">
     ${cabBloquePresu(1, 'Mano de Obra', 'El trabajo del taller: horas \u00d7 tempario', t.manoObra, $)}
     <div class="grid-envoltorio"><table class="grid">
-      <thead><tr><th style="width:44px">N°</th><th>Descripción</th><th style="width:52px">OP</th>
-        ${COL_HORAS.map((c) => '<th class="num" style="width:106px" title="' + esc(c.ayuda) +
+      <thead><tr><th style="width:44px">N°</th><th>Descripción</th><th style="width:132px">OP</th>
+        ${COL_HORAS.map((c) => '<th class="num" style="width:120px" title="' + esc(c.ayuda) +
           '">' + esc(c.rot) + '</th>').join('')}
         <th class="num" style="width:112px">Valor</th><th style="width:44px"></th></tr></thead>
       <tbody>${manoObra.length ? manoObra.map(filaMO).join('')
@@ -917,6 +936,13 @@ function pPresupuesto() {
      Se guardan al salir del campo, no en cada tecla: escribir «1,78» son
      cuatro pulsaciones y cuatro guardados serían cuatro hechos en el
      expediente para un solo dato. */
+  /* El desplegable de OP de cada línea. Va por `change` y no por `input`:
+     un select dispara los dos, y con `input` se guardaba mientras el usuario
+     todavía estaba recorriendo la lista con el teclado. */
+  document.querySelectorAll('select[data-op]').forEach((sel) => sel.addEventListener('change', () =>
+    ejecutar(() => Modelo.actualizar_linea_presupuesto(sel.dataset.op, { proceso: sel.value }),
+      'Operación actualizada.')));
+
   document.querySelectorAll('[data-horas]').forEach((inp) => {
     inp.addEventListener('change', () => {
       const cambios = {};

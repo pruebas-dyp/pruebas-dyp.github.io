@@ -1665,7 +1665,7 @@ table.grid tr.fila-desplegable.solo-flecha td.flecha-col:hover .flecha { color: 
   background: var(--borde); border: 1px solid var(--borde);
   border-radius: 3px; overflow: hidden; margin-bottom: 14px;
 }
-.tira-tempario .celda { background: var(--superficie-2); padding: 8px 11px; }
+.tira-tempario .celda { background: var(--superficie-2); padding: 13px 16px; }
 .tira-tempario .celda.destacada { background: var(--acento-bg); }
 .tira-tempario .rot {
   display: block; font-size: 9.5px; font-weight: 700; letter-spacing: .7px;
@@ -1677,6 +1677,27 @@ table.grid tr.fila-desplegable.solo-flecha td.flecha-col:hover .flecha { color: 
 }
 .tira-tempario .pie { display: block; font-size: 10.5px; color: var(--gris); margin-top: 2px; }
 
+/* 🔴 EL PANEL DE PRESUPUESTO, MÁS AMPLIO (26-08-2026, Marco: «que se parezca un
+   poco más a lo que tienen hoy día… que quede como más amplio cada campo y así
+   para que tengan una visibilidad más fácil de hacer el trabajo»).
+
+   Es la pantalla donde más rato pasa el evaluador —presupuestos de hasta cien
+   ítems, según él mismo— y era la más apretada del sistema: filas de 9 px de
+   alto y casillas de horas de 80. Acá sólo se le da aire; lo que hace la
+   pantalla no cambia. */
+.bloque-presu table.grid td { padding-top: 9px; padding-bottom: 9px; }
+.bloque-presu table.grid th { padding-top: 8px; padding-bottom: 8px; }
+.bloque-presu table.grid input,
+.bloque-presu table.grid select { min-height: 34px; font-size: 13.5px; }
+
+/* La OP de cada línea: el desplegable con la palabra, no una letra. */
+select.op-linea {
+  width: 100%; min-height: 34px; padding: 5px 8px; font-size: 13px;
+  border: 1px solid var(--borde); border-radius: 3px;
+  background: var(--superficie); color: var(--texto);
+}
+select.op-linea:focus { outline: 2px solid var(--acento); outline-offset: -1px; }
+
 /* La franja de agregar línea, con la forma del sistema actual: encabezados
    arriba, el campo de descripción ANCHO —es el que más se escribe y el que
    más largo queda: «neumatico sailun terramax sv301 235/55R19 delantero
@@ -1685,13 +1706,18 @@ table.grid tr.fila-desplegable.solo-flecha td.flecha-col:hover .flecha { color: 
   border: 1px solid var(--borde); border-radius: 3px;
   background: var(--superficie); margin-bottom: 14px; overflow: hidden;
 }
+/* 🔴 MÁS AMPLIO (26-08-2026, Marco). Las tres celdas eran 1fr / 220 / 150 y el
+   desplegable y el botón quedaban chicos al lado de una descripción enorme. En
+   el sistema que usan hoy las tres se parecen bastante más. Se sube el mínimo
+   de las dos de la derecha sin quitarle a la descripción, que sigue siendo la
+   que más texto recibe. */
 .agregar-linea .rot,
-.agregar-linea .fila { display: grid; grid-template-columns: 1fr 220px 150px; }
+.agregar-linea .fila { display: grid; grid-template-columns: 1fr 300px 220px; }
 .agregar-linea .rot {
   background: var(--superficie-2); border-bottom: 1px solid var(--borde);
 }
 .agregar-linea .rot span {
-  padding: 5px 10px; font-size: 10.5px; font-weight: 700; letter-spacing: .4px;
+  padding: 8px 13px; font-size: 10.5px; font-weight: 700; letter-spacing: .4px;
   text-transform: uppercase; color: var(--gris);
   border-right: 1px solid var(--borde);
 }
@@ -1701,13 +1727,17 @@ table.grid tr.fila-desplegable.solo-flecha td.flecha-col:hover .flecha { color: 
 .agregar-linea .fila input,
 .agregar-linea .fila select {
   width: 100%; height: 100%; border: none; border-right: 1px solid var(--borde);
-  padding: 8px 10px; font-size: 13px; background: var(--superficie); color: var(--texto);
+  /* 44px de alto: es lo que mide la fila en el sistema que usan, y es la
+     medida con la que un campo se ve como un campo y no como una línea de
+     texto suelta. */
+  min-height: 44px; padding: 10px 13px; font-size: 14px;
+  background: var(--superficie); color: var(--texto);
 }
 .agregar-linea .fila input:focus,
 .agregar-linea .fila select:focus { outline: 2px solid var(--acento); outline-offset: -2px; }
 .agregar-linea .fila .btn { border-radius: 0; height: 100%; }
 .agregar-linea .pie {
-  padding: 6px 10px; font-size: 11px; color: var(--gris);
+  padding: 9px 13px; font-size: 11px; color: var(--gris);
   border-top: 1px solid var(--borde); background: var(--superficie-2);
 }
 @media (max-width: 820px) {
