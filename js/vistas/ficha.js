@@ -130,10 +130,24 @@ function refrescarFicha() {
   render();
 }
 
-/* Las OCHO pantallas que cuelgan de la ficha viven en `js/vistas/pantallas-ot.js`
-   desde el 16-08-2026, porque el expandible de la Torre ofrece las mismas y dos
-   copias de la misma lista terminan ofreciendo cosas distintas. Acá se leen; no
-   se redefinen. */
+/* Las OCHO pantallas que cuelgan de la ficha en el sistema actual, con su
+   rótulo literal. Las que todavía no se construyen se rotulan como tales:
+   un botón que no hace nada y no lo dice es peor que no tenerlo. */
+const FICHA_ENLACES = [
+  { rot: 'Ver recepción',                   imprimir: 'recepcion', permiso: 'ficha.completa' },
+  // El impreso del presupuesto es el documento comercial —cliente, RUT y
+  // valores—, así que pide `presupuesto.montos`. Quien solo tiene
+  // `presupuesto.ver` lee las líneas sin precio en la ficha.
+  { rot: 'Ver Presupuesto',                 imprimir: 'presupuesto', permiso: 'presupuesto.montos' },
+  { rot: 'Ver repuestos',                   tab: 'repuestos', permiso: 'repuesto.ver' },
+  { rot: 'Ver/Subir Documentos o imágenes', vista: 'documentos', permiso: 'documento.ver' },
+  { rot: 'Ver Fotografías',                 tab: 'fotos', permiso: 'foto.ver' },
+  { rot: 'Editar Recepción',                tab: null, tanda: 8, permiso: 'ot.editar',
+    nota: 'la recepción se edita desde su propia pantalla; editar una ya guardada exige política de versiones' },
+  { rot: 'Agregar OR',                      vista: 'presupuesto', permiso: 'presupuesto.crear' },
+  { rot: 'Bodega de esta orden',            vista: 'bodega', permiso: 'repuesto.cargar' },
+  { rot: 'Bitácora',                        tab: 'bitacora', permiso: 'ficha.completa' }
+];
 
 function vFichaOT(o) {
   const f = fichaEstado();
@@ -145,7 +159,7 @@ function vFichaOT(o) {
     bitacora: fichaBitacora, repuestos: fichaRepuestos, fotos: fichaFotos
   }[f.tab](o);
 
-  const enlaces = pantallasOtDe('ficha');
+  const enlaces = FICHA_ENLACES.filter((l) => !l.permiso || Modelo.puede(l.permiso));
 
   return `
   <div class="panel">
@@ -558,18 +572,13 @@ function fichaRepuestos(o) {
 /* ── Pestaña · Fotografías ─────────────────────────────────────────────── */
 
 function fichaFotos(o) {
-  /* ⛔ Las capturas de firma se descartan enteras desde el 26-08-2026, no solo
-     del resumen de tamaño como antes. La captura en pantalla se eliminó (C-47),
-     pero un navegador que la usó ayer todavía tiene esos PNG en IndexedDB: sin
-     esto le aparecían como un grupo de fotos rotulado «firma» —el rótulo se fue
-     con la función—, o sea una firma digital que el sistema ya no reconoce. */
-  const todas = Modelo.mediaDe(o.id).filter((m) => m.momento !== 'firma');
+  const todas = Modelo.mediaDe(o.id);
   const porMomento = {};
   todas.forEach((m) => { (porMomento[m.momento] = porMomento[m.momento] || []).push(m); });
-  const res = Media.resumen(todas);
+  const res = Media.resumen(todas.filter((m) => m.momento !== 'firma'));
 
   const ROTULOS = { ingreso: 'Imágenes de ingreso', proceso: 'Imágenes por etapa',
-                    entrega: 'Imágenes de entrega' };
+                    entrega: 'Imágenes de entrega', firma: 'Firma del cliente' };
 
   return `
   <div class="panel">
@@ -598,10 +607,15 @@ function fichaFotos(o) {
             veces: baja todas, borra las que no sirven y le manda el resto al
             liquidador. El botón grande baja TODO —que es el pedido— y cada
             bloque baja el suyo, porque a veces sólo hace falta el desarme. */''}
-      ${todas.length ? '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">' +
-        '<button class="btn" type="button" data-bajar-fotos="*">' +
+      ${/* `flex-wrap` y el botón que no se encoge: sin eso, en un celular el texto
+            de ayuda se llevaba el ancho y el botón quedaba en 121 px con el
+            rótulo partido en dos líneas. Medido a 375 px en la auditoría. */''}
+      ${todas.length ? '<div style="display:flex;gap:8px;align-items:center;' +
+        'flex-wrap:wrap;margin-bottom:12px">' +
+        '<button class="btn" type="button" data-bajar-fotos="*" style="flex:0 0 auto">' +
         'Guardar las ' + todas.length + ' en una carpeta</button>' +
-        '<span class="ayuda">Se baja un .zip con todas: recepción, presupuesto y etapas juntas</span>' +
+        '<span class="ayuda" style="flex:1 1 220px">Se baja un .zip con todas: ' +
+        'recepción, presupuesto y etapas juntas</span>' +
         '</div>' : ''}
 
       ${Object.keys(porMomento).length
@@ -684,8 +698,29 @@ function pFichaOT(o) {
      Abría el ÚLTIMO sin decirlo, que es la peor de las respuestas: el que
      imprime cree que tiene el documento que pidió. Con una sola OR se abre
      directo, que es el caso de todos los días. */
-  document.querySelectorAll('#contenido [data-imprimir]').forEach((b) => b.addEventListener('click', () =>
-    abrirImpresoDeOT(b.dataset.imprimir, o)));
+  document.querySelectorAll('#contenido [data-imprimir]').forEach((b) => b.addEventListener('click', () => {
+    if (b.dataset.imprimir !== 'presupuesto' || o.presupuestos.length <= 1)
+      return abrirImpreso(b.dataset.imprimir, o.id);
+
+    dialogo('¿Qué presupuesto quieres abrir?',
+      '<p class="pie-nota" style="margin:0 0 10px">Esta orden tiene ' +
+      o.presupuestos.length + ' documentos. Se abren en otra pestaña.</p>' +
+      '<div class="grid-envoltorio"><table class="grid"><tbody>' +
+      o.presupuestos.map((pr) => {
+        const e = ESTADO_PRESUPUESTO[pr.estado] || { txt: pr.estado, clase: 'gris' };
+        return '<tr><td><span class="cod">OR ' + esc(pr.numeroOR) + '</span></td>' +
+          '<td><span class="et ' + esc(e.clase) + '">' + esc(e.txt) + '</span></td>' +
+          '<td class="num">' + fMonto(pr.total) + '</td>' +
+          '<td><button class="btn secundario chico" data-elegir-pr="' + esc(pr.id) + '">' +
+          'Abrir</button></td></tr>';
+      }).join('') + '</tbody></table></div>');
+
+    (dialogo.ultimo || document).querySelectorAll('[data-elegir-pr]').forEach((x) =>
+      x.addEventListener('click', () => {
+        if (dialogo.cerrar) dialogo.cerrar();
+        abrirImpreso('presupuesto', o.id, x.dataset.elegirPr);
+      }));
+  }));
 
   // Salir de la ficha hacia otro módulo: la ficha vive en su propia pestaña,
   // así que se abre el sistema completo en esa vista.

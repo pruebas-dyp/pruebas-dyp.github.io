@@ -842,32 +842,8 @@ const Semilla = (function () {
       'Quezada', 'Riquelme', 'Sepúlveda', 'Tapia', 'Urrutia', 'Vergara', 'Yáñez', 'Zúñiga'];
 
     // RUT ficticio de la serie 11.111.111-K. No corresponde a nadie.
-    /* 🔴 EL DÍGITO VERIFICADOR SE CALCULA, no se inventa (26-08-2026).
-
-       Era `n % 10`, o sea que casi ningún RUT de la demostración estaba bien
-       formado. Da igual mientras nadie lo comprueba — pero desde que la
-       recepción busca al cliente por RUT y **exige el DV correcto para
-       disparar** (C-51), un padrón con DV inventados es un padrón donde la
-       búsqueda no encuentra nunca, y el que prueba la demostración concluye
-       que la función no sirve.
-
-       El cuerpo sigue siendo ficticio, de la serie 11.1xx.yyy: no corresponde
-       a nadie. Lo que cambia es que ahora está bien escrito. */
-    const dvDe = (cuerpo) => {
-      let suma = 0, mult = 2;
-      for (let i = String(cuerpo).length - 1; i >= 0; i--) {
-        suma += Number(String(cuerpo)[i]) * mult;
-        mult = mult === 7 ? 2 : mult + 1;
-      }
-      const resto = 11 - (suma % 11);
-      return resto === 11 ? '0' : resto === 10 ? 'K' : String(resto);
-    };
-    const rutFalso = (n) => {
-      const cuerpo = '11' + String(100 + (n % 900)).padStart(3, '0') +
-        String(100 + ((n * 7) % 900)).padStart(3, '0');
-      return cuerpo.slice(0, 2) + '.' + cuerpo.slice(2, 5) + '.' + cuerpo.slice(5) +
-        '-' + dvDe(cuerpo);
-    };
+    const rutFalso = (n) => '11.' + String(100 + (n % 900)).padStart(3, '0') + '.' +
+      String(100 + ((n * 7) % 900)).padStart(3, '0') + '-' + (n % 10);
 
     const persona = [];
     const persona_etapa = [];

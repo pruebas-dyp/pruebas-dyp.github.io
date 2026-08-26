@@ -23,16 +23,6 @@ function editRecCargar(o) {
     correo: o.correo || '', direccion: o.direccion || '',
     patente: o.patente || '', vin: o.vin || '', anio: o.anio || '',
     marca_id: o.marcaId || '', modelo_id: o.modeloId || '', color_id: o.colorId || '',
-    /* 🔶 EL PASO 3 ENTRA ACÁ (26-08-2026, pedido del cliente).
-
-       `fecha_ingreso` viaja como el `datetime-local` que espera el campo, que
-       es el mismo formato del ingreso. */
-    fecha_ingreso: recIsoLocal(new Date(o.fechaIngreso)),
-    tipo_ingreso_id: o.tipoIngresoId || '', compania_id: o.companiaId || '',
-    siniestro: o.siniestro || '', deducible: o.deducible == null ? '' : o.deducible,
-    liquidador: o.liquidador || '', or_externa: o.orExterna || '',
-    descripcion_danos: o.descripcionDanos || '', prioridad_id: o.prioridadId || '',
-    estado: o.estado || '', descripcion_estado: o.descripcionEstado || '',
     km: (o.recepcion && o.recepcion.km) || '',
     combustible: (o.recepcion && o.recepcion.combustible != null) ? o.recepcion.combustible : '',
     observaciones: (o.recepcion && o.recepcion.observaciones) || ''
@@ -68,20 +58,9 @@ function editRecCargar(o) {
 
      1 · Datos del cliente   2 · Datos del vehículo   4 · Estado descriptivo
 
-     1 · Datos del cliente   2 · Datos del vehículo
-     3 · Solicitud de reparación   4 · Estado descriptivo
-
-   🔶 EL PASO 3 ENTRÓ EL 26-08-2026, a pedido del cliente: *"en editar
-   recepción te debe permitir editar todo lo que se ingresa en recepción"*.
-
-   Estaba fuera con un argumento que suena bien y no lo es: que compañía,
-   siniestro y tipo de ingreso son de la ORDEN y no de la recepción, así que se
-   cambiaban en la ficha. Es cierto en el modelo de datos y da igual en el
-   mesón — el recepcionista escribe los tres en la misma pasada, y si se
-   equivoca en el siniestro tiene que poder arreglarlo donde lo escribió. La
-   pantalla sigue el gesto, no la tabla.
-
-   El 5 no está y no va a estar: es Verificar, que es para antes de crear.
+   El paso 3 (Solicitud de reparación) no está: compañía, siniestro y tipo de
+   ingreso son de la ORDEN, no de la recepción, y se cambian en la ficha. El 5
+   es Verificar, que es para antes de crear.
 
    `Estado descriptivo` quedó tal cual el del ingreso: el dibujo a la
    izquierda, y a la derecha la casilla única de observaciones, el tablero
@@ -90,7 +69,6 @@ function editRecCargar(o) {
 const EDIT_REC_BLOQUES = [
   { id: 'cliente',  rot: '1 · Datos del cliente' },
   { id: 'vehiculo', rot: '2 · Datos del vehículo' },
-  { id: 'orden',    rot: '3 · Solicitud de reparación' },
   { id: 'estado',   rot: '4 · Estado descriptivo' }
 ];
 
@@ -134,8 +112,7 @@ function vRecepcionEditarFicha() {
 
       <div class="tabs" style="margin:12px 0 10px">${EDIT_REC_BLOQUES.map(pestana).join('')}</div>
 
-      ${e.bloque === 'estado' ? vEditRecEstado()
-        : e.bloque === 'orden' ? vEditRecOrden(e) : vEditRecCampos(e)}
+      ${e.bloque === 'estado' ? vEditRecEstado() : vEditRecCampos(e)}
 
       <div class="rejilla-campos" style="margin-top:12px">
         <div class="campo" style="grid-column:1/-1">
@@ -166,12 +143,11 @@ function vRecepcionEditarFicha() {
         </tbody></table></div>` : ''}
 
       <div class="nota" style="margin-top:12px">
-        <strong>Corregir acá no reimprime nada.</strong> El comprobante se firma en papel —los tres
-        recuadros—, así que la hoja que el cliente firmó en el mesón sigue valiendo tal cual. Lo que
-        cambia es lo que el sistema dice de ella, y el impreso declara qué versión es.
-        <strong>Si una corrección obliga a imprimir de nuevo y volver a pedir las firmas</strong>
-        —o si la hoja original sigue sirviendo— lo decide el taller: es la pregunta que quedó
-        abierta cuando se eliminó la captura de firma en pantalla.
+        <strong>La firma no se vuelve a pedir acá, y no es un pendiente técnico.</strong> Volver a
+        firmar es tener al cliente otra vez adelante, y si hay que hacerlo o no es la pregunta que
+        está sobre la mesa del taller: si el papel de la versión 1 sigue valiendo, o cada corrección
+        se firma de nuevo. Mientras no se responda, la firma que hay es la de la versión 1 y el
+        comprobante lo dice.
       </div>
     </div>
   </div>`;
@@ -216,78 +192,6 @@ function vEditRecCampos(e) {
     cat('modelo_id', 'Modelo', 'modelo') +
     cat('color_id', 'Color', 'color_vehiculo') +
     campo('anio', 'Año', 'type="number" min="1950" max="2035"') +
-    /* La fecha de ingreso va última, igual que en el paso 2 del formulario.
-       🔴 No es un campo más: de ella cuelgan los tres relojes de la torre. El
-       motor la valida con la misma regla del ingreso y arrastra la estadía. */
-    '<div class="campo"><label>Fecha de ingreso</label>' +
-      '<input type="datetime-local" data-edrec="fecha_ingreso" value="' +
-      esc(c.fecha_ingreso || '') + '">' +
-      '<span class="ayuda">De acá salen los días de la orden. Corregirla mueve el contador</span>' +
-    '</div>' +
-    '</div>';
-}
-
-/* ── 3 · Solicitud de reparación, el mismo paso del ingreso ────────────
-   Mismo orden de campos que `recOrdenes()` y los mismos rótulos:
-
-     Tipo · Compañía · Siniestro · Deducible · N° de OR · Liquidador ·
-     Descripción de daños · Prioridad · Estado · Descripción del estado
-
-   Dos diferencias con el ingreso, y las dos son porque acá se corrige una
-   orden que YA existe:
-
-   · No hay «varias órdenes». En el ingreso un bloque genera una OT; acá se
-     está editando una sola. Agregar otra es «Agregar OR», que es otro botón.
-   · Los campos de compañía se muestran SIEMPRE que la orden los tenga
-     cargados, aunque el tipo elegido no los exija. Ocultarlos escondería un
-     siniestro ya escrito, y un dato que no se ve no se puede corregir. */
-function vEditRecOrden(e) {
-  const c = e.campos;
-  const tipos = Modelo.catalogo('tipo_ingreso');
-  const t = tipos.find((x) => x.id === c.tipo_ingreso_id) || null;
-  const estados = Modelo.catalogo('estado')
-    .filter((x) => (x.alcanzable_en || []).indexOf('ingreso') >= 0);
-
-  const campo = (clave, rot, dentro, ayuda) => '<div class="campo"><label>' + esc(rot) + '</label>' +
-    dentro + (ayuda ? '<span class="ayuda">' + esc(ayuda) + '</span>' : '') + '</div>';
-
-  const texto = (clave, rot, ayuda, extra) => campo(clave, rot,
-    '<input data-edrec="' + clave + '" value="' + esc(c[clave] == null ? '' : c[clave]) + '" ' +
-    (extra || '') + '>', ayuda);
-
-  const area = (clave, rot, ayuda) => '<div class="campo"><label>' + esc(rot) + '</label>' +
-    '<textarea rows="2" data-edrec="' + clave + '">' + esc(c[clave] || '') + '</textarea>' +
-    (ayuda ? '<span class="ayuda">' + esc(ayuda) + '</span>' : '') + '</div>';
-
-  const lista = (clave, rot, filas, vacio, ayuda) => campo(clave, rot,
-    '<select data-edrec="' + clave + '">' +
-    (vacio ? '<option value="">' + esc(vacio) + '</option>' : '') +
-    filas.map((f) => '<option value="' + esc(f.id || f.codigo) + '"' +
-      (String(c[clave]) === String(f.id || f.codigo) ? ' selected' : '') + '>' +
-      esc(f.nombre) + '</option>').join('') + '</select>', ayuda);
-
-  // Se muestran si el tipo los pide O si la orden ya los trae escritos.
-  const verCompania = (t && t.exige_compania) || c.compania_id || c.siniestro || c.liquidador;
-  const verOR = (t && t.exige_or) || c.or_externa;
-
-  return '<div class="rejilla-campos campos-vertical" style="margin-top:11px">' +
-    lista('tipo_ingreso_id', 'Tipo de ingreso', tipos, 'Seleccione tipo de ingreso') +
-    (verCompania
-      ? lista('compania_id', 'Compañía',
-          Modelo.catalogo('compania').filter((x) => x.vigente !== false),
-          'Seleccione compañía', 'Del catálogo: no se escribe a mano') +
-        texto('siniestro', 'N° de siniestro') +
-        campo('deducible', 'Deducible neto',
-          '<input type="number" data-edrec="deducible" value="' + esc(c.deducible) + '">')
-      : '') +
-    (verOR ? texto('or_externa', 'N° de OR', 'El que trae el cliente corporativo') : '') +
-    (verCompania ? area('liquidador', 'Liquidador / evaluador de la OT') : '') +
-    area('descripcion_danos', 'Descripción de daños',
-      'En palabras. Las marcas de la silueta se corrigen en el paso 4') +
-    lista('prioridad_id', 'Prioridad', Modelo.catalogo('prioridad'), '') +
-    lista('estado', 'Estado', estados.map((x) => ({ id: x.codigo, nombre: x.nombre })), '',
-      'Lo mueve el mismo procedimiento del resto del sistema, con su registro') +
-    area('descripcion_estado', 'Descripción del estado') +
     '</div>';
 }
 
@@ -529,13 +433,8 @@ function pRecepcionEditarFicha() {
   document.querySelectorAll('[data-edrec]').forEach((el) => {
     const clave = el.dataset.edrec;
     el.addEventListener('input', () => {
-      /* El VIN se normaliza igual que la patente, y por lo mismo: `maxlength`
-         solo frena lo que se TECLEA. Pegando 29 caracteres desde un correo, el
-         campo los aceptaba y el guardado los rechazaba después, sin decir
-         dónde. Se corta acá, donde se ve. */
-      const limpiar = { patente: normalizarPatente, vin: normalizarVin }[clave];
-      e.campos[clave] = limpiar ? limpiar(el.value) : el.value;
-      if (limpiar && el.value !== e.campos[clave]) el.value = e.campos[clave];
+      e.campos[clave] = clave === 'patente' ? normalizarPatente(el.value) : el.value;
+      if (clave === 'patente' && el.value !== e.campos[clave]) el.value = e.campos[clave];
     });
     el.addEventListener('change', () => { e.campos[clave] = el.value; });
   });
@@ -586,21 +485,6 @@ function pRecepcionEditarFicha() {
       vehiculo: { patente: c.patente, vin: c.vin, anio: c.anio === '' ? null : Number(c.anio),
                   marca_id: c.marca_id || null, modelo_id: c.modelo_id || null,
                   color_id: c.color_id || null },
-      /* El paso 3. `estado` y `fecha_ingreso` van acá como cualquier otro
-         campo, pero el motor NO los escribe a mano: la fecha pasa por la regla
-         del ingreso y arrastra la estadía, y el estado pasa por el
-         procedimiento de siempre. */
-      orden: { tipo_ingreso_id: c.tipo_ingreso_id || null,
-               compania_id: c.compania_id || null,
-               siniestro: c.siniestro || null,
-               deducible: c.deducible === '' ? 0 : Number(c.deducible),
-               liquidador: c.liquidador || null,
-               or_externa: c.or_externa || null,
-               descripcion_danos: c.descripcion_danos || '',
-               prioridad_id: c.prioridad_id || null,
-               estado: c.estado || null,
-               descripcion_estado: c.descripcion_estado || '',
-               fecha_ingreso: c.fecha_ingreso || null },
       recepcion: { km: c.km === '' ? null : Number(c.km),
                    combustible: c.combustible === '' ? null : Number(c.combustible),
                    observaciones: c.observaciones },
@@ -618,9 +502,7 @@ function pRecepcionEditarFicha() {
     ejecutar(() => Modelo.corregir_recepcion(e.otId, cambios, e.motivo),
       'Recepción corregida. Quedó como versión nueva, con lo que decía antes, quién lo cambió y ' +
       'por qué — y el comprobante impreso ahora dice qué versión es.',
-      (res) => {
-        // La fecha de hace más de un mes no traba la corrección, pero se dice.
-        (res.avisos || []).forEach((a) => avisar({ ok: false, motivo: a }));
+      () => {
         const o = Modelo.otPorId(e.otId);
         if (o) editRecCargar(o);
         render();
