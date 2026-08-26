@@ -2213,6 +2213,188 @@ const Pruebas = (function () {
         });
       })();
 
+      /* 🔴 EL PRIMER CLIC NO PUEDE MOVER LA FILA (26-08-2026, Marco).
+
+         «Si tiene una OT abierta y desplegada y quiere abrir otra en otra
+         pestaña, doble clic a la otra y se le abre. Porque actualmente tiene
+         que contraer primero todo para después doble clic y abrir.»
+
+         La causa: el primer clic desplegaba al tiro, la tabla se rearmaba y la
+         fila apuntada se corría 259 px bajo el dedo —medido en Chrome—, así que
+         el segundo clic caía en otra parte. Con todo contraído nada se movía y
+         por eso «funcionaba» sólo así.
+
+         ⚠️ LA PRUEBA HACE LOS DOS CLICS SIN NADA ENTRE MEDIO, que es el caso
+         que estaba roto. Si alguien vuelve a hacer que el clic simple actúe sin
+         esperar la ventana del doble clic, acá se cae. */
+      (function () {
+        if (typeof conDobleClic !== 'function' || typeof VENTANA_DOBLE_CLIC !== 'number') {
+          push({ nombre: '🔴 Con una fila desplegada, el doble clic en otra abre igual',
+            intento: 'Buscar conDobleClic', esperado: 'cargada',
+            paso: false, detalle: 'conDobleClic no está cargada (falta js/app/render.js)' });
+          return;
+        }
+
+        /* Una fila de mentira con lo justo: un `addEventListener` que guarda el
+           oyente y un `contains` que dice que sí. No se toca el DOM real porque
+           en el arnés no hay. */
+        const oyentes = [];
+        const celda = { classList: { add() {} }, title: '', contains: () => true };
+        const fila = { addEventListener: (t, f) => { if (t === 'click') oyentes.push(f); } };
+
+        let desplegadas = 0, abiertas = 0;
+        conDobleClic(fila, 'ot-23366',
+          () => { abiertas++; return true; },
+          () => { desplegadas++; },
+          celda);
+
+        const clic = () => oyentes.forEach((f) => f({ target: celda }));
+        clic(); clic();                       // los dos clics, sin nada entremedio
+
+        /* Lo que importa: al segundo clic YA abrió, y el despliegue del primero
+           no llegó a ejecutarse. Si el clic simple actuara al tiro, acá
+           `desplegadas` valdría 1 y la tabla se habría movido entre medio. */
+        push({
+          nombre: '🔴 Con una fila desplegada, el doble clic en otra abre igual',
+          intento: 'Dos clics seguidos sobre la celda de la OT, sin nada entre medio',
+          esperado: 'Abre UNA pestaña y no despliega: entre clic y clic la tabla no se mueve',
+          paso: abiertas === 1 && desplegadas === 0,
+          detalle: desplegadas
+            ? 'El primer clic desplegó al tiro (' + desplegadas + '): la fila se corre y el ' +
+              'segundo clic cae en otra parte — es el bug que se está arreglando'
+            : (abiertas !== 1
+              ? 'Abrió ' + abiertas + ' pestañas en vez de una'
+              : 'Una pestaña, cero despliegues, con ventana de ' + VENTANA_DOBLE_CLIC + ' ms')
+        });
+      })();
+
+      /* 🔴 UN GESTO, UNA PESTAÑA (26-08-2026).
+
+         `conDobleClic` tenía DOS caminos para el mismo gesto: la cuenta a mano
+         y un `dblclick` nativo. Mientras el clic simple redibujaba, el nativo no
+         llegaba a dispararse y nadie lo notó; en los paneles sin desplegable
+         —Bodega, Documentos— sí se disparaba, y un doble clic llamaba a abrir
+         dos veces. Dos `window.open`, dos pestañas de la misma orden.
+
+         La prueba cuenta oyentes: si vuelve a aparecer un segundo camino, falla
+         antes de que alguien lo vea en pantalla. */
+      (function () {
+        if (typeof conDobleClic !== 'function') return;
+        const tipos = [];
+        const celda = { classList: { add() {} }, title: '', contains: () => true };
+        const fila = { addEventListener: (t) => tipos.push(t) };
+        conDobleClic(fila, 'ot-1', () => true, null, celda);
+
+        push({
+          nombre: '🔴 Un doble clic abre una pestaña, no dos',
+          intento: 'Contar los oyentes que engancha `conDobleClic` en la fila',
+          esperado: 'Sólo `click`. Con `dblclick` además, el mismo gesto abre dos veces',
+          paso: tipos.length === 1 && tipos[0] === 'click',
+          detalle: tipos.indexOf('dblclick') >= 0
+            ? 'Volvió el `dblclick` nativo junto a la cuenta a mano: dos caminos, dos pestañas'
+            : 'Un solo camino (' + (tipos.join(', ') || 'ninguno') + ')'
+        });
+      })();
+
+      /* 🔴 Y EL PASE LO TIENE QUE DEJAR QUIEN ABRE (26-08-2026).
+
+         Sin esto, todo lo de abajo se puede cumplir perfecto y el sistema
+         seguir echando a la gente: bastaba que `abrirNuestra` no dejara el
+         pase, y la pestaña nueva no tenía qué adoptar. Se comprobó rompiéndolo
+         a propósito —sacando la llamada— y ninguna prueba se caía.
+
+         Se mira el efecto real: abrir una ficha tiene que dejar el pase puesto,
+         no que exista la función. */
+      (function () {
+        if (typeof abrirFicha !== 'function' || typeof CLAVE_PASE !== 'string') return;
+        const antes = (Modelo.personaActual() || {}).id || null;
+        Modelo.fijar_persona_actual('pe-t-2');
+        try { localStorage.removeItem(CLAVE_PASE); } catch (e) { /* nada */ }
+
+        const real = window.open;
+        window.open = function () { return null; };
+        try { abrirFicha(23298); } catch (e) { /* lo que importa es el pase */ }
+        window.open = real;
+
+        let dejo = null;
+        try { dejo = JSON.parse(localStorage.getItem(CLAVE_PASE) || 'null'); } catch (e) { dejo = null; }
+        try { localStorage.removeItem(CLAVE_PASE); } catch (e) { /* nada */ }
+        Modelo.fijar_persona_actual(antes);
+
+        push({
+          nombre: '🔴 Abrir una orden le deja el pase a la pestaña nueva',
+          intento: 'Abrir la ficha de una orden y mirar si quedó el pase puesto',
+          esperado: 'Queda el pase con el id de quien tiene la sesión',
+          paso: !!dejo && dejo.id === 'pe-t-2' && typeof dejo.t === 'number',
+          detalle: !dejo
+            ? 'No dejó pase: la pestaña nueva no tiene qué adoptar y pedirá la clave de nuevo'
+            : (dejo.id !== 'pe-t-2'
+              ? 'Dejó el pase de otra persona: ' + dejo.id
+              : 'Pase puesto para pe-t-2, con hora')
+        });
+      })();
+
+      /* 🔴 LA PESTAÑA NUEVA NO PUEDE PEDIR LA CLAVE DE NUEVO (26-08-2026, Marco).
+
+         «Se me abre una pestaña automáticamente pero luego me devuelve a la
+         original (Torre de control).» Eso que se ve es el arranque sin sesión:
+         pinta la Torre y le pone el ingreso encima, venga uno de Bodega, de
+         Presupuesto o de donde sea.
+
+         Sacar `noopener` hizo que Chrome de escritorio copiara el
+         `sessionStorage` —la prueba de más arriba cuida eso— pero esa copia es
+         una cortesía del navegador y no se puede dar por hecha. El pase la
+         reemplaza cuando no llega.
+
+         ⚠️ SE PRUEBA ADOPTANDO DE VERDAD, no mirando la tabla: se deja el pase,
+         se vacía la sesión como si fuera otra pestaña, y se pregunta si entró
+         quien correspondía. Y se comprueban los dos candados que lo hacen
+         aceptable: de un solo uso, y muere con el reloj. */
+      (function () {
+        if (typeof dejarPase !== 'function' || typeof tomarPase !== 'function') {
+          push({ nombre: '🔴 La pestaña nueva hereda la sesión, no la vuelve a pedir',
+            intento: 'Buscar el pase', esperado: 'cargado',
+            paso: false, detalle: 'dejarPase/tomarPase no están (falta js/app/render.js)' });
+          return;
+        }
+        const antes = (Modelo.personaActual() || {}).id || null;
+        Modelo.fijar_persona_actual('pe-t-2');          // Gabriel Díaz
+
+        dejarPase();
+        const primero = tomarPase();
+        const segundo = tomarPase();                    // el mismo pase, otra vez
+
+        Modelo.fijar_persona_actual(null);              // como una pestaña que nace vacía
+        const adoptado = Modelo.adoptar_sesion(primero);
+        const quedo = (Modelo.personaActual() || {}).id || null;
+
+        // Y uno vencido: se fabrica con la hora corrida hacia atrás.
+        Modelo.fijar_persona_actual('pe-t-2');
+        dejarPase();
+        try {
+          const d = JSON.parse(localStorage.getItem('dyp-pase'));
+          d.t = d.t - (PASE_VIVE + 1000);
+          localStorage.setItem('dyp-pase', JSON.stringify(d));
+        } catch (e) { /* si no se pudo, la comprobación de abajo lo dirá */ }
+        const vencido = tomarPase();
+
+        Modelo.fijar_persona_actual(antes);
+
+        const bien = primero === 'pe-t-2' && segundo === null &&
+          adoptado === true && quedo === 'pe-t-2' && vencido === null;
+        push({
+          nombre: '🔴 La pestaña nueva hereda la sesión, no la vuelve a pedir',
+          intento: 'Dejar el pase, adoptarlo desde una pestaña sin sesión, y volver a pedirlo',
+          esperado: 'Entra quien tenía la sesión · el pase sirve UNA vez · vencido no sirve',
+          paso: bien,
+          detalle: primero !== 'pe-t-2' ? 'El pase no trajo a quien tenía la sesión: ' + primero
+            : (segundo !== null ? 'El pase sirvió DOS veces: no es de un solo uso'
+            : (!adoptado || quedo !== 'pe-t-2' ? 'No adoptó la sesión: quedó en ' + quedo
+            : (vencido !== null ? 'Un pase de hace más de ' + PASE_VIVE + ' ms todavía sirve'
+            : 'Hereda, se gasta al primer uso, y a los ' + (PASE_VIVE / 1000) + ' s ya no sirve')))
+        });
+      })();
+
       /* 🔴 LO QUE SE ESCRIBE HOY QUEDA FECHADO HOY (23-08-2026, Marco).
 
          `HOY` estaba clavado en el 12-08-2026 —el día del levantamiento— así que

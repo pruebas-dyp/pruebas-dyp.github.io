@@ -3516,6 +3516,36 @@ const Modelo = (function () {
     return fijar_persona_actual(id).ok;
   }
 
+  /* 🔴 LA SESIÓN SE PUEDE ADOPTAR DESDE LA PESTAÑA QUE NOS ABRIÓ (26-08-2026).
+
+     `retomar_sesion` lee el almacenamiento de ESTA pestaña. Cuando el doble
+     clic en una OT abre una pestaña nueva, el navegador debería entregarle una
+     copia de ese almacenamiento —en Chrome de escritorio lo hace, está
+     comprobado—, pero no es algo con lo que se pueda contar: no lo hace con
+     `noopener`, no lo hace si el enlace se abre a mano, y en el teléfono
+     depende del navegador. Cada vez que falla, la pestaña nueva arranca sin
+     sesión y el arranque la manda a la pantalla de ingreso con la Torre de
+     control pintada debajo. Marco lo describió exactamente así: «se me abre
+     una pestaña pero luego me devuelve a la Torre de control».
+
+     Entonces se deja de depender del navegador: la pestaña que abre le PASA la
+     sesión a la que abrió, y ésta la adopta. Quien decide sigue siendo el
+     modelo —se comprueba que la persona exista y esté activa, igual que al
+     retomar— y queda escrita en el almacenamiento de la pestaña nueva para
+     que un F5 no la vuelva a echar.
+
+     No es una puerta nueva: para adoptar hay que traer el id de alguien que ya
+     tiene sesión abierta en este mismo navegador. Quien no lo trae entra por
+     la pantalla de ingreso, como siempre. */
+  function adoptar_sesion(persona_id) {
+    if (!persona_id) return false;
+    const p = db.persona.find((x) => x.id === persona_id);
+    if (!p || !p.activo) return false;
+    if (!fijar_persona_actual(persona_id).ok) return false;
+    try { if (guardaSesion) guardaSesion.setItem(CLAVE_SESION, persona_id); } catch (e) { /* sin almacenamiento */ }
+    return true;
+  }
+
   const haySesion = () => !!persona_actual;
 
   /* Quién está en la sesión GUARDADA, que puede no ser quien tiene esta
@@ -3958,7 +3988,7 @@ const Modelo = (function () {
        `permisosDePersona` los lee, los dos `fijar_` los mueven. */
     permisosDePersona, fijar_persona_permiso, fijar_persona_modulo,
     personaActual, fijar_persona_actual, sesionesPosibles,
-    iniciar_sesion, cerrar_sesion, retomar_sesion, haySesion, cambiar_clave,
+    iniciar_sesion, cerrar_sesion, retomar_sesion, adoptar_sesion, haySesion, cambiar_clave,
     sesionGuardada, sesionAlDia, CLAVE_SESION,
     // operación
     crear_ot_desde_recepcion, asignar_etapas, finalizar_etapa, finalizar_etapas, quitar_etapa,

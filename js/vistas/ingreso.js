@@ -201,6 +201,16 @@ function pantallaIngreso(motivo) {
 /* Lo que pasa una vez adentro: se dibuja el marco con el menú que le
    corresponde a esa cuenta y se la deja en lo suyo. */
 function arrancarSesion(r) {
+  /* Si la dirección pedía una ORDEN, se va a la orden. Es la pestaña que se
+     abrió con doble clic —o con un enlace compartido— y a la que la sesión no
+     llegó: la persona ya pagó el peaje de la clave, mandarla encima a su
+     primer módulo era perderle la orden que venía a mirar. */
+  if (typeof PARAM_OT !== 'undefined' && PARAM_OT && buscarOT(PARAM_OT)) {
+    fichaAplicarDireccion();
+    modoRegistro(PARAM_OT);
+    return;
+  }
+
   pintarMenu();
   montarRol();
 

@@ -602,7 +602,80 @@ const urlFicha = (numero, tab, modo) => 'index.html#ot=' + encodeURIComponent(nu
    Se saca: el destino es nuestra propia página, así que no hay tercero del que
    proteger el `opener`. */
 function abrirNuestra(url) {
+  dejarPase();
   return window.open(url, '_blank');
+}
+
+/* ───────── El pase: la sesión viaja con la pestaña ─────────
+   🔴 26-08-2026. Sacar `noopener` —acá arriba— hizo que Chrome de escritorio
+   le copiara el `sessionStorage` a la pestaña nueva, y ahí se dio el asunto por
+   cerrado. No estaba cerrado: esa copia es una cortesía del navegador, no una
+   garantía. No la hace con `noopener`, no la hace si el enlace se abre a mano,
+   y en el teléfono depende de cuál sea. Cada vez que no la hace, la pestaña
+   nueva arranca SIN SESIÓN, y el arranque pinta la Torre de control con el
+   ingreso encima. Es exactamente lo que Marco vio, panel por panel: «se me
+   abre una pestaña pero luego me devuelve a la Torre de control».
+
+   El pase no le pide nada al navegador: antes de abrir, la pestaña que abre
+   deja el id de quien tiene la sesión, y la pestaña nueva lo levanta al
+   arrancar. Tres candados, porque esto vuelve a dejar una sesión en el
+   almacenamiento del navegador entero —y eso es justo lo que COD-1 sacó de
+   ahí—:
+
+     · DE UN SOLO USO. Quien lo lee lo borra, le haya servido o no.
+     · DIEZ SEGUNDOS, con la hora guardada adentro. Cerrar y volver a abrir el
+       navegador no lo estira: se compara contra el reloj, no contra la vida de
+       la pestaña.
+     · Y LA PESTAÑA QUE LO DEJÓ LO BORRA IGUAL a los diez segundos, por si la
+       pestaña nueva nunca llegó a arrancar.
+
+   Lo que queda expuesto, dicho derecho: si alguien mata el navegador dentro de
+   esos diez segundos y otra persona lo abre antes de que se cumplan, entra sin
+   clave. No es una sesión guardada —es una ventana de diez segundos que hay
+   que acertar—, y la alternativa era que el sistema echara a la gente cada vez
+   que abre una orden. */
+const CLAVE_PASE = 'dyp-pase';
+const PASE_VIVE = 10000;
+
+function dejarPase() {
+  const p = Modelo.personaActual();
+  if (!p) return;
+  try {
+    localStorage.setItem(CLAVE_PASE, JSON.stringify({ id: p.id, t: new Date().getTime() }));
+    setTimeout(() => { try { localStorage.removeItem(CLAVE_PASE); } catch (e) { /* nada */ } }, PASE_VIVE);
+  } catch (e) { /* sin almacenamiento: la pestaña nueva pedirá entrar, y está bien */ }
+}
+
+function tomarPase() {
+  let d = null;
+  try {
+    d = JSON.parse(localStorage.getItem(CLAVE_PASE) || 'null');
+    localStorage.removeItem(CLAVE_PASE);
+  } catch (e) { return null; }
+  if (!d || !d.id || !d.t) return null;
+  if (new Date().getTime() - d.t > PASE_VIVE) return null;
+  return d.id;
+}
+
+/* De dónde saca la sesión una pestaña recién abierta, en orden:
+
+     1. de la suya, si el navegador se la copió —es el camino normal—;
+     2. de la pestaña que la abrió, leyendo su almacenamiento directo. Es el
+        mismo origen, así que se puede. `window.opener.Modelo` NO se puede:
+        `Modelo` es una constante léxica y no vive en `window`;
+     3. del pase, que es el único que sirve cuando `opener` viene vacío.
+
+   Devuelve si esta pestaña quedó con sesión. */
+function sesionDeEstaPestana() {
+  if (Modelo.retomar_sesion()) return true;
+
+  let delQueAbrio = null;
+  try {
+    if (window.opener && window.opener.sessionStorage)
+      delQueAbrio = window.opener.sessionStorage.getItem(Modelo.CLAVE_SESION);
+  } catch (e) { delQueAbrio = null; }   // otro origen: no es asunto nuestro
+
+  return Modelo.adoptar_sesion(delQueAbrio) || Modelo.adoptar_sesion(tomarPase());
 }
 
 function abrirFicha(numero, tab, modo) {
@@ -613,47 +686,98 @@ function abrirFicha(numero, tab, modo) {
    El cliente pidió el 15-08-2026 que el doble clic abra la orden desde TODOS
    los paneles, no sólo desde la torre y el histórico.
 
-   Y hay una trampa que costó encontrar la primera vez, así que vive acá una
-   sola vez y no repetida en cada panel: cuando el clic simple vuelve a dibujar
-   la tabla, la fila se reemplaza y el navegador ya no puede emitir `dblclick`
-   —los dos clics caen sobre elementos distintos—. Por eso el doble clic se
-   cuenta a mano, con la hora del clic anterior. El `dblclick` nativo se deja
-   igual, para los paneles que no repintan.
-
    `alSimple` es opcional: en los paneles que no despliegan nada, la fila sólo
    responde al doble clic. */
-const VENTANA_DOBLE_CLIC = 450;
-const memoriaClic = { clave: null, t: 0 };
+/* 🔴 EL PRIMER CLIC NO PUEDE MOVER LA FILA (26-08-2026, Marco).
 
-/* `abridor` acota DESDE DÓNDE se puede abrir con doble clic. Sin él, el gesto
-   vive en todo `el` —la fila entera—, que es lo que hacía que seleccionar
-   texto de cualquier celda terminara abriendo una pestaña. Con él, el clic
-   simple sigue funcionando en toda la fila y el doble clic sólo cuenta sobre
-   esa celda. */
+   Lo que estaba escrito acá contaba el doble clic a mano porque el redibujo
+   del primer clic reemplaza la fila y el navegador ya no puede emitir
+   `dblclick`. Eso era cierto, pero atacaba el síntoma. El problema es el
+   redibujo mismo:
+
+     el primer clic despliega la fila → la tabla se rearma → LA FILA QUE SE
+     ESTABA APUNTANDO SE CORRE → el segundo clic cae en otra parte.
+
+   Medido en Chrome con una orden ya desplegada arriba: la fila de destino
+   saltó de y=384 a y=643. Doscientos cincuenta y nueve píxeles bajo el dedo,
+   entre un clic y el otro. Por eso «actualmente tiene que contraer primero
+   todo para después doble clic y abrir»: con todo contraído nada se mueve y el
+   gesto acierta. No era una manía del usuario, era la única forma de que
+   funcionara.
+
+   Ahora el clic sobre la celda de la OT NO ACTÚA AL TIRO: espera la ventana
+   del doble clic. Si llega un segundo clic, es doble y abre la pestaña; si no
+   llega, recién ahí despliega. Entre los dos clics el DOM no cambia, así que
+   la fila no se mueve y el segundo clic cae donde el primero.
+
+   La demora se paga SÓLO en la celda de la OT. El resto de la fila —y la
+   flecha— siguen desplegando al instante, que es como se usa la tabla el
+   noventa por ciento del tiempo.
+
+   ⚠️ Y SE VA EL `dblclick` NATIVO. Ahora que la fila sobrevive entre los dos
+   clics, el navegador SÍ lo emite, y con los dos caminos vivos un solo doble
+   clic llamaba a `alDoble()` dos veces — dos `window.open`, dos pestañas. En
+   los paneles sin desplegable (Bodega, Documentos) eso ya estaba pasando. Un
+   gesto, un camino. */
+const VENTANA_DOBLE_CLIC = 500;
+const memoriaClic = { clave: null, t: 0, pendiente: null };
+
+/* El clic aplazado que está esperando su ventana. Si llega OTRO clic que no es
+   su doble —otra fila, otra celda—, no se bota: se ejecuta al tiro y recién
+   después se atiende el nuevo. Botarlo era perder un clic del usuario. */
+function resolverPendiente(claveNueva) {
+  const p = memoriaClic.pendiente;
+  if (!p) return;
+  clearTimeout(p.temporizador);
+  memoriaClic.pendiente = null;
+  if (p.clave !== claveNueva) p.accion();
+  // El de la MISMA clave no se ejecuta: el clic nuevo lo reemplaza o lo
+  // convierte en doble, y en ambos casos correrlo además sería duplicarlo.
+}
+
 function conDobleClic(el, clave, alDoble, alSimple, abridor) {
   const abre = (ev) => !abridor || (ev.target && abridor.contains(ev.target));
 
   el.addEventListener('click', (ev) => {
-    const ahora = new Date().getTime();
-    if (memoriaClic.clave === clave && ahora - memoriaClic.t < VENTANA_DOBLE_CLIC && abre(ev)) {
+    /* Fuera de la celda que abre no hay doble clic que esperar: despliega al
+       instante, como siempre. */
+    if (!abre(ev)) {
+      resolverPendiente(clave);
       memoriaClic.clave = null; memoriaClic.t = 0;
-      if (alDoble() !== false) return;
+      if (alSimple) alSimple();
+      return;
     }
+
+    const ahora = new Date().getTime();
+    if (memoriaClic.clave === clave && ahora - memoriaClic.t < VENTANA_DOBLE_CLIC) {
+      resolverPendiente(clave);
+      memoriaClic.clave = null; memoriaClic.t = 0;
+      /* `alDoble` devuelve `false` cuando no pudo abrir —la torre, si no
+         encuentra la orden de esa fila—. Ahí el gesto cae al clic simple en
+         vez de quedarse en nada. */
+      if (alDoble() !== false) return;
+      if (alSimple) alSimple();
+      return;
+    }
+
+    resolverPendiente(clave);
     memoriaClic.clave = clave; memoriaClic.t = ahora;
-    if (alSimple) alSimple();
-  });
-  el.addEventListener('dblclick', (ev) => {
-    if (!abre(ev)) return;
-    ev.preventDefault(); alDoble();
+    if (!alSimple) return;                       // nada que aplazar
+    const pendiente = { clave, accion: alSimple, temporizador: 0 };
+    pendiente.temporizador = setTimeout(() => {
+      if (memoriaClic.pendiente === pendiente) memoriaClic.pendiente = null;
+      alSimple();
+    }, VENTANA_DOBLE_CLIC);
+    memoriaClic.pendiente = pendiente;
   });
 
   if (abridor) {
     abridor.classList.add('abre-ot');
     abridor.title = 'Doble clic abre la orden en otra pestaña';
   }
-  /* Sin `title`. Lo tenia, y el globo del navegador se montaba encima de la
-     etiqueta de datos —que dice bastante mas que el globo— y tapaba la fila de
-     abajo. El gesto ya esta explicado en el subtitulo del panel. */
+  /* Sin `title` en la fila entera. Lo tenía, y el globo del navegador se
+     montaba encima de la etiqueta de datos —que dice bastante más que el
+     globo— y tapaba la fila de abajo. */
 }
 
 /* ───────────── El expandible, en todos los paneles ─────────────

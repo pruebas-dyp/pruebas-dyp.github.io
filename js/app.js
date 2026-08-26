@@ -476,8 +476,15 @@ setTimeout(() => {
 }, 900);
 
 /* Sin sesión no se ve nada. Se retoma la de antes —un F5 no puede echar a la
-   recepcionista con el formulario a medio llenar— y si no hay, se pide entrar. */
-const HAY_SESION = Modelo.retomar_sesion();
+   recepcionista con el formulario a medio llenar— y si no hay, se pide entrar.
+
+   🔴 Desde el 26-08-2026 no se retoma sólo la propia: una pestaña abierta con
+   doble clic desde otra HEREDA la sesión de la que la abrió. El navegador a
+   veces la copia solo y a veces no —de eso era el reclamo de Marco: cada
+   pestaña nueva pedía entrar de nuevo—, así que ahora lo garantiza el sistema.
+   El orden de búsqueda y sus candados están en `sesionDeEstaPestana`, en
+   render.js, junto al `abrirNuestra` que deja el pase. */
+const HAY_SESION = sesionDeEstaPestana();
 
 if (!HAY_SESION) {
   pintarMenu();
