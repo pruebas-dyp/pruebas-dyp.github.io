@@ -580,7 +580,7 @@ window.addEventListener('storage', (ev) => {
      acá. No se tocan: las usa la comprobación de sesión del arranque. */
   if (ev.key !== Modelo.CLAVE) return;
   if (!Modelo.recargarDeDisco()) return;
-  if (ui.registroOT) modoRegistro(ui.registroOT); else render();
+  render();
 });
 
 /* Las teclas que la barra de herramientas promete. Si el botón dice F2, F2

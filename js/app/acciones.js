@@ -540,7 +540,7 @@ function ejecutarAccion(accion) {
       ? new Date(HOY.getTime() + 7 * 86400000)
       : new Date(HOY_ORIGINAL.getTime());
     Modelo.fijar_rol_actual(Modelo.rolActual().id);   // invalida los memos
-    if (ui.registroOT) modoRegistro(ui.registroOT); else render();
+    render();
     return avisar({ ok: true, motivo: '' }, 'La fecha del sistema es ahora ' + fFechaHora(HOY) +
       '. Los tres relojes se recalcularon solos: ninguno está guardado.');
   }
@@ -769,7 +769,7 @@ function ejecutar(fn, textoOk, despues) {
   const r = fn();
   avisar(r, typeof textoOk === 'function' ? textoOk(r) : textoOk);
   if (r.ok) {
-    if (ui.registroOT) modoRegistro(ui.registroOT); else render();
+    render();
     if (despues) despues(r);
   }
   return r;

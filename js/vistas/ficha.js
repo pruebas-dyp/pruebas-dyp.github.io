@@ -54,7 +54,7 @@ function fichaAplicarDireccion() {
 }
 
 function refrescarFicha() {
-  if (ui.registroOT) modoRegistro(ui.registroOT); else render();
+  render();
 }
 
 /* Las OCHO pantallas que cuelgan de la ficha en el sistema actual, con su

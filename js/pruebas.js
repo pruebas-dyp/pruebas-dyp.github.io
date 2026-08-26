@@ -2213,6 +2213,63 @@ const Pruebas = (function () {
         });
       })();
 
+      /* 🔴 NADIE PINTA LA TORRE ENCIMA DE UNA FICHA (26-08-2026, Marco).
+
+         «Hago doble clic para visualizar la info de esa OT y me vuelve a la
+         Torre de control y más encima me saca el panel lateral.»
+
+         `render()` pinta `ui.vista` —que en la ventana de una OT vale «torre»—
+         así que cualquiera que lo llame ahí borra la ficha. La sala compartida
+         lo llamaba en cada latido: la ficha duraba un segundo.
+
+         ⚠️ LA PRUEBA LLAMA A `render()` DIRECTO, que es lo que hacen la sala,
+         los temporizadores y el próximo archivo que se escriba. La primera
+         versión de esta prueba leía el código de la sala buscando llamadas
+         sueltas, y NO cazaba el latido — el camino que de verdad rompía la
+         pantalla de Marco— porque esa función no se puede leer desde afuera.
+         Mirando el comportamiento se cazan todos, incluso los que no existen
+         todavía. */
+      (function () {
+        const antesReg = ui.registroOT;
+        const realModo = (typeof modoRegistro === 'function') ? modoRegistro : null;
+        if (!realModo) {
+          push({ nombre: '🔴 Nadie pinta la Torre encima de una ficha',
+            intento: 'Buscar modoRegistro', esperado: 'cargada',
+            paso: false, detalle: 'modoRegistro no está (falta js/app.js)' });
+          return;
+        }
+        let fichas = 0;
+        try {
+          modoRegistro = () => { fichas++; };
+
+          ui.registroOT = '23368';
+          let reventoConFicha = false;
+          try { render(); } catch (e) { reventoConFicha = true; }
+          const conFicha = fichas;
+
+          fichas = 0;
+          ui.registroOT = null;
+          try { render(); } catch (e) { /* en el arnés no hay DOM: da igual */ }
+          const sinFicha = fichas;
+
+          push({
+            nombre: '🔴 Nadie pinta la Torre encima de una ficha',
+            intento: 'Llamar a render() —como hace la sala— con una OT abierta, y después sin ella',
+            esperado: 'Con OT abierta repinta LA FICHA; sin ella, el panel de siempre',
+            paso: conFicha === 1 && !reventoConFicha && sinFicha === 0,
+            detalle: conFicha === 0
+              ? 'Con la ficha abierta, render() se puso a pintar el panel: es la Torre encima ' +
+                'de la OT, sin barra lateral — el bug que se está arreglando'
+              : (reventoConFicha ? 'Reventó al repintar la ficha'
+                : (sinFicha !== 0 ? 'Sin ficha abierta igual repintó la ficha ' + sinFicha + ' vez/veces'
+                  : 'Con OT abierta → ficha · sin OT → panel'))
+          });
+        } finally {
+          modoRegistro = realModo;
+          ui.registroOT = antesReg;
+        }
+      })();
+
       /* 🔴 EL PRIMER CLIC NO PUEDE MOVER LA FILA (26-08-2026, Marco).
 
          «Si tiene una OT abierta y desplegada y quiere abrir otra en otra

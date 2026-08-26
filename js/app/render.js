@@ -228,7 +228,35 @@ const ESTADO_BARRA = {
   entrega:     () => '<strong>' + Modelo.metricas().enTaller + '</strong> vehículos en condiciones de entrega'
 };
 
+/* 🔴 `render()` NO PUEDE PINTAR ENCIMA DE UNA FICHA (26-08-2026, Marco).
+
+   «Hago doble clic para visualizar la info de esa OT y me vuelve a la Torre de
+   control y más encima me saca el panel lateral.»
+
+   La ventana de una OT no la dibuja `render()`: la dibuja `modoRegistro`.
+   `render()` pinta `ui.vista`, que en esa ventana vale «torre» —nadie la cambió,
+   no hace falta—, así que llamarlo ahí BORRA LA FICHA Y PINTA LA TORRE, y sin
+   barra lateral, porque el menú ya estaba escondido.
+
+   El cuidado existía, pero como una línea copiada CUATRO veces en los sitios
+   que se acordaron: app.js, acciones.js dos veces, ficha.js. `sala.js` se
+   escribió después y tiene dos repintados que no se enteraron —y la sala
+   repinta sola, cada latido—. Con la sala encendida la ficha duraba un
+   segundo. Apagada no pasaba nunca, y por eso no se vio al publicar.
+
+   ⚠️ Por eso el guardia vive ACÁ ADENTRO y no en los que llaman. Un repintado
+   que se olvide de mirar si hay una ficha abierta no puede existir: no hay
+   dónde olvidarlo. El primer intento fue una función aparte, `repintar()`, que
+   cada sitio tenía que acordarse de usar — o sea, el mismo error con otro
+   nombre. Se probó: devolviendo `render()` al latido de la sala, ninguna
+   prueba se caía.
+
+   No hay recursión: `modoRegistro` pinta la ficha derecho y no vuelve por
+   acá. Y `ir()` limpia `ui.registroOT` ANTES de repintar, que es como se sale
+   de la ficha hacia un módulo. */
 function render() {
+  if (ui.registroOT && typeof modoRegistro === 'function') return modoRegistro(ui.registroOT);
+
   const m = MENU.find((x) => x.id === ui.vista);
   document.getElementById('titulo').innerHTML =
     (m ? ico(m.icono, 'g') : '') +
