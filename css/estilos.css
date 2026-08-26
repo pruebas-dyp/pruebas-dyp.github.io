@@ -1105,6 +1105,22 @@ svg.chispa.verde .chispa-punto { fill: var(--verde); }
    🔴 Ni un color escrito a mano: todos salen de las variables del tema. El
    círculo tiene que leerse igual en oscuro y en claro, y un `#fff` acá se ve
    bien en uno de los dos y desaparece en el otro. */
+/* ───────── El expandible de la Torre, con dos paneles ─────────
+   🔴 CLASE PROPIA, y `.ficha-rejilla` NO SE TOCA: la comparten ocho pantallas
+   —la ficha, el histórico, la entrega, el personal, el presupuesto y los dos
+   pasos de la recepción—, así que cambiarla para acomodar la Torre las movería
+   todas.
+
+   `.ficha-rejilla` es `auto-fit` con `minmax(240px, 1fr)`: con cuatro paneles
+   repartía bien, pero al quedar DOS cada uno se estiraba a media pantalla
+   —más de 500 px para una columna de etiqueta y valor—, con el texto perdido a
+   la izquierda y una franja vacía a la derecha. El tope los deja del ancho que
+   ya tenían y los junta al comienzo, en vez de repartirlos a lo ancho. */
+.detalle-torre {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 360px));
+  justify-content: start;
+}
+
 .pantallas-ot {
   display: grid;
   /* Tope de 200px por tarjeta, y no `1fr`, POR EL CASO DE UNA SOLA. Un operario

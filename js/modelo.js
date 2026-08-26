@@ -2646,9 +2646,23 @@ const Modelo = (function () {
     if (!ESTADOS_PRESU.includes(estado)) return { ok: false, motivo: 'Ese estado no existe.' };
     if (p.estado === estado)
       return { ok: false, motivo: 'El presupuesto ' + p.numero_or + ' ya está ' + estado + '.' };
+    /* 🔴 DE `anulado` NO SE SALE, y esta guarda faltaba. Sin ella
+       `anulado → enviado` pasaba todas las revisiones y el documento VOLVÍA A
+       LA VIDA: `totalOT` excluye solo lo anulado, así que la OR resucitada
+       volvía a contar en la venta parada de la orden y del taller.
+
+       No se veía porque la pantalla escondía el botón `Enviar` fuera de
+       borrador. Al pasar los cuatro botones a dibujarse siempre (26-08-2026) la
+       puerta quedaba abierta, así que se cierra donde corresponde: en el motor,
+       que es quien tiene que rechazarlo aunque el botón se apriete. */
+    if (p.estado === 'anulado')
+      return { ok: false, motivo: 'El presupuesto ' + p.numero_or + ' está anulado y no vuelve a ' +
+        'circular: dejó de contar en la venta de la orden y del taller. Si hay que cotizar otra ' +
+        'vez, se abre una OR nueva.' };
     if (['aprobado', 'rechazado'].includes(p.estado))
       return { ok: false, motivo: 'El presupuesto ' + p.numero_or + ' ya está ' + p.estado +
-        '. Para cambiarlo se crea una versión nueva.' };
+        ', y un documento resuelto no cambia de estado. Para modificar lo que dice se crea la ' +
+        'versión siguiente, y la anterior queda intacta.' };
     if (estado === 'enviado' && !db.presupuesto_linea.some((l) => l.presupuesto_id === pid))
       return { ok: false, motivo: 'No se envía un presupuesto sin líneas.' };
     p.estado = estado;

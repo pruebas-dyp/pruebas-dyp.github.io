@@ -59,8 +59,14 @@ const PANTALLAS_OT = [
   { rot: 'Editar Recepción', icono: 'editar',
     vista: 'recepcion', permiso: 'ot.editar' },
 
+  /* ⚠️ El permiso es `presupuesto.abrir`, no `presupuesto.crear`. Los dos
+     existen a propósito y no son sinónimos: «abrir la OR» y «ponerle los
+     montos» están separados para que Recepción pueda abrir el trabajo sin
+     valorizarlo. Lo que el motor exige en `crear_presupuesto` es el primero, y
+     acá estaba el segundo — así que este botón se le escondía justamente a la
+     cuenta que sí puede usarlo. Corregido el 26-08-2026. */
   { rot: 'Agregar OR', icono: 'nuevo',
-    vista: 'presupuesto', permiso: 'presupuesto.crear' },
+    vista: 'presupuesto', permiso: 'presupuesto.abrir' },
 
   /* ⚠️ `Bodega de esta orden` NO está en la referencia que mandó el cliente
      para la rejilla de la Torre, pero sí existe en la ficha desde antes. Se
