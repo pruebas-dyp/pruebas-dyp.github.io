@@ -3222,16 +3222,21 @@ const Pruebas = (function () {
           const ahora = Modelo.base().persona.filter((x) => x.tipo === 'trabajador').length;
           const aviso = Modelo.porQueSeResembro();
 
-          paso = ok === true && !quedaMarca && !quedaEnMemoria && !!aviso;
-          detalle = ok !== true
+          /* `'resembrado'` y no `true`: ése es el contrato. Devolver `true` a
+             secas dejaría a la sala sin poder distinguir «cargué lo tuyo» de
+             «lo tuyo era viejo», y con eso el documento viejo se queda arriba. */
+          paso = ok === 'resembrado' && !quedaMarca && !quedaEnMemoria && !!aviso;
+          detalle = !ok
             ? 'recargarDeDisco devolvió ' + ok + ': ni siquiera leyó el documento'
+            : (ok !== 'resembrado'
+              ? 'Devolvió ' + JSON.stringify(ok) + ' en vez de «resembrado»: la sala no puede saber que hay que subir'
             : (quedaMarca
               ? 'Cargó el documento viejo tal cual: la marca sigue adentro. La pantalla mostraría datos de otra versión'
               : (quedaEnMemoria
                 ? 'No volvió a sembrar: avisó y dejó la base como estaba, así que el aviso miente'
                 : (!aviso
                 ? 'Sembró de nuevo pero no lo dijo: el usuario ve cambiar los datos sin explicación'
-                  : 'Detecta el sello ajeno, vuelve a sembrar y lo avisa · ' + ahora + ' trabajadores')));
+                  : 'Detecta el sello ajeno, vuelve a sembrar y lo avisa · ' + ahora + ' trabajadores'))));
         } catch (e) {
           detalle = 'reventó: ' + e.message;
         } finally {
@@ -3243,6 +3248,57 @@ const Pruebas = (function () {
           nombre: nombreP,
           intento: 'Sellar el documento guardado como de otra versión y recargar de disco',
           esperado: 'Se da cuenta, vuelve a sembrar y lo dice en pantalla',
+          paso: paso, detalle: detalle
+        });
+      })();
+
+      /* 🔴 Y LO RESEMBRADO TIENE QUE SUBIR A LA SALA (26-08-2026).
+
+         La de arriba comprueba que un documento de otra versión no se cargue.
+         Ésta comprueba la otra mitad, que es la que de verdad se veía: si el
+         equipo se cura solo pero no sube lo suyo, la sala sigue repartiendo el
+         documento viejo a todos los demás. Cada uno se cura al abrir —y por eso
+         no se nota— hasta que entra alguien con el código anterior y lo vuelve
+         a imponer.
+
+         Se llama a `Sala.aplicar()`, que es la que de verdad decide, y se le
+         pregunta a `Sala.hayQueSubir()`, que es la que de verdad mira. */
+      (function () {
+        const nombreP = '🔴 Lo resembrado sube a la sala, no se queda en este equipo';
+        if (typeof Sala === 'undefined' || !Sala.aplicar || !Sala.hayQueSubir) {
+          push({ nombre: nombreP, intento: 'Buscar Sala.aplicar y Sala.hayQueSubir',
+            esperado: 'las dos', paso: false, detalle: 'La sala no está cargada' });
+          return;
+        }
+        let crudo = null;
+        try { crudo = localStorage.getItem(Modelo.CLAVE); } catch (e) { crudo = null; }
+        if (!crudo) {
+          push({ nombre: nombreP, intento: 'Leer el documento guardado',
+            esperado: 'Hay uno', paso: false, detalle: 'No hay almacenamiento' });
+          return;
+        }
+
+        let paso = false, detalle = '';
+        try {
+          const doc = JSON.parse(crudo);
+          doc.sello = 'sello-de-otra-version';
+          // Llega por la sala, como llegaría de otro equipo.
+          Sala.aplicar({ version: 4242, db: doc });
+          const sube = Sala.hayQueSubir();
+          paso = sube === true;
+          detalle = sube
+            ? 'Después de resembrar queda marcado para subir: la sala se pone al día'
+            : 'Se dio por conforme: la sala se queda con el documento viejo y se lo reparte a todos';
+        } catch (e) {
+          detalle = 'reventó: ' + e.message;
+        } finally {
+          try { localStorage.setItem(Modelo.CLAVE, crudo); Modelo.recargarDeDisco(); } catch (e) { /* nada */ }
+        }
+
+        push({
+          nombre: nombreP,
+          intento: 'Hacer llegar por la sala un documento de otra versión de la semilla',
+          esperado: 'El equipo resiembra Y queda con algo que subir',
           paso: paso, detalle: detalle
         });
       })();

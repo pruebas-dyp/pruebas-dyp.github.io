@@ -184,7 +184,21 @@ const Sala = (function () {
       localStorage.setItem(Modelo.CLAVE, JSON.stringify(fila.db));
       const ok = Modelo.recargarDeDisco();
       versionVista = Number(fila.version) || versionVista;
-      versionEnviada = Modelo.versionGuardada();   // lo que acabo de aplicar ya está en la sala
+
+      /* 🔴 SI LO QUE LLEGÓ ERA VIEJO, LO DE AHORA HAY QUE SUBIRLO (26-08-2026).
+
+         Acá decía `versionEnviada = Modelo.versionGuardada()` a secas, con el
+         comentario «lo que acabo de aplicar ya está en la sala». Es cierto…
+         salvo cuando el modelo NO aplicó lo que llegó: si el documento venía de
+         otra versión de la semilla, `recargarDeDisco` vuelve a sembrar, y lo
+         que hay en memoria ahora no está allá arriba.
+
+         Marcarlo igual como «ya está» dejaba el documento viejo en la sala para
+         siempre. Cada equipo se curaba solo al abrir —y por eso el error no se
+         veía— pero la sala seguía repartiendo lo anterior, y el primero que
+         entrara con la versión anterior del código lo volvía a imponer. */
+      if (ok === 'resembrado') versionEnviada = -1;          // fuerza la subida
+      else versionEnviada = Modelo.versionGuardada();        // esto sí está allá
       if (ok && yoTambienCambie) {
         pisado = 'Llegaron cambios de otro equipo y se aplicaron encima. ' +
           'Lo que estabas haciendo acá se perdió: hay que volver a hacerlo.';

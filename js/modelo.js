@@ -266,7 +266,12 @@ const Modelo = (function () {
       console.warn('El documento que llegó es de otra versión de la semilla (' +
         (g.sello || 'sin sello') + ' → ' + Semilla.SELLO + '). Se vuelve a sembrar.');
       sembrar();
-      return true;
+      /* Devuelve `'resembrado'` y no `true` a propósito: quien llamó tiene que
+         poder distinguir «cargué lo que me diste» de «lo tuyo era viejo y
+         volví a sembrar». La sala lo necesita para saber si lo que hay ahora
+         está allá arriba o no. Sigue siendo un valor verdadero, así que los
+         que sólo preguntan «¿pudo?» no cambian. */
+      return 'resembrado';
     }
 
     db = g.db; modificado = !!g.modificado;
