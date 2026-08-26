@@ -236,6 +236,39 @@ const Modelo = (function () {
   function recargarDeDisco() {
     const g = cargar();
     if (!g) return false;
+
+    /* 🔴 EL SELLO TAMBIÉN SE MIRA ACÁ (26-08-2026).
+
+       `iniciar()` compara el sello de la semilla y vuelve a sembrar si el
+       documento guardado es de otra versión. Esa comprobación existe porque
+       Marco pasó un día viendo siete cuentas cuando el sistema ya traía
+       diecinueve. Pero sólo corría AL ARRANCAR, leyendo el almacenamiento de
+       este navegador.
+
+       Desde que existe la sala compartida hay una segunda puerta: la sala
+       escribe el documento y llama acá. Y acá no se miraba nada. Resultado: se
+       publica una versión con datos nuevos, la sala baja el documento viejo, y
+       el sello no se entera. Pasó hoy mismo — se cargaron los once del taller,
+       se publicó, y la pantalla seguía mostrando catorce trabajadores sin un
+       solo error a la vista.
+
+       No alcanza con acordarse de sembrar antes: el que trae los datos viejos
+       es el otro equipo, no éste. La comprobación tiene que estar donde entran
+       los datos, y por acá entran todos.
+
+       ⚠️ Esto PISA lo que hubiera en la sala. Es lo mismo que ya hacía el
+       arranque con el almacenamiento local, y es lo correcto: un documento de
+       otra versión de la semilla no se puede mezclar con ésta. Se avisa en
+       pantalla, que para eso está `porQueSeResembro`. */
+    if (g.sello !== Semilla.SELLO) {
+      resembradoPorVersion = 'Los datos de demostración se actualizaron a la versión nueva ' +
+        'del sistema. Lo que hubiera en la sala compartida se reemplazó.';
+      console.warn('El documento que llegó es de otra versión de la semilla (' +
+        (g.sello || 'sin sello') + ' → ' + Semilla.SELLO + '). Se vuelve a sembrar.');
+      sembrar();
+      return true;
+    }
+
     db = g.db; modificado = !!g.modificado;
     version++; limpiarMemo(); alinearSeqEvento();
     // El documento cambió, aunque no lo haya cambiado nadie de acá: lo escribió
@@ -3600,7 +3633,12 @@ const Modelo = (function () {
   /* Con quién se puede entrar: el equipo activo más el dueño, que no es un
      trabajador del taller sino quien mira todo. */
   function sesionesPosibles() {
-    return db.persona.filter((p) => p.tipo === 'trabajador' && p.activo).map((p) => {
+    /* 🔶 SOLO LOS QUE TIENEN CUENTA. Desde que el taller entró a Personal
+       hay trabajadores sin usuario —encargados de etapa, no usuarios— y sin
+       este filtro la pantalla de ingreso los ofrecía igual: once filas con el
+       nombre y el hueco donde iría el correo, y un botón «entrar» que no podía
+       funcionar. Un botón muerto, que es lo que no se hace acá. */
+    return db.persona.filter((p) => p.tipo === 'trabajador' && p.activo && p.usuario).map((p) => {
       const pr = db.persona_rol.find((x) => x.persona_id === p.id);
       const rol = db.rol.find((r) => r.id === (pr || {}).rol_id) || {};
       return {

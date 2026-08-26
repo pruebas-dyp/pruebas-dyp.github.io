@@ -52,7 +52,11 @@ const Semilla = (function () {
      que no es del taller. Salieron las cinco que habíamos inventado nosotros
      para poder mostrar el sistema: los cuatro puestos del taller y el
      evaluador. */
-  const EQUIPO_DEMO            = 14;
+  /* Fichas de trabajador en la demostración. 🔶 26-08-2026: pasó de 14 a 25 al
+     entrar los once del taller. NO son 25 cuentas: catorce entran al sistema y
+     once son encargados de etapa sin usuario. La distinción importa porque
+     este número sella la semilla y porque «cuántas cuentas hay» es otra cosa. */
+  const EQUIPO_DEMO            = 25;
   const TOTAL_HISTORICO        = 120;  // ~3 entregas diarias (§C.21)
   const ULTIMA_OT              = 23488;// reglas §C.13 — al 12-08-2026
 
@@ -111,7 +115,7 @@ const Semilla = (function () {
      nada. Ese es todo el trabajo de este número. */
   /* 12: la Reportería pasa a ser un permiso RESERVADO, que ningún rol otorga,
      y nace dado a dos cuentas con nombre. */
-  const FORMA_DATOS = 12;
+  const FORMA_DATOS = 13;
   // TEMPARIO_HORA ($10.000, reglas §C.15) se eliminó el 13-08-2026 junto con
   // el tempario entero. La cifra queda medida en `reglas`, no en el sistema.
 
@@ -286,15 +290,14 @@ const Semilla = (function () {
       modulos: ['torre', 'historico', 'personal', 'presupuesto', 'documentos'] },
     /* Nicole es la única jefatura de taller que queda en la lista, así que es
        ella quien da el visto bueno. Andrés también puede: los dos con `ro-2`. */
-    { id: 'pe-t-5', nombre: 'Nicole', apellidos: 'Hernández', rol: 'ro-2',
-      etapas: ['et-1', 'et-5', 'et-8', 'et-9'],
+    { id: 'pe-t-5', nombre: 'Nicole', apellidos: 'Hernández', rol: 'ro-2', etapas: [],
       cargo: 'Jefatura', usuario: 'nicole.hernandez',
       modulos: ['torre', 'historico', 'recepcion', 'taller', 'personal', 'presupuesto',
                 'documentos', 'bodega'] },
-    { id: 'pe-t-6', nombre: 'Iván', apellidos: 'Villalobos', rol: 'ro-1', etapas: [],
+    { id: 'pe-t-6', nombre: 'Iván', apellidos: 'Villalobos', rol: 'ro-1', etapas: ['et-8'],
       cargo: 'Recepción', usuario: 'ivan.villalobos',
       modulos: ['torre', 'historico', 'recepcion', 'taller', 'presupuesto'] },
-    { id: 'pe-t-7', nombre: 'Esteban', apellidos: 'Calvo', rol: 'ro-1', etapas: [],
+    { id: 'pe-t-7', nombre: 'Esteban', apellidos: 'Calvo', rol: 'ro-1', etapas: ['et-8'],
       cargo: 'Recepción', usuario: 'esteban.calvo',
       modulos: ['torre', 'historico', 'recepcion', 'taller', 'presupuesto'] },
     { id: 'pe-t-8', nombre: 'Sheila', apellidos: 'Marín', rol: 'ro-8', etapas: [],
@@ -306,16 +309,13 @@ const Semilla = (function () {
     { id: 'pe-t-10', nombre: 'Cristian', apellidos: 'Vidal', rol: 'ro-1', etapas: [],
       cargo: 'Recepción', usuario: 'cristian.vidal',
       modulos: ['torre', 'historico', 'recepcion', 'taller', 'presupuesto'] },
-    { id: 'pe-t-11', nombre: 'Cristopher', apellidos: 'Zúñiga', rol: 'ro-4',
-      etapas: ['et-6', 'et-8'],
+    { id: 'pe-t-11', nombre: 'Cristopher', apellidos: 'Zúñiga', rol: 'ro-4', etapas: [],
       cargo: 'Bodega', usuario: 'cristopher.zuniga',
       modulos: ['torre', 'historico', 'documentos', 'bodega'] },
-    { id: 'pe-t-12', nombre: 'Nicolás', apellidos: 'Zúñiga', rol: 'ro-4',
-      etapas: ['et-6', 'et-8'],
+    { id: 'pe-t-12', nombre: 'Nicolás', apellidos: 'Zúñiga', rol: 'ro-4', etapas: [],
       cargo: 'Bodega', usuario: 'nicolas.zuniga',
       modulos: ['torre', 'historico', 'documentos', 'bodega'] },
-    { id: 'pe-t-13', nombre: 'Andrés', apellidos: 'Guzmán', rol: 'ro-2',
-      etapas: ['et-1', 'et-5', 'et-8', 'et-9'],
+    { id: 'pe-t-13', nombre: 'Andrés', apellidos: 'Guzmán', rol: 'ro-2', etapas: [],
       cargo: 'Jefe de Recepción', usuario: 'andres.guzman',
       modulos: ['torre', 'historico', 'recepcion', 'taller', 'presupuesto', 'consolidado'] },
 
@@ -330,7 +330,57 @@ const Semilla = (function () {
        Va declarada como lo que es —el cargo lo dice— y con acceso total. */
     { id: 'pe-t-14', nombre: 'Administrador', apellidos: 'Arttmize', rol: 'ro-5', etapas: [],
       cargo: 'Arttmize SpA · puesta en marcha', usuario: 'administrador',
-      modulos: MODULOS_TODOS }
+      modulos: MODULOS_TODOS },
+
+    /* ── EL TALLER ────────────────────────────────────────────────────────
+       🔴 26-08-2026. Hasta hoy el modelo no tenía un solo operario y cuatro
+       etapas —Desabolladura, Preparación, Pintura y Terminación— no tenían a
+       NADIE habilitado. Las órdenes de demostración que estaban en esas etapas
+       salían «Sin Asignar», que es exactamente lo que no pasa en el taller.
+
+       Estos once salen de las ocho capturas del sistema actual que dejó Marco
+       en `010 Etapas`: los desplegables «Seleccionar encargado» de cada etapa,
+       uno por uno. No están inventados y no están interpretados.
+
+       ⚠️ DOS COSAS QUE SE COPIAN TAL CUAL, A PROPÓSITO:
+
+         · LOS NOMBRES VAN COMO LOS ESCRIBE SU SISTEMA, sin tildes y con el
+           apodo adentro («Carlos (Beto) Rodriguez»). Corregirlos por mi cuenta
+           haría que el papel y su pantalla dejaran de decir lo mismo, y el
+           día que alguien busque «Vicitacion» no lo encuentre.
+         · NO TIENEN CUENTA. `sinCuenta` los deja sin usuario y sin clave: hoy
+           en el sistema actual son ENCARGADOS —salen en el desplegable de una
+           etapa— y de ahí no se deduce que entren al sistema. Marco todavía no
+           lo confirma. Ponerles una cuenta es agregarles el usuario y volver a
+           sembrar; sacársela después es más caro. */
+    { id: 'pe-t-15', nombre: 'Jose', apellidos: 'Castillo', rol: 'ro-3', sinCuenta: true,
+      cargo: 'Operario de taller', etapas: ['et-1', 'et-2', 'et-5'] },
+    { id: 'pe-t-16', nombre: 'Clever Vicitacion', apellidos: 'Ramirez Mendoza', rol: 'ro-3',
+      sinCuenta: true, cargo: 'Operario de taller', etapas: ['et-1', 'et-2', 'et-5'] },
+    { id: 'pe-t-17', nombre: 'Moises Benjamin', apellidos: 'Avendaño Rojas', rol: 'ro-3',
+      sinCuenta: true, cargo: 'Operario de taller', etapas: ['et-1', 'et-2', 'et-5'] },
+    { id: 'pe-t-18', nombre: 'Gustavo', apellidos: 'Herrera', rol: 'ro-3', sinCuenta: true,
+      cargo: 'Operario de taller', etapas: ['et-1', 'et-2', 'et-5'] },
+    { id: 'pe-t-19', nombre: 'Juan Cupertino', apellidos: 'Mora', rol: 'ro-3', sinCuenta: true,
+      cargo: 'Operario de taller', etapas: ['et-1', 'et-2', 'et-5'] },
+    { id: 'pe-t-20', nombre: 'Jeronimo', apellidos: 'Hernandez', rol: 'ro-3', sinCuenta: true,
+      cargo: 'Operario de taller', etapas: ['et-1', 'et-2', 'et-5'] },
+    /* David es el único del grupo que NO está en Desabolladura. No es un olvido
+       de la captura: su desplegable lo muestra en Desarme y en Armado, y no en
+       Desabolladura. */
+    { id: 'pe-t-21', nombre: 'David Ulises', apellidos: 'Milla Caviedes', rol: 'ro-3',
+      sinCuenta: true, cargo: 'Operario de taller', etapas: ['et-1', 'et-5'] },
+    /* Los tres de la línea de pintura: preparan, pintan y terminan. */
+    { id: 'pe-t-22', nombre: 'Carlos (Beto)', apellidos: 'Rodriguez', rol: 'ro-3',
+      sinCuenta: true, cargo: 'Operario de taller', etapas: ['et-3', 'et-4', 'et-7'] },
+    { id: 'pe-t-23', nombre: 'Luis Fernando', apellidos: 'Arroyave Nuñez', rol: 'ro-3',
+      sinCuenta: true, cargo: 'Operario de taller', etapas: ['et-3', 'et-4', 'et-7'] },
+    { id: 'pe-t-24', nombre: 'Felipe', apellidos: 'Miranda Vasquez', rol: 'ro-3',
+      sinCuenta: true, cargo: 'Operario de taller', etapas: ['et-3', 'et-4', 'et-7'] },
+    /* Mecánica la hace uno solo. Si se va de vacaciones, el taller no tiene a
+       quién asignarle una mecánica: eso lo dice el dato, no yo. */
+    { id: 'pe-t-25', nombre: 'Julio Alexis', apellidos: 'Reyes Orellana', rol: 'ro-3',
+      sinCuenta: true, cargo: 'Operario de taller', etapas: ['et-6'] },
   ];
 
   /* Quién reparte y quién da el visto bueno en los datos de demostración.
@@ -849,9 +899,14 @@ const Semilla = (function () {
          apuntando a otra. */
       const id = x.id;
       const corto = x.usuario || sinTildes(x.nombre);
+      /* 🔶 QUIEN NO ENTRA AL SISTEMA NO TIENE CUENTA. Los once del taller son
+         encargados de etapa, no usuarios: salen en «Asignar etapas» y en
+         Personal, y no en la pantalla de ingreso. Darles un usuario que nadie
+         pidió sería inventar trece cuentas de más y contarlas como si fueran
+         del cliente. */
       persona.push({
         id, tipo: 'trabajador', ficha: 1001 + i, rut: rutFalso(i + 1),
-        usuario: corto + '@dyp.cl',
+        usuario: x.sinCuenta ? null : corto + '@dyp.cl',
         /* 🔷 UNA SOLA CLAVE PARA TODOS (17-08-2026, Marco: "de momento todos
            entren con la contraseña dyp2026"). Antes cada cuenta tenía la suya
            —`nombre` + 2026— y para probar el sistema con catorce cuentas había
@@ -865,10 +920,10 @@ const Semilla = (function () {
            documento entero sube a la sala compartida y la sala se lee sin
            cuenta: mientras acá decía `clave: CLAVE_DEMO`, un GET devolvía las
            catorce claves legibles. El porqué completo está en `Reglas`. */
-        clave_hash: Reglas.claveHash(id, CLAVE_DEMO),
-        clave_inicial: true,
+        clave_hash: x.sinCuenta ? null : Reglas.claveHash(id, CLAVE_DEMO),
+        clave_inicial: !x.sinCuenta,
         nombres: x.nombre, apellidos: x.apellidos || '', cargo: x.cargo,
-        correo: corto + '@dyp.cl',
+        correo: x.sinCuenta ? null : corto + '@dyp.cl',
         telefono: '+56 9 0000 ' + String(1001 + i).slice(-4),
         direccion: 'Dirección de ejemplo ' + (100 + i), comuna: 'Comuna de ejemplo',
         /* A qué módulos entra. `null` no es "a ninguno": es "los que su rol

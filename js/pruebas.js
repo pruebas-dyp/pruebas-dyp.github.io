@@ -2213,6 +2213,116 @@ const Pruebas = (function () {
         });
       })();
 
+      /* 🔴 QUIÉN HACE CADA ETAPA, CLAVADO CONTRA EL SISTEMA ACTUAL (26-08-2026).
+
+         Marco mandó ocho capturas del sistema que usan hoy —el desplegable
+         «Seleccionar encargado» de cada etapa— y esto es la transcripción.
+         No es una preferencia de diseño: es el dato del cliente, y si alguien
+         edita la semilla y se lleva a alguien por delante, el taller se queda
+         sin a quién asignarle esa etapa y nadie se entera hasta que un jefe
+         abre «Asignar etapas» y encuentra el desplegable vacío.
+
+         ⚠️ LA PRUEBA FIJA LOS NOMBRES, UNO POR UNO. Contar cuántos hay no
+         sirve: cambiar a una persona por otra deja el número igual. */
+      (function () {
+        const ESPERADO = {
+          'Desarme': ['Jose Castillo', 'Clever Vicitacion Ramirez Mendoza',
+            'Moises Benjamin Avendaño Rojas', 'Gustavo Herrera', 'Juan Cupertino Mora',
+            'Jeronimo Hernandez', 'David Ulises Milla Caviedes'],
+          'Desabolladura': ['Jose Castillo', 'Clever Vicitacion Ramirez Mendoza',
+            'Moises Benjamin Avendaño Rojas', 'Gustavo Herrera', 'Juan Cupertino Mora',
+            'Jeronimo Hernandez'],
+          'Preparación': ['Carlos (Beto) Rodriguez', 'Luis Fernando Arroyave Nuñez',
+            'Felipe Miranda Vasquez'],
+          'Pintura': ['Carlos (Beto) Rodriguez', 'Luis Fernando Arroyave Nuñez',
+            'Felipe Miranda Vasquez'],
+          'Armado': ['Jose Castillo', 'Clever Vicitacion Ramirez Mendoza',
+            'Moises Benjamin Avendaño Rojas', 'Gustavo Herrera', 'Juan Cupertino Mora',
+            'Jeronimo Hernandez', 'David Ulises Milla Caviedes'],
+          'Mecánica': ['Julio Alexis Reyes Orellana'],
+          'Terminación': ['Carlos (Beto) Rodriguez', 'Luis Fernando Arroyave Nuñez',
+            'Felipe Miranda Vasquez'],
+          'Control de calidad': ['Iván Villalobos', 'Esteban Calvo']
+        };
+
+        const bd = Modelo.base();
+        const problemas = [];
+        Object.keys(ESPERADO).forEach((nombre) => {
+          const e = bd.etapa.find((x) => x.nombre === nombre);
+          if (!e) { problemas.push('no existe la etapa «' + nombre + '»'); return; }
+          const tiene = bd.persona_etapa.filter((x) => x.etapa_id === e.id).map((x) => {
+            const p = bd.persona.find((y) => y.id === x.persona_id) || {};
+            return ((p.nombres || '') + ' ' + (p.apellidos || '')).trim();
+          });
+          const faltan = ESPERADO[nombre].filter((n) => tiene.indexOf(n) < 0);
+          const sobran = tiene.filter((n) => ESPERADO[nombre].indexOf(n) < 0);
+          if (faltan.length) problemas.push(nombre + ' perdió a ' + faltan.join(', '));
+          if (sobran.length) problemas.push(nombre + ' tiene de más a ' + sobran.join(', '));
+        });
+
+        push({
+          nombre: '🔴 Cada etapa la hace quien la hace en el sistema actual',
+          intento: 'Comparar los habilitados de las 8 etapas contra las capturas de Marco',
+          esperado: 'Los mismos nombres, etapa por etapa',
+          paso: problemas.length === 0,
+          detalle: problemas.length ? problemas.join(' · ')
+            : 'Las 8 etapas calzan · ' +
+              Object.keys(ESPERADO).map((n) => n + ' ' + ESPERADO[n].length).join(', ')
+        });
+      })();
+
+      /* 🔴 Y QUE NINGUNA ETAPA QUEDE SIN A QUIÉN ASIGNARLE.
+
+         Va aparte de la de arriba a propósito: aquélla dice QUIÉNES son, ésta
+         dice que el taller puede funcionar. Si mañana el cliente cambia la
+         lista, la de arriba hay que actualizarla —es dato suyo—; ésta no se
+         toca nunca, porque una etapa sin nadie es un vehículo que no avanza.
+
+         Entrega queda fuera: en el sistema actual esa fila no tiene
+         desplegable ni casilla, así que no se asigna a nadie. */
+      (function () {
+        const bd = Modelo.base();
+        const SIN_ENCARGADO = ['Entrega'];
+        const vacias = bd.etapa
+          .filter((e) => e.vigente && SIN_ENCARGADO.indexOf(e.nombre) < 0)
+          .filter((e) => !bd.persona_etapa.some((x) => x.etapa_id === e.id))
+          .map((e) => e.nombre);
+
+        push({
+          nombre: '🔴 Ninguna etapa del taller se queda sin a quién asignarle',
+          intento: 'Recorrer las etapas vigentes y mirar si alguna no tiene habilitados',
+          esperado: 'Ninguna vacía (salvo Entrega, que no se asigna)',
+          paso: vacias.length === 0,
+          detalle: vacias.length
+            ? 'Sin nadie: ' + vacias.join(', ') + '. El jefe de taller abre «Asignar etapas» y el desplegable sale vacío'
+            : 'Las ' + (bd.etapa.filter((e) => e.vigente).length - 1) + ' etapas asignables tienen gente'
+        });
+      })();
+
+      /* 🔶 Y QUIEN NO TIENE CUENTA NO SE OFRECE PARA ENTRAR.
+
+         Los once del taller están en Personal pero no son usuarios. Sin esto
+         la pantalla de ingreso los listaba igual, con el correo en blanco y un
+         botón «entrar» que no podía funcionar. */
+      (function () {
+        const bd = Modelo.base();
+        const sinCuenta = bd.persona.filter((p) => p.tipo === 'trabajador' && !p.usuario);
+        const ofrecidos = Modelo.sesionesPosibles();
+        const colados = ofrecidos.filter((x) => !x.usuario);
+
+        push({
+          nombre: '🔶 La pantalla de ingreso no ofrece cuentas que no existen',
+          intento: 'Pedir las sesiones posibles con ' + sinCuenta.length + ' trabajadores sin usuario',
+          esperado: 'Sólo los que tienen cuenta de verdad',
+          paso: sinCuenta.length > 0 && colados.length === 0,
+          detalle: !sinCuenta.length
+            ? 'No hay trabajadores sin cuenta: el caso no se pudo probar'
+            : (colados.length
+              ? 'Se colaron ' + colados.length + ' sin usuario: serían botones muertos'
+              : 'Ofrece ' + ofrecidos.length + ' y deja fuera a los ' + sinCuenta.length + ' del taller')
+        });
+      })();
+
       /* 🔴 NADIE PINTA LA TORRE ENCIMA DE UNA FICHA (26-08-2026, Marco).
 
          «Hago doble clic para visualizar la info de esa OT y me vuelve a la
@@ -3040,6 +3150,103 @@ const Pruebas = (function () {
          no entraba, y sí entraba — lo que pasaba es que se estaba contando en
          el `db` viejo. Lo que se ve no falla; lo que se mide, sí. */
 
+      /* 🔴 LA SALA NO PUEDE TRAER DATOS DE OTRA VERSIÓN (26-08-2026).
+
+         El sello de la semilla existe desde que Marco pasó un día viendo siete
+         cuentas con el sistema ya en diecinueve. Pero se miraba SÓLO al
+         arrancar, sobre el almacenamiento de este navegador.
+
+         La sala compartida abrió una segunda puerta y ahí no había nadie
+         mirando: se publican datos nuevos, la sala baja el documento viejo, y
+         la pantalla muestra lo anterior sin un solo error. Pasó hoy: entraron
+         los once del taller, se sembró, y la Personal seguía en catorce.
+
+         ⚠️ LA PRUEBA ENSUCIA EL ALMACENAMIENTO Y LO DEJA COMO ESTABA. Va acá,
+         al final, junto a la otra que reemplaza el `db` del modelo, y por el
+         mismo motivo: lo que corra después estaría midiendo otro objeto. */
+      (function () {
+        const nombreP = '🔴 Un documento de otra versión de la semilla se vuelve a sembrar';
+        let crudo = null;
+        try { crudo = localStorage.getItem(Modelo.CLAVE); } catch (e) { crudo = null; }
+        if (!crudo) {
+          push({ nombre: nombreP, intento: 'Leer el documento guardado',
+            esperado: 'Hay uno', paso: false, detalle: 'No hay almacenamiento' });
+          return;
+        }
+
+        let detalle = '', paso = false;
+        try {
+          const doc = JSON.parse(crudo);
+
+          /* ⚠️ SE MIRA EL MODELO, NO EL DISCO. La primera versión de esta prueba
+             comprobaba que el documento guardado quedara con el sello nuevo, y
+             fallaba siempre — con el arreglo funcionando perfecto.
+
+             El motivo: TODA la suite corre dentro de `Modelo.sandbox()`, que
+             cambia `guardar` por un simulacro que no escribe nada. Es a
+             propósito y está bien: las pruebas no pueden ensuciar los datos de
+             quien está usando el sistema. Pero significa que en una prueba el
+             disco NUNCA cambia, y cualquier afirmación sobre él es falsa aunque
+             el sistema haga lo correcto.
+
+             Lo que sí se puede afirmar acá dentro es lo que importa: que el
+             modelo volvió a la semilla y que lo dijo. */
+          /* ⚠️ Y SE LE PONE UNA MARCA AL DOCUMENTO VIEJO. Contar trabajadores no
+             distingue nada: adentro del sandbox la base YA es la semilla, así
+             que sembrar de nuevo la deja igual. Se comprobó rompiéndolo a
+             propósito —«detecta el sello pero no siembra»— y la prueba pasaba
+             igual. La marca sólo sobrevive si el documento viejo se cargó tal
+             cual; si de verdad se volvió a sembrar, no está. */
+          const MARCA = 'pe-marca-del-documento-viejo';
+          /* Y UNA SEGUNDA MARCA, ÉSTA EN MEMORIA. Con una sola no alcanzaba: la
+             mutación «detecta el sello pero no siembra» no carga el documento
+             viejo NI vuelve a sembrar —deja la base como estaba— y la marca del
+             documento tampoco aparecía, así que la prueba pasaba igual.
+
+             Las dos juntas cierran las tres salidas:
+               · si cargó el documento viejo  → aparece MARCA
+               · si no hizo nada              → sigue MARCA_MEM
+               · si sembró de verdad          → no está ninguna de las dos */
+          const MARCA_MEM = 'pe-marca-en-memoria';
+          Modelo.base().persona.push({ id: MARCA_MEM, tipo: 'trabajador', nombres: 'Marca',
+            apellidos: 'en memoria', activo: false, demo: true });
+
+          doc.sello = 'sello-de-otra-version';
+          doc.db.persona.push({ id: MARCA, tipo: 'trabajador', nombres: 'Marca',
+            apellidos: 'del documento viejo', activo: false, demo: true });
+          localStorage.setItem(Modelo.CLAVE, JSON.stringify(doc));
+
+          const ok = Modelo.recargarDeDisco();
+          const quedaMarca = Modelo.base().persona.some((x) => x.id === MARCA);
+          const quedaEnMemoria = Modelo.base().persona.some((x) => x.id === MARCA_MEM);
+          const ahora = Modelo.base().persona.filter((x) => x.tipo === 'trabajador').length;
+          const aviso = Modelo.porQueSeResembro();
+
+          paso = ok === true && !quedaMarca && !quedaEnMemoria && !!aviso;
+          detalle = ok !== true
+            ? 'recargarDeDisco devolvió ' + ok + ': ni siquiera leyó el documento'
+            : (quedaMarca
+              ? 'Cargó el documento viejo tal cual: la marca sigue adentro. La pantalla mostraría datos de otra versión'
+              : (quedaEnMemoria
+                ? 'No volvió a sembrar: avisó y dejó la base como estaba, así que el aviso miente'
+                : (!aviso
+                ? 'Sembró de nuevo pero no lo dijo: el usuario ve cambiar los datos sin explicación'
+                  : 'Detecta el sello ajeno, vuelve a sembrar y lo avisa · ' + ahora + ' trabajadores')));
+        } catch (e) {
+          detalle = 'reventó: ' + e.message;
+        } finally {
+          // Se deja exactamente como estaba, pase lo que pase.
+          try { localStorage.setItem(Modelo.CLAVE, crudo); Modelo.recargarDeDisco(); } catch (e) { /* nada */ }
+        }
+
+        push({
+          nombre: nombreP,
+          intento: 'Sellar el documento guardado como de otra versión y recargar de disco',
+          esperado: 'Se da cuenta, vuelve a sembrar y lo dice en pantalla',
+          paso: paso, detalle: detalle
+        });
+      })();
+
       /* 🔴 SIS-2 · PISAR LO DE OTRO EQUIPO YA NO ES SILENCIOSO (23-08-2026).
 
          La prueba llama a `Sala.aplicar()`, que es la función que de verdad
@@ -3267,13 +3474,19 @@ const Pruebas = (function () {
          Al dejar sólo las trece cuentas de la lista de Andrés se fueron las
          que habíamos inventado para el piso —«Desabolladura», «Pintura»—, y
          con ellas quedaron CUATRO de las nueve etapas sin ninguna cuenta que
-         las tenga habilitadas. No es un defecto del modelo: es lo que dice la
-         nómina, porque quien pinta y quien desabolla no tiene cuenta en el
-         sistema. Se cuenta para que sea un número y no una impresión, y para
-         que el día que el taller cree esas cuentas se vea bajar. */
+         las tenga habilitadas.
+
+         🔶 26-08-2026: BAJÓ DE 4 A 1, que es de lo que se trataba. Marco mandó
+         las ocho capturas del sistema actual con el desplegable de encargados
+         de cada etapa, y con eso entraron los once del taller. Desabolladura,
+         Preparación, Pintura y Terminación pasaron a tener gente.
+
+         La que queda es ENTREGA, y queda a propósito: en el sistema actual esa
+         fila no tiene casilla ni desplegable, así que no se le asigna a nadie.
+         Si algún día baja a 0 hay que preguntarse quién la llenó y por qué. */
       ['Etapas del taller que ninguna cuenta puede hacer',
         db.etapa.filter((e) =>
-          !db.persona_etapa.some((h) => h.etapa_id === e.id)).length, 4],
+          !db.persona_etapa.some((h) => h.etapa_id === e.id)).length, 1],
 
       /* 🔴 QUE LA TASA DE DEVOLUCIONES NO SALGA PLANA. Es la cuarta vez
          que aparece la misma trampa: un dato sembrado repartido con un `%`
