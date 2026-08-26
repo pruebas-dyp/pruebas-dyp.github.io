@@ -127,11 +127,17 @@ svg.ico.g { width: 16px; height: 16px; flex-basis: 16px; }
 .app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
 /* Barra de menú superior */
+/* El alto va en una variable porque NO es sólo el alto de la barra: es dónde
+   empieza el cajón del celular y dónde empieza su velo. Escrito como número en
+   los tres sitios, el primer ajuste de la barra deja el cajón montado encima o
+   con una franja muerta debajo. */
+:root { --alto-barra: 48px; }
 .barra-menu {
   display: flex; align-items: center; gap: 2px;
   background: var(--menu-bg); color: var(--menu-texto);
   border-bottom: 1px solid var(--borde);
-  padding: 0 10px; height: 48px; flex: 0 0 48px; user-select: none;
+  padding: 0 10px; height: var(--alto-barra); flex: 0 0 var(--alto-barra);
+  user-select: none;
 }
 .barra-menu .prod {
   display: flex; align-items: center; gap: 7px; font-weight: 600; color: #fff;
@@ -1235,8 +1241,24 @@ body.nav-abierta .btn-nav .rayas { background: transparent; }
 body.nav-abierta .btn-nav .rayas::before { top: 0; transform: rotate(45deg); }
 body.nav-abierta .btn-nav .rayas::after { top: 0; transform: rotate(-45deg); }
 
+/* 🔴 EL VELO NO TAPA LA BARRA DE ARRIBA (26-08-2026, Marco: «mira cómo se
+   ve»). Decía `inset: 0`, o sea de la esquina a la esquina, y con el cajón
+   encima la barra quedaba amputada: el logo y el botón de módulos escondidos
+   detrás del cajón, y a la derecha «Clave / Salir / Oscuro» flotando sin nada
+   al lado. Y el botón de módulos es el que se convierte en ✕ para cerrar: el
+   único cierre a la vista estaba tapado por lo que tenía que cerrar.
+
+   Ahora la barra queda entera y encima de todo. El cajón cuelga de ella. */
 .velo-nav {
-  position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, .5);
+  position: fixed; top: var(--alto-barra); left: 0; right: 0; bottom: 0;
+  z-index: 60;
+  /* 🔶 .72 y no .5. Medido: con .5 cada píxel de atrás queda EXACTAMENTE a
+     la mitad (34,39,44 → 17,19,22), y sobre el tema oscuro la mitad de casi
+     negro se sigue leyendo perfecto. El resultado era que la franja de la
+     derecha —tarjetas cortadas a media palabra— competía con el menú en vez de
+     quedarse atrás. En el tema claro .5 alcanzaba de sobra; el que manda es el
+     oscuro, que es el que Marco usa en el teléfono. */
+  background: rgba(0, 0, 0, .72);
 }
 .velo-nav[hidden] { display: none; }
 /* El rótulo corto de un botón sólo aparece en pantalla chica. */
@@ -1268,11 +1290,17 @@ body.sin-desplazar { overflow: hidden; }
      HTML y el mismo JavaScript: un segundo menú sólo para el teléfono se
      habría desincronizado del de escritorio en la primera semana. */
   .sidebar {
-    position: fixed; top: 0; bottom: 0; left: 0; z-index: 70;
+    /* Cuelga de la barra, no la tapa: `top` es el alto de la barra, el mismo
+       número que ella usa. Así el logo se sigue viendo y el botón de módulos
+       —que abierto es una ✕— queda a la mano para cerrar. */
+    position: fixed; top: var(--alto-barra); bottom: 0; left: 0; z-index: 70;
     width: 264px; flex-basis: 264px; max-width: 82vw;
     transform: translateX(-102%); transition: transform .18s ease;
-    box-shadow: 4px 0 22px rgba(0, 0, 0, .38);
-    padding-top: env(safe-area-inset-top, 0);
+    /* El borde importa tanto como la sombra: los dos fondos se parecen
+       demasiado —#11161c el cajón, #0e1116 la página— y sin una línea el cajón
+       no se leía como una capa aparte, sino como parte de la misma pantalla. */
+    border-right: 1px solid var(--borde);
+    box-shadow: 6px 0 26px rgba(0, 0, 0, .55);
   }
   body.nav-abierta .sidebar { transform: translateX(0); }
   /* Plegar y arrastrar son gestos de escritorio: en un cajón no significan
@@ -1308,7 +1336,12 @@ body.sin-desplazar { overflow: hidden; }
   /* La barra de arriba se queda con lo imprescindible: el botón de módulos,
      el logo y quién está adentro. Los botones de sesión bajan al pie del
      cajón, donde hay sitio para tocarlos. */
-  .barra-menu { padding: 0 6px; gap: 0; height: 52px; flex-basis: 52px; }
+  /* Cambia la variable, no el alto: así el cajón y su velo bajan con ella. */
+  :root { --alto-barra: 52px; }
+  .barra-menu { padding: 0 6px; gap: 0; }
+  /* Un poco más ancho: deja la franja de atrás en 90 px en vez de 126, que es
+     donde las tarjetas se cortaban a media palabra y ensuciaban la pantalla. */
+  .sidebar { width: 288px; flex-basis: 288px; max-width: 86vw; }
   .barra-menu .prod { padding-right: 8px; margin-right: 4px; border-right: none; font-size: 0; }
   .barra-menu .prod img.logo { height: 30px; padding: 2px 5px; }
   .barra-menu .der { gap: 6px; }
