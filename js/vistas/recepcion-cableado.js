@@ -125,10 +125,26 @@ function pRecepcion() {
         if (pista) pista.textContent = recAyudaLargo(el.dataset.rec);
       }
 
+      /* Autocompletar. NO se consulta tecla a tecla: `recBuscarPor` sale
+         antes si el identificador no está completo — ver por qué en su
+         cabecera. */
+      if (el.dataset.rec === 'rut' || el.dataset.rec === 'patente') recBuscarPor(el.dataset.rec);
+
       recDesmarcar(el, el.dataset.rec);
       guardarBorrador();
     }));
   // Los desplegables sí repintan: marca cambia la lista de modelos.
+  /* Y al SALIR del campo, que es el otro momento en que el identificador
+     está completo: quien pega un RUT desde un correo no dispara un `input` por
+     carácter, y quien escribe la patente y se va con el tabulador tampoco. */
+  ['rut', 'patente'].forEach((clave) => {
+    const campo = document.querySelector('input[data-rec="' + clave + '"]');
+    if (campo) campo.addEventListener('blur', () => recBuscarPor(clave));
+  });
+
+  document.querySelectorAll('[data-deshacer-traido]').forEach((b) =>
+    b.addEventListener('click', () => recDeshacerTraido(b.dataset.deshacerTraido)));
+
   document.querySelectorAll('select[data-rec]').forEach((el) => el.addEventListener('change', () => {
     r.campos[el.dataset.rec] = el.value;
     if (el.dataset.rec === 'marca_id') r.campos.modelo_id = '';
@@ -456,6 +472,187 @@ function recIrAVerificar() {
   r.paso = 'verificar'; r.marcados = [];
   guardarBorrador(); render();
   avisar({ ok: true, motivo: '' }, 'Todo completo. Revisa el resumen antes de ingresar la recepción.');
+}
+
+/* ══ AUTOCOMPLETAR POR IDENTIFICADOR COMPLETO ═════════════════════════════
+   Pedido del cliente el 26-08-2026: al escribir un RUT que ya existe, que
+   traiga los datos de ese cliente; al escribir una patente registrada, los del
+   vehículo.
+
+   🔴 NO SE CONSULTA TECLA A TECLA, Y NO ES UN DETALLE DE IMPLEMENTACIÓN.
+
+   Un autocompletar que sugiere mientras se escribe deja recorrer el padrón
+   entero probando prefijos, y el padrón de este cliente son 6.518 personas con
+   RUT, teléfono y domicilio. Es el hallazgo DP-3 de la auditoría — sería
+   nuestro si lo construyéramos así. Acá se sale antes si el identificador no
+   está completo, el motor exige coincidencia exacta y devuelve UNA fila o
+   ninguna. Quien no sabe el RUT entero no saca nada.
+
+   🔴 EL RUT Y LA PATENTE SON BÚSQUEDAS INDEPENDIENTES. Un auto se vende: la
+   misma patente puede volver con otro dueño, y el mismo cliente puede traer
+   autos distintos. Encontrar el vehículo NO rellena el cliente y encontrar al
+   cliente NO rellena el vehículo. Dos consultas, dos resultados, sin cruzarse.
+
+   🔴 SE AUTOCOMPLETA LA IDENTIDAD, NUNCA LA CONDICIÓN. Marca, modelo, color,
+   año y VIN son lo que el auto ES. Kilometraje, combustible, el inventario de
+   los 28 ítems y las marcas de la silueta son cómo LLEGÓ HOY, y ésos se leen
+   mirando el auto. Un checklist que llega premarcado no lo revisa nadie, y es
+   exactamente lo que el cliente firma. El paso 3 tampoco se toca: siniestro,
+   deducible y liquidador son de ESTA orden, no del vehículo.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Rellena SOLO los campos vacíos y devuelve cuáles llenó. Lo que el
+   recepcionista ya escribió no se pisa nunca: si vino escribiendo el teléfono
+   nuevo del cliente, el del padrón no se lo borra. */
+function recRellenarVacios(pares) {
+  const r = rec();
+  const llenados = [];
+  Object.keys(pares).forEach((clave) => {
+    const valor = pares[clave];
+    if (valor === '' || valor == null) return;
+    if (String(r.campos[clave] == null ? '' : r.campos[clave]).trim() !== '') return;
+    r.campos[clave] = valor;
+    llenados.push(clave);
+  });
+  return llenados;
+}
+
+/* Suelta lo que trajo una búsqueda anterior, sin avisar ni repintar: lo usa
+   `recBuscarPor` cuando el identificador cambió, y `recDeshacerTraido` cuando
+   lo pide el usuario. */
+function recSoltarTraido(clave) {
+  const r = rec();
+  const t = r.traido[clave];
+  if (!t) return;
+  (t.llenados || []).forEach((c) => {
+    r.campos[c] = '';
+    if (r.textos && r.textos[c] != null) r.textos[c] = '';
+  });
+  r.traido[clave] = null;
+}
+
+/* Deshacer devuelve los campos a vacío, que es exactamente como estaban: solo
+   se rellenan los que lo estaban, así que no hay nada del usuario que perder. */
+function recDeshacerTraido(clave) {
+  if (!rec().traido[clave]) return;
+  // Los combos guardan aparte el texto escrito; si no se limpia, el campo
+  // sigue mostrando «CHERY» con el id ya borrado. Lo hace `recSoltarTraido`.
+  recSoltarTraido(clave);
+  rec().buscado[clave] = '';
+  guardarBorrador();
+  render();
+  avisar({ ok: true, motivo: '' }, 'Se deshizo el relleno. Los campos volvieron a quedar vacíos.');
+}
+
+function recBuscarPor(clave) {
+  const r = rec();
+  const valor = String(r.campos[clave] || '');
+
+  /* El corte que hace que esto sea una ayuda y no una fuga: sin identificador
+     completo no se consulta nada. El RUT pasa además por su dígito verificador
+     —`Modelo.rutValido`— y la patente tiene que tener sus seis caracteres. */
+  const completo = clave === 'rut'
+    ? Modelo.rutValido(valor)
+    : normalizarPatente(valor).length === PATENTE_LARGO;
+
+  if (!completo) {
+    // Se borró o se corrigió: el hallazgo anterior ya no corresponde.
+    if (r.traido[clave]) { r.traido[clave] = null; r.buscado[clave] = ''; render(); }
+    return;
+  }
+  /* Ya se consultó este mismo identificador: no se repite ni se repinta. El
+     guardia vive en el BORRADOR —`r.buscado`— y no en una variable del módulo,
+     para que descartar el borrador también lo olvide. */
+  if (r.buscado[clave] === valor) return;
+  r.buscado[clave] = valor;
+
+  /* 🔴 LO TRAÍDO POR EL IDENTIFICADOR ANTERIOR SE VA PRIMERO. Si alguien
+     escribe una patente, se le trae el auto, y después corrige la patente
+     porque se equivocó en un carácter, la marca y el VIN del OTRO auto se
+     quedaban puestos: los campos ya no estaban vacíos, así que la regla de «no
+     pisar lo escrito» los protegía — protegiendo un dato que no era de nadie.
+
+     Se limpia solo lo que trajo el sistema. Lo que escribió el recepcionista a
+     mano no se toca nunca, que es la misma regla mirada al derecho. */
+  recSoltarTraido(clave);
+
+  const hallado = clave === 'rut' ? recTraerCliente(valor) : recTraerVehiculo(valor);
+
+  /* 🔶 SIN COINCIDENCIA NO PASA NADA, y sin alarma: un cliente nuevo o un auto
+     que entra por primera vez es el caso NORMAL, no un error. */
+  r.traido[clave] = hallado;
+  guardarBorrador();
+  recRepintarConservandoFoco(clave);
+}
+
+function recTraerCliente(rut) {
+  const c = Modelo.cliente_por_rut(rut);
+  if (!c) return null;
+  const llenados = recRellenarVacios({
+    nombre: c.nombre, telefono: c.telefono, correo: c.correo, direccion: c.direccion
+  });
+  return { tipo: 'cliente', nombre: c.nombre, llenados };
+}
+
+function recTraerVehiculo(patente) {
+  const v = Modelo.vehiculo_por_patente(patente);
+  if (!v) return null;
+
+  /* 🔶 EL VIN QUE NO CALZA SE AVISA (§7 del encargo). Si el vehículo está
+     registrado con otro VIN, o la patente está mal digitada o hay algo que no
+     cuadra — y las dos cosas conviene verlas ANTES de crear la orden, no
+     después. No se corrige solo: se dice y decide una persona. */
+  const vinEscrito = normalizarVin(rec().campos.vin || '');
+  const avisoVin = (vinEscrito && v.vehiculo.vin && vinEscrito !== v.vehiculo.vin)
+    ? 'Ojo: este vehículo está registrado con el VIN ' + v.vehiculo.vin + ', y acá dice ' +
+      vinEscrito + '. Revisa cuál corresponde antes de seguir.'
+    : '';
+
+  /* CASO 3 · Ya tiene una orden abierta. Hoy esto se descubre recién AL
+     GUARDAR, con el formulario entero lleno; detectarlo en el campo de la
+     patente le ahorra al recepcionista los otros cuatro pasos.
+
+     No se rellena nada: si no se puede crear la orden, completar el formulario
+     es trabajo perdido. */
+  if (v.otAbierta) {
+    return { tipo: 'ocupada', patente: v.vehiculo.patente, numeroOT: v.otAbierta.numeroOT,
+             estadoNombre: v.otAbierta.estadoNombre, avisoVin };
+  }
+
+  // CASO 2 · Existe y está libre: se trae lo que el auto ES.
+  const llenados = recRellenarVacios({
+    marca_id: v.vehiculo.marca_id, modelo_id: v.vehiculo.modelo_id,
+    color_id: v.vehiculo.color_id, anio: v.vehiculo.anio, vin: v.vehiculo.vin
+  });
+  /* Los combos muestran el NOMBRE y guardan el id: hay que dejar los dos, o el
+     campo queda en blanco con la marca ya elegida por dentro. */
+  const r = rec();
+  if (llenados.indexOf('marca_id') >= 0) r.textos.marca_id = v.vehiculo.marca;
+  if (llenados.indexOf('modelo_id') >= 0) r.textos.modelo_id = v.vehiculo.modelo;
+  if (llenados.indexOf('color_id') >= 0) r.textos.color_id = v.vehiculo.color;
+
+  const ult = v.ultimasOrdenes[0];
+  const resumen = v.visitas === 1
+    ? 'estuvo 1 vez, en ' + fFechaHora(ult.fechaIngreso)
+    : 'estuvo ' + v.visitas + ' veces, la última en ' + fFechaHora(ult.fechaIngreso);
+
+  return { tipo: 'vehiculo', resumen, llenados, avisoVin };
+}
+
+/* Repintar y devolver el cursor donde estaba. Rellenar cambia varios campos
+   —incluidos los combos, que guardan el texto por separado— así que repintar
+   es lo único que deja la pantalla coherente. Pero un `render()` a secas le
+   saca el cursor al que está escribiendo, así que se lo devuelve al mismo
+   campo y al final del texto. */
+function recRepintarConservandoFoco(clave) {
+  const activo = document.activeElement;
+  const teniaFoco = activo && activo.dataset && activo.dataset.rec === clave;
+  render();
+  if (!teniaFoco) return;
+  const el = document.querySelector('input[data-rec="' + clave + '"]');
+  if (!el) return;
+  el.focus();
+  try { el.setSelectionRange(el.value.length, el.value.length); } catch (e) { /* no todos lo admiten */ }
 }
 
 /* ── Fotos ─────────────────────────────────────────────────────────────── */

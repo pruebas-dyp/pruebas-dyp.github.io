@@ -1719,6 +1719,106 @@ const Modelo = (function () {
     return { ok: true, motivo: '' };
   }
 
+  /* ══ BUSCAR POR IDENTIFICADOR COMPLETO ═══════════════════════════════
+     Las dos que usa la recepción para autocompletar: el cliente por su RUT y
+     el vehículo por su patente. Van acá y no en la pantalla porque ninguna
+     vista lee un arreglo crudo — es la regla del archivo.
+
+     🔴 COINCIDENCIA EXACTA, NUNCA POR PREFIJO, Y NUNCA UNA LISTA.
+
+     No es un detalle de implementación: es la diferencia entre una ayuda y una
+     fuga. Un autocompletar que sugiere mientras se escribe deja recorrer el
+     padrón entero probando prefijos, y el padrón de este cliente son **6.518
+     personas** con RUT, teléfono y domicilio. Es el hallazgo DP-3 de la
+     auditoría, y sería nuestro si lo construyéramos así.
+
+     Por eso las dos exigen el identificador COMPLETO y BIEN FORMADO —el RUT con
+     su dígito verificador comprobado, la patente con sus seis caracteres— y las
+     dos devuelven UNA coincidencia o ninguna. Quien no sabe el RUT entero no
+     saca nada de acá.
+
+     ⚠️ EN PRODUCCIÓN ESTO VA CONTRA EL PADRÓN. Acá está modelado; allá exige
+     permiso propio y **queda en la traza de lecturas** (requisito A-10 de la
+     auditoría), porque consultar quién es el dueño de una patente es un acceso
+     a datos personales aunque no modifique nada. Se garantiza con RLS y una
+     tabla de auditoría, no con este `if`.
+
+     ⚠️ `js/vistas/expediente.js` también busca por patente y NO se unificó: su
+     contrato es otro. Ahí se resuelve QUÉ ORDEN abrir —acepta además el número
+     de OT y mira el histórico completo— y acá se resuelve QUÉ VEHÍCULO es, para
+     rellenar un formulario. Unificarlas cambiaría cuál orden abre el expediente
+     cuando una patente tiene varias, que es una decisión de esa pantalla. */
+
+  /* El dígito verificador, calculado. Vive acá y no en la pantalla porque es
+     una regla del dato.
+
+     ⚠️ NO se usa para RECHAZAR el RUT que escribe el recepcionista: eso sigue
+     sin validarse a propósito —está dicho en `formatearRut`— porque rechazarle
+     el RUT a un cliente que está parado en el mesón es una decisión del taller
+     y no está tomada. Acá sirve para lo contrario: para decidir si vale la pena
+     ir a buscar, y para no salir a consultar el padrón con un número a medias. */
+  function rutValido(rut) {
+    const limpio = String(rut || '').toUpperCase().replace(/[^0-9K]/g, '');
+    if (limpio.length < 8 || limpio.length > 9) return false;
+    const cuerpo = limpio.slice(0, -1);
+    const dv = limpio.slice(-1);
+    if (!/^[0-9]+$/.test(cuerpo)) return false;
+    let suma = 0, mult = 2;
+    for (let i = cuerpo.length - 1; i >= 0; i--) {
+      suma += Number(cuerpo[i]) * mult;
+      mult = mult === 7 ? 2 : mult + 1;
+    }
+    const resto = 11 - (suma % 11);
+    const esperado = resto === 11 ? '0' : resto === 10 ? 'K' : String(resto);
+    return dv === esperado;
+  }
+
+  // El RUT sin puntos ni guión, que es como se compara: el mismo RUT escrito de
+  // cuatro formas tiene que encontrar a la misma persona.
+  const rutPlano = (r) => String(r || '').toUpperCase().replace(/[^0-9K]/g, '');
+
+  function cliente_por_rut(rut) {
+    if (!rutValido(rut)) return null;
+    const buscado = rutPlano(rut);
+    const p = db.persona.find((x) => x.tipo === 'cliente' && x.activo !== false &&
+      rutPlano(x.rut) === buscado);
+    if (!p) return null;
+    // Se devuelve lo que la recepción necesita y nada más. El resto de la ficha
+    // —qué órdenes tuvo, cuánto gastó— no es asunto de un formulario de ingreso.
+    return { id: p.id, rut: p.rut, nombre: nombreDe(p), telefono: p.telefono || '',
+             correo: p.correo || '', direccion: p.direccion || '' };
+  }
+
+  function vehiculo_por_patente(patente) {
+    const pat = String(patente || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (pat.length !== 6) return null;
+    const v = db.vehiculo.find((x) => x.patente === pat);
+    if (!v) return null;
+
+    const nom = (tabla, id) => { const f = (db[tabla] || []).find((x) => x.id === id); return f ? f.nombre : ''; };
+    const suyas = db.orden_trabajo.filter((o) => o.vehiculo_id === v.id)
+      .sort((a, b) => new Date(b.fecha_ingreso) - new Date(a.fecha_ingreso));
+    const abierta = suyas.find((o) => Reglas.estaAbierta(db, o.estado));
+
+    return {
+      vehiculo: { id: v.id, patente: v.patente, vin: v.vin || '', anio: v.anio || '',
+                  marca_id: v.marca_id || '', modelo_id: v.modelo_id || '', color_id: v.color_id || '',
+                  marca: nom('marca', v.marca_id), modelo: nom('modelo', v.modelo_id),
+                  color: nom('color_vehiculo', v.color_id) },
+      visitas: suyas.length,
+      ultimasOrdenes: suyas.slice(0, 3).map((o) => ({
+        id: o.id, numeroOT: o.numero_ot, fechaIngreso: o.fecha_ingreso,
+        estado: o.estado, estadoNombre: Reglas.nombreEstado(db, o.estado) })),
+      /* El tercer caso, que hoy se descubre recién al guardar: una patente no
+         puede tener dos órdenes abiertas (Regla 1). Detectarlo en el campo le
+         ahorra al recepcionista los otros cuatro pasos del formulario. */
+      otAbierta: abierta ? { id: abierta.id, numeroOT: abierta.numero_ot,
+                             estado: abierta.estado,
+                             estadoNombre: Reglas.nombreEstado(db, abierta.estado),
+                             fueraDeTaller: abierta.estado === 'fuera_taller' } : null
+    };
+  }
+
   /* ── Corregir una recepción ya guardada ───────────────────────────────
      Pedido de Marco el 15-08-2026. Faltaba, y no por tiempo: una recepción es
      lo que el cliente firmó, y para poder cambiarla había que decidir tres
@@ -4194,6 +4294,8 @@ const Modelo = (function () {
     personasParaEtapa, destinatarios, fijar_fecha_compromiso,
     registrar_salida, registrar_reingreso, cambiar_estado_ot, registrar_entrega,
     programar_entrega, corregir_recepcion, correccionesDeRecepcion,
+    // Las dos búsquedas por identificador completo que usa la recepción.
+    cliente_por_rut, vehiculo_por_patente, rutValido,
     cargar_repuesto, recibir_repuesto, entregar_repuesto_area, fijar_responsable_pago,
     adjuntar_vale_repuesto, devolver_repuesto, declarar_perdida_total,
     fijar_codigo_repuesto,

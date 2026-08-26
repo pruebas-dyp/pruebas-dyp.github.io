@@ -20,10 +20,51 @@
    Y se fue `Celular`. El taller llama a UN número. Dos casillas para lo mismo
    terminan con una vacía y la otra con el número que sí contesta — o peor, con
    dos números y nadie sabiendo cuál es el bueno. */
+/* ── La línea de lo que se encontró ────────────────────────────────────
+   Se pinta desde el estado, no a mano sobre el DOM: así sobrevive al ir y
+   volver entre pasos. Si no hay nada encontrado, no ocupa lugar.
+
+   🔴 SIEMPRE CON SU «DESHACER». Nada de magia silenciosa: si aparecen datos
+   solos y nadie dice de dónde salieron, el recepcionista no sabe si creerles.
+   La línea dice qué se encontró, cuántos campos se llenaron y ofrece volver
+   atrás en un clic. */
+function recHallazgo(clave) {
+  const t = rec().traido[clave];
+  if (!t) return '';
+
+  const deshacer = (t.llenados && t.llenados.length)
+    ? '<button type="button" class="btn secundario chico" data-deshacer-traido="' + clave + '">' +
+      'Deshacer</button>' : '';
+  const cuantos = !t.llenados ? '' : t.llenados.length
+    ? ' · se ' + (t.llenados.length === 1 ? 'completó 1 campo' : 'completaron ' + t.llenados.length + ' campos')
+    : ' · no se completó nada: ya estaba todo escrito';
+
+  if (t.tipo === 'ocupada')
+    return '<div class="hallazgo malo">' + ico('alerta') +
+      '<span><strong>La patente ' + esc(t.patente) + ' ya tiene la orden ' + esc(t.numeroOT) +
+      ' abierta</strong> (' + esc(t.estadoNombre) + '). Una patente no puede tener dos órdenes ' +
+      'abiertas a la vez: hay que cerrar ésa antes de volver a ingresar el vehículo.' +
+      (t.avisoVin ? ' ' + esc(t.avisoVin) : '') + '</span></div>';
+
+  if (t.tipo === 'cliente')
+    return '<div class="hallazgo"><span><strong>Cliente encontrado</strong> · ' +
+      esc(t.nombre) + cuantos + '</span>' + deshacer + '</div>';
+
+  if (t.tipo === 'vehiculo')
+    return '<div class="hallazgo"><span><strong>Vehículo registrado</strong> · ' +
+      esc(t.resumen) + cuantos + '</span>' + deshacer +
+      (t.avisoVin ? '<span class="pie-nota" style="margin:0;flex-basis:100%">' +
+        esc(t.avisoVin) + '</span>' : '') + '</div>';
+
+  return '';
+}
+
 function recCliente() {
   return `
   <div class="rejilla-campos campos-vertical">
-    ${recCampo('rut', 'RUT', { marcador: '11.111.111-1' })}
+    ${recCampo('rut', 'RUT', { marcador: '11.111.111-1',
+      ayuda: 'Con el RUT completo se traen los datos que ya estén registrados' })}
+    ${recHallazgo('rut')}
     ${recCampo('nombre', 'Nombre completo', { marcador: 'Nombre y apellidos' })}
     ${recCampo('telefono', 'Teléfono')}
     ${recCampo('correo', 'Correo')}
@@ -135,6 +176,7 @@ function recVehiculo() {
     ${recCampo('patente', 'Patente', {
       marcador: 'AABB11', largo: PATENTE_LARGO, normalizar: normalizarPatente,
       ayuda: recAyudaLargo('patente') })}
+    ${recHallazgo('patente')}
     ${recCombo('marca_id', 'Marca', marcas, 'marca', { marcador: 'Escribe la marca' })}
     ${recCombo('modelo_id', 'Modelo', modelos, 'modelo', {
       marcador: r.campos.marca_id ? 'Escribe el modelo' : 'Primero la marca',

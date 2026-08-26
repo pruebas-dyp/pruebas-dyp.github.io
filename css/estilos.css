@@ -1105,6 +1105,30 @@ svg.chispa.verde .chispa-punto { fill: var(--verde); }
    🔴 Ni un color escrito a mano: todos salen de las variables del tema. El
    círculo tiene que leerse igual en oscuro y en claro, y un `#fff` acá se ve
    bien en uno de los dos y desaparece en el otro. */
+/* ───────── Lo que se trajo del padrón ─────────
+   La línea que aparece bajo el RUT o la patente cuando se encontró algo. Es
+   discreta a propósito: informa, no interrumpe. La variante `malo` es para el
+   caso que SÍ frena —la patente con orden abierta—, y por eso cambia de color.
+
+   Todos los colores salen de las variables del tema: la línea tiene que
+   leerse igual en oscuro y en claro. */
+.hallazgo {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: -2px 0 2px; padding: 6px 9px;
+  border: 1px solid var(--verde-borde); border-radius: 3px;
+  background: var(--verde-bg); color: var(--verde-texto);
+  font-size: 11.5px; line-height: 1.45;
+}
+.hallazgo span { flex: 1 1 auto; min-width: 0; }
+.hallazgo .ico { flex: 0 0 auto; width: 14px; height: 14px; }
+.hallazgo.malo {
+  border-color: var(--ambar-borde); background: var(--ambar-bg); color: var(--ambar-texto);
+}
+/* En el bloque vertical la etiqueta ocupa la primera columna: la línea va
+   debajo del campo entero, no metida en la columna del valor. */
+.campos-vertical .hallazgo { margin-left: 0; }
+
 /* ───────── El expandible de la Torre, con dos paneles ─────────
    🔴 CLASE PROPIA, y `.ficha-rejilla` NO SE TOCA: la comparten ocho pantallas
    —la ficha, el histórico, la entrega, el personal, el presupuesto y los dos

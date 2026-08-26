@@ -128,6 +128,15 @@ function rec() {
       // item_id → la nota del recepcionista. Solo se pide en los ítems que
       // quedaron `no presente` o `dañado`, que son los que después se discuten.
       obsInventario: {},
+      /* Lo que se trajo del padrón, por identificador: qué se encontró y qué
+         campos se rellenaron. Sirve para pintar el aviso y para deshacerlo. */
+      traido: { rut: null, patente: null },
+      /* Qué identificador se consultó por última vez en cada campo. Va en el
+         BORRADOR y no en una variable del módulo: si vive fuera, descartar el
+         borrador y volver a escribir el mismo RUT no traía nada — el guardia
+         seguía creyendo que ya se había buscado, y el recepcionista veía los
+         campos vacíos sin ninguna explicación. */
+      buscado: { rut: '', patente: '' },
       fotos: []
     };
   }
@@ -153,7 +162,12 @@ function guardarBorrador() {
       paso: r.paso, llave: r.llave, campos: r.campos, bloques: r.bloques,
       danos: r.danos, textos: r.textos,
       inventario: r.inventario, obsInventario: r.obsInventario,
-      fotos: r.fotos
+      fotos: r.fotos,
+      /* Lo encontrado viaja con el borrador. Sin esto, recargar la pantalla
+         borraba el aviso —incluido el de «esta patente ya tiene orden
+         abierta»— y con él el botón de deshacer, dejando los campos
+         rellenados sin decir de dónde salieron. */
+      traido: r.traido, buscado: r.buscado
     }));
   } catch (e) { /* sin almacenamiento: el formulario sigue vivo en memoria */ }
 }
@@ -187,7 +201,7 @@ function restaurarBorrador() {
     return Object.assign({
       paso: 'cliente', llave: 'rec-' + Date.now().toString(36),
       textos: {}, danos: [], inventario: {}, obsInventario: {}, fotos: [],
-      marcados: []
+      marcados: [], traido: { rut: null, patente: null }, buscado: { rut: '', patente: '' }
     }, d);
   } catch (e) { return null; }
 }
