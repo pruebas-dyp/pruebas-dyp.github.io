@@ -391,6 +391,10 @@ const Modelo = (function () {
       compania: comp ? comp.codigo : '—', companiaId: o.compania_id,
       origenIngreso: (ix.tipo_ingreso.get(o.tipo_ingreso_id) || {}).codigo,
       origenIngresoNombre: (ix.tipo_ingreso.get(o.tipo_ingreso_id) || {}).nombre,
+      // Los ids de los dos catálogos de la ORDEN, por la misma razón que los
+      // tres del vehículo de arriba: Editar Recepción tiene que saber cuál
+      // viene seleccionado, y del código no se puede volver al id.
+      tipoIngresoId: o.tipo_ingreso_id, prioridadId: o.prioridad_id,
       siniestro: o.siniestro, deducible: o.deducible, liquidador: o.liquidador,
       // Lo que se escribió en el ingreso, por orden. `orExterna` es la OR que
       // digita la recepción en las órdenes de empresa: no es la OR del taller.
@@ -1766,6 +1770,36 @@ const Modelo = (function () {
         ' ya tiene la orden ' + abierta.numero_ot + ' abierta. Una patente, una orden.' };
     }
 
+    /* Las dos correcciones del paso 3 que NO son escribir un campo, y por eso
+       se revisan antes de aplicar cualquier otra: si una de las dos rebota, la
+       corrección entera rebota sin haber dejado la mitad escrita.
+
+       🔴 EL ESTADO NO SE ESCRIBE A MANO ACÁ. Pasa por `cambiar_estado_ot`, que
+       es el mismo procedimiento del resto del sistema: revisa el maestro, cierra
+       la estadía si el estado es final y deja su hecho con autor. Asignarlo
+       directo dejaba mover una orden a «Entregado» desde una pantalla de
+       corrección sin fecha de salida y sin que el registro dijera quién. */
+    let estadoPedido = null;
+    if (c.orden && c.orden.estado && c.orden.estado !== o.estado) {
+      const permiso = Reglas.puedeCambiarEstado(db, { ot_id, nuevo_estado: c.orden.estado });
+      if (!permiso.ok) return permiso;
+      estadoPedido = c.orden.estado;
+    }
+
+    /* La fecha de ingreso pasa por la MISMA regla que el ingreso: ni futura, y
+       avisando si es de hace más de un mes. Corregir no puede aceptar lo que
+       crear rechaza. */
+    let entradaPedida = null;
+    const avisosFecha = [];
+    if (c.orden && c.orden.fecha_ingreso) {
+      const ing = fechaDeIngreso(c.orden.fecha_ingreso);
+      if (ing.error) return { ok: false, motivo: ing.error };
+      if (new Date(o.fecha_ingreso).getTime() !== ing.fecha.getTime()) {
+        entradaPedida = ing.fecha;
+        (ing.avisos || []).forEach((a) => avisosFecha.push(a));
+      }
+    }
+
     // Qué cambió de verdad. Lo que se manda igual a lo que ya había no es una
     // corrección y no ensucia el registro.
     const hechos = [];
@@ -1805,6 +1839,66 @@ const Modelo = (function () {
       if (c.recepcion[k] === undefined) return;
       if (anotar(RECEP[k], r[k], c.recepcion[k])) r[k] = c.recepcion[k];
     });
+
+    /* ── Paso 3 · Solicitud de reparación ────────────────────────────────
+       Pedido del cliente el 26-08-2026: *"en editar recepción te debe permitir
+       editar todo lo que se ingresa en recepción"*. Faltaba justo este bloque.
+
+       Se había dejado fuera con un argumento que suena bien y no lo es: que
+       compañía, siniestro y tipo de ingreso son de la ORDEN y no de la
+       recepción. Es verdad en el modelo de datos y da igual en el mesón — el
+       recepcionista los escribe en la misma pasada, y si se equivoca en el
+       número de siniestro tiene que poder arreglarlo donde lo escribió. La
+       pantalla sigue el gesto, no la tabla.
+
+       Se versiona igual que todo lo demás: el registro dice qué decía antes,
+       quién lo cambió y por qué. */
+    const ORDEN = { siniestro: 'N° de siniestro', deducible: 'Deducible neto',
+      liquidador: 'Liquidador / evaluador de la OT', or_externa: 'N° de OR',
+      descripcion_danos: 'Descripción de daños',
+      descripcion_estado: 'Descripción del estado' };
+    if (c.orden) {
+      Object.keys(ORDEN).forEach((k) => {
+        if (c.orden[k] === undefined) return;
+        if (anotar(ORDEN[k], o[k], c.orden[k])) o[k] = c.orden[k];
+      });
+
+      // Los tres de catálogo se anotan por su NOMBRE, igual que marca y color:
+      // el registro lo lee una persona, no la base.
+      [['tipo_ingreso_id', 'Tipo de ingreso', 'tipo_ingreso'],
+       ['compania_id', 'Compañía', 'compania'],
+       ['prioridad_id', 'Prioridad', 'prioridad']].forEach(([k, rotulo, tabla]) => {
+        if (c.orden[k] === undefined) return;
+        const nom = (id) => { const f = (db[tabla] || []).find((x) => x.id === id); return f ? f.nombre : ''; };
+        if (anotar(rotulo, nom(o[k]), nom(c.orden[k]))) o[k] = c.orden[k];
+      });
+
+      /* 🔴 LA FECHA DE INGRESO ARRASTRA LA ESTADÍA, Y ESE ES TODO EL PUNTO.
+         Los tres relojes de la torre NO leen `orden_trabajo.fecha_ingreso`:
+         leen `ot_estadia.entro_at`. Corrigiendo solo el campo, la ficha habría
+         mostrado la fecha nueva mientras los días seguían contando desde la
+         vieja — dos números que se contradicen, y manda el que nadie ve. Es la
+         misma trampa que en el ingreso (C-1).
+
+         Se mueve la PRIMERA estadía, no la abierta: la fecha que se corrige es
+         la de cuándo entró el auto por primera vez. Si salió y volvió, ese
+         segundo ingreso es un hecho aparte y no se toca desde acá. */
+      if (entradaPedida) {
+        const dia = (f) => (f ? new Date(f).toLocaleString('es-CL') : '');
+        anotar('Fecha de ingreso', dia(o.fecha_ingreso), dia(entradaPedida));
+        o.fecha_ingreso = entradaPedida;
+        const primera = db.ot_estadia.filter((x) => x.ot_id === ot_id)
+          .sort((a, b) => new Date(a.entro_at) - new Date(b.entro_at))[0];
+        if (primera) primera.entro_at = entradaPedida;
+      }
+
+      // El estado ya pasó su revisión arriba: acá solo se ejecuta, y lo hace
+      // el procedimiento de siempre para que deje su propio hecho.
+      if (estadoPedido) {
+        anotar('Estado', Reglas.nombreEstado(db, o.estado), Reglas.nombreEstado(db, estadoPedido));
+        cambiar_estado_ot(ot_id, estadoPedido, 'Corrección de la recepción: ' + String(motivo).trim());
+      }
+    }
 
     if (c.inventario) {
       const validos = INV_ESTADOS.map((e) => e.codigo);
@@ -1876,7 +1970,7 @@ const Modelo = (function () {
       hechos.map((h) => h.campo + ': «' + (h.antes || '—') + '» → «' + (h.despues || '—') + '»').join(' · ') +
       ' — ' + String(motivo).trim());
     tocado();
-    return { ok: true, motivo: '', version, cambios: hechos.length };
+    return { ok: true, motivo: '', version, cambios: hechos.length, avisos: avisosFecha };
   }
 
   /* Las correcciones de una recepción, de la más nueva a la más vieja, con el

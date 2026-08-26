@@ -51,9 +51,13 @@ const PANTALLAS_OT = [
   { rot: 'Ver Fotografías', icono: 'camara',
     tab: 'fotos', permiso: 'foto.ver' },
 
+  /* 🔶 DEJÓ DE SER UN PENDIENTE EL 26-08-2026. La pantalla existía desde el
+     15-08 —`recepcion-editar.js`, con versionado— pero solo se llegaba
+     buscando la patente a mano dentro de Recepción, así que este botón
+     avisaba que no estaba construida. Estaba: lo que faltaba era la puerta.
+     Ahora abre Recepción ya parada en ESTA orden. */
   { rot: 'Editar Recepción', icono: 'editar',
-    tab: null, tanda: 8, permiso: 'ot.editar',
-    nota: 'la recepción se edita desde su propia pantalla; editar una ya guardada exige política de versiones' },
+    vista: 'recepcion', permiso: 'ot.editar' },
 
   { rot: 'Agregar OR', icono: 'nuevo',
     vista: 'presupuesto', permiso: 'presupuesto.crear' },
