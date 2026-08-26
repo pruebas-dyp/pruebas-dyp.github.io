@@ -825,7 +825,13 @@ const abiertoPorPanel = {};
 /* Abrir o cerrar el detalle de una fila desde AFUERA de la flecha —un botón
    «Ver», por ejemplo—. Existe para que ese botón no se arme su propio estado:
    el Presupuesto tenía el suyo (`p.abierta`) además de éste, y con los dos
-   abiertos la fila pintaba la lista DOS VECES. Un solo dueño del estado. */
+   abiertos la fila pintaba la lista DOS VECES. Un solo dueño del estado.
+
+   ⚠️ SIN LLAMADORES desde el 26-08-2026: su único cliente era el botón «Ver»
+   del Presupuesto, que se eliminó porque hacía lo mismo que el clic en la fila.
+   Se deja porque el problema que resuelve vuelve apenas otro panel quiera abrir
+   una fila desde un botón — pero si pasa otra tanda sin que nadie la llame, se
+   borra. */
 function alternarDetalle(clave) {
   const v = ui.vista;
   abiertoPorPanel[v] = (abiertoPorPanel[v] === String(clave)) ? null : String(clave);

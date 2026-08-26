@@ -62,17 +62,26 @@ function listaPresupuestos(o) {
   if (!o) return '<div class="vacio"><div class="texto">No se pudo leer esta orden.</div></div>';
   const veMontos = Modelo.puede('presupuesto.montos');
 
+  /* 🔶 LOS CUATRO SE DIBUJAN SIEMPRE (26-08-2026, pedido del cliente).
+
+     Antes `Editar Presupuesto` y `Enviar` salían solo en borrador y `Anular`
+     desaparecía en tres estados, así que un presupuesto **aprobado** quedaba
+     con un botón. Ahora están los cuatro y, cuando la acción no corresponde,
+     **se aprieta, se rechaza y se explica el motivo**: es la regla de la casa
+     —ninguna regla se enseña escondiendo o apagando un botón— y es la que ya
+     rige en la ficha de la OT.
+
+     `Ver PDF` es la excepción y no es lo mismo: no se esconde por ESTADO sino
+     por PERMISO. El documento lleva cliente, RUT y montos; quien no puede verlos
+     no tiene una versión suya que mirar. */
   const acciones = (pr) => {
     const b = [];
     if (veMontos) b.push('<button class="btn secundario chico" data-pr-pdf="' + esc(pr.id) +
       '" data-pr-ot="' + esc(o.id) + '">' + ico('imprimir') + 'Ver PDF</button>');
-    if (pr.estado === 'borrador') {
-      b.push('<button class="btn secundario chico" data-pr-editar="' + esc(pr.id) +
-        '" data-pr-ot="' + esc(o.id) + '">' + ico('editar') + 'Editar Presupuesto</button>');
-      b.push('<button class="btn secundario chico" data-pr-enviar="' + esc(pr.id) + '">Enviar</button>');
-    }
-    if (pr.estado !== 'anulado' && pr.estado !== 'aprobado' && pr.estado !== 'rechazado')
-      b.push('<button class="btn secundario chico" data-pr-anular="' + esc(pr.id) + '">Anular</button>');
+    b.push('<button class="btn secundario chico" data-pr-editar="' + esc(pr.id) +
+      '" data-pr-ot="' + esc(o.id) + '">' + ico('editar') + 'Editar Presupuesto</button>');
+    b.push('<button class="btn secundario chico" data-pr-enviar="' + esc(pr.id) + '">Enviar</button>');
+    b.push('<button class="btn secundario chico" data-pr-anular="' + esc(pr.id) + '">Anular</button>');
     return b.join(' ');
   };
 
@@ -80,7 +89,27 @@ function listaPresupuestos(o) {
     return '<div class="linea-presu"><span style="color:var(--gris-2)">Esta orden todavía no ' +
       'tiene OR abierta.</span></div>';
 
-  return o.presupuestos.map((pr) => {
+  /* 🔴 LA SEGUNDA OR SE ABRE DESDE ACÁ, y por eso este botón no es un adorno.
+
+     `Generar` dejó de salir en las filas que ya tienen presupuesto (26-08-2026).
+     Sin este botón, desde el módulo de Presupuesto ya no habría forma de abrir
+     una segunda OR — y una OT con varias OR es una regla central del negocio:
+     el presupuesto le pone el apellido a la OT, y la Torre cuenta cuántas tiene.
+
+     Va UNO por orden y no uno por documento: abrir una OR es de la ORDEN, no del
+     presupuesto que se esté mirando. Repetirlo en cada línea sugeriría que cada
+     documento abre el suyo.
+
+     Mismo destino que `Agregar OR` de la ficha —`pantallas-ot.js`—: deja el
+     módulo parado en esta orden, donde vive el botón que la crea de verdad. Es
+     el mismo `data-presu-ot` que usaba `Generar`, no un camino nuevo. */
+  const agregarOR = Modelo.puede('presupuesto.abrir')
+    ? '<div class="linea-presu"><span></span><span>' +
+      '<button class="btn secundario chico" data-presu-ot="' + esc(o.id) + '">' +
+      ico('nuevo') + 'Agregar OR</button></span></div>'
+    : '';
+
+  return agregarOR + o.presupuestos.map((pr) => {
       const e = ESTADO_PRESUPUESTO[pr.estado] || { txt: pr.estado, clase: 'gris' };
       /* 🔶 LA ETIQUETA DE DATOS, ACÁ TAMBIÉN (16-08-2026, Marco): «que pueda
          ver una etiqueta de datos simple para saber qué documento abrir».
@@ -129,9 +158,14 @@ function listaPresupuestos(o) {
 
 function vPresupuestoListado() {
   const p = presuEstado();
+  /* 🔴 EL TOTAL NETO DE LA COLUMNA TAMBIÉN SE ENMASCARA. Lo hacían la línea de
+     cada OR y el editor, y esta columna no: una cuenta sin `presupuesto.montos`
+     no veía «Ver PDF» ni los montos del detalle, pero leía el total de cada
+     orden en la lista — el dato que los otros dos estaban tapando, servido en
+     columna y para las 102. Visto probando con Bodega el 26-08-2026. */
+  const veMontos = Modelo.puede('presupuesto.montos');
   const q = p.busqueda.trim().toLowerCase();
   const filas = Modelo.torre()
-    .filter((o) => !p.soloSin || !o.presupuestos.length)
     .filter((o) => !q ||
       [o.numeroOT, o.patente, o.cliente, o.presupuestos.map((x) => x.numeroOR).join(' ')]
         .join(' ').toLowerCase().includes(q));
@@ -146,9 +180,16 @@ function vPresupuestoListado() {
   <div class="panel">
     <div class="cab">
       <div><h2>${ico('presupuesto', 'g')}Presupuesto</h2>
-        <div class="desc">Las 9 columnas del original, con el total neto por orden</div></div>
-      <div class="filtros"><input type="search" id="q-presu" placeholder="OT, OR, patente o cliente" value="${esc(p.busqueda)}">
-        <button class="btn secundario" id="presu-solo-sin" title="Ver solo las órdenes que todavía no tienen OR abierta">Sin OR</button></div>
+        ${/* ⛔ La bajada se eliminó el 26-08-2026, con la ruta y la barra. */''}</div>
+      ${/* ⛔ EL FILTRO «Sin OR» SE ELIMINÓ (26-08-2026, pedido del cliente).
+           Con él se fue `p.soloSin` entero: el estado, el filtro de la lista y
+           su manejador. Dejar el estado sin quién lo encienda es dejar una
+           rama que nunca corre.
+
+           Lo que el filtro buscaba se sigue viendo sin él: las órdenes sin OR
+           llevan la etiqueta ámbar «sin OR» en su columna, y son las únicas que
+           muestran `Generar` en la columna Acción. */''}
+      <div class="filtros"><input type="search" id="q-presu" placeholder="OT, OR, patente o cliente" value="${esc(p.busqueda)}"></div>
     </div>
     <div class="grid-envoltorio"><table class="grid">
       <thead><tr><th>OT</th><th>Cliente</th><th>Patente</th><th>Marca</th><th>Modelo</th>
@@ -181,19 +222,29 @@ function vPresupuestoListado() {
                trabajo. «Sin presupuesto» suena a que la OR existe y está en
                blanco, que es otra cosa. */
             : '<span class="et ambar">sin OR</span>') + '</td>' +
-          '<td class="num">' + (neto ? fMonto(neto) : '—') + '</td>' +
+          '<td class="num">' + (neto
+            ? (veMontos ? fMonto(neto) : '<span class="monto" title="Este rol no ve los montos">•••••</span>')
+            : '—') + '</td>' +
+          /* ⛔ EL BOTÓN `Ver` SE ELIMINÓ (26-08-2026). Hacía exactamente lo
+             mismo que el clic en la fila —desplegarla— con el agravante de
+             mover el mismo estado por dos caminos: ese doble dueño ya había
+             hecho que la lista se pintara DOS VECES. Ahora la flecha del
+             expandible es el único indicador y el único camino.
+
+             🔶 Y `Generar` solo cuando NO hay OR (pedido del cliente). El
+             original lo ofrece siempre; nosotros no, y es una divergencia
+             deliberada — está anotada como C-48. La segunda OR se abre desde
+             el expandible, con `Agregar OR`.
+
+             El permiso es `presupuesto.abrir` y no `presupuesto.crear`: abrir
+             la OR y ponerle los montos son dos permisos distintos a propósito
+             —Recepción abre, no valoriza— y el que exige `crear_presupuesto`
+             en el motor es el primero. */
           '<td><span style="display:flex;gap:6px;flex-wrap:wrap">' +
-            '<button class="btn secundario chico" data-presu-ot="' + esc(o.id) + '">' +
-              ico('editar') + 'Generar</button>' +
-            (o.presupuestos.length
-              ? '<button class="btn secundario chico" data-presu-ver-fila="' + esc(o.numeroOT) + '">' +
-                ico('imprimir') + 'Ver</button>'
+            (!o.presupuestos.length && Modelo.puede('presupuesto.abrir')
+              ? '<button class="btn secundario chico" data-presu-ot="' + esc(o.id) + '">' +
+                ico('editar') + 'Generar</button>'
               : '') +
-          /* 🔴 SIN fila propia acá. La pintaba este listado Y la pintaba
-             `dobleClicPorFilas`, cada uno con su estado: el botón «Ver» con
-             `p.abierta` y la flecha con el del panel. Con los dos abiertos la
-             lista salía DOS VECES. Ahora el botón mueve el MISMO estado que
-             la flecha y hay un solo dueño. */
           '</span></td></tr>';
       }).join('')}</tbody>
     </table></div>
@@ -470,27 +521,8 @@ function grillaPresupuesto(o, pr, editable, $) {
     const sub = COL_HORAS.reduce((s, c) => s + (Number(l[c.campo]) || 0), 0) * pr.tempario;
     return '<tr><td class="num">' + (i + 1) + '</td>' +
       '<td>' + esc(l.descripcion) + '</td>' +
-      /* 🔴 LA OP, CON LA PALABRA Y EDITABLE (26-08-2026, Marco: «que quede
-         como más amplio cada campo, para que tengan una visibilidad más fácil
-         de hacer el trabajo»).
-
-         Acá era una etiqueta de 24 px con UNA LETRA —E, C, R— y había que
-         acordarse de cuál era cuál. En el sistema que usan hoy la OP es un
-         desplegable que dice la palabra: «Cambio», «Reparar», «Externo». Se
-         deja igual.
-
-         Y de paso se puede corregir sin borrar la línea, que es lo que se hacía
-         antes: si se marcó Reparar y era Cambio, había que quitar la línea y
-         escribirla de nuevo. Ahora se cambia la OP y `actualizar_linea_presupuesto`
-         se encarga del repuesto. */
-      '<td>' + (editable
-        ? '<select class="op-linea" data-op="' + esc(l.id) + '" title="Qué se le hace a esta pieza">' +
-          PROCESOS.map((x) => '<option value="' + x.codigo + '"' +
-            (l.proceso === x.codigo ? ' selected' : '') + '>' + esc(x.nombre) + '</option>').join('') +
-          '</select>'
-        : '<span class="et ' + (l.proceso === 'cambio' ? 'azul' : 'gris') + '">' +
-          esc((PROCESOS.find((x) => x.codigo === l.proceso) || {}).nombre || l.proceso) + '</span>') +
-      '</td>' +
+      '<td class="num"><span class="et ' + (l.proceso === 'cambio' ? 'azul' : 'gris') +
+        '" title="' + esc(l.proceso) + '">' + OP_ROT[l.proceso] + '</span></td>' +
       COL_HORAS.map((c) => '<td class="num">' + (editable
         /* `type="text"` con `inputmode="decimal"`, NO `type=number`: el campo
            numerico solo acepta el PUNTO como separador, asi que un "1,20"
@@ -499,7 +531,7 @@ function grillaPresupuesto(o, pr, editable, $) {
            valor en pesos debajo y la casilla vacia arriba: el evaluador
            creeria que se le borraron las horas. El teclado del celular igual
            abre en numeros por el `inputmode`. */
-        ? '<input type="text" inputmode="decimal" style="width:96px" ' +
+        ? '<input type="text" inputmode="decimal" style="width:80px" ' +
           'data-horas="' + esc(l.id) + '" data-campo="' + c.campo + '" ' +
           'value="' + esc(fHoras(l[c.campo])) + '" placeholder="0,00" title="' + esc(c.ayuda) + '">'
         : (fHoras(l[c.campo]) || '—')) +
@@ -516,8 +548,8 @@ function grillaPresupuesto(o, pr, editable, $) {
   <section class="bloque-presu mano-obra">
     ${cabBloquePresu(1, 'Mano de Obra', 'El trabajo del taller: horas \u00d7 tempario', t.manoObra, $)}
     <div class="grid-envoltorio"><table class="grid">
-      <thead><tr><th style="width:44px">N°</th><th>Descripción</th><th style="width:132px">OP</th>
-        ${COL_HORAS.map((c) => '<th class="num" style="width:120px" title="' + esc(c.ayuda) +
+      <thead><tr><th style="width:44px">N°</th><th>Descripción</th><th style="width:52px">OP</th>
+        ${COL_HORAS.map((c) => '<th class="num" style="width:106px" title="' + esc(c.ayuda) +
           '">' + esc(c.rot) + '</th>').join('')}
         <th class="num" style="width:112px">Valor</th><th style="width:44px"></th></tr></thead>
       <tbody>${manoObra.length ? manoObra.map(filaMO).join('')
@@ -801,12 +833,6 @@ function pPresupuesto() {
     n.focus(); n.setSelectionRange(n.value.length, n.value.length);
   });
 
-  const soloSin = document.getElementById('presu-solo-sin');
-  if (soloSin) {
-    soloSin.classList.toggle('activo', !!p.soloSin);
-    soloSin.addEventListener('click', () => { p.soloSin = !p.soloSin; render(); });
-  }
-
   /* 🔴 LOS BOTONES DE FILA CORTAN EL EVENTO. La fila entera abre la orden con
      doble clic, así que sin `stopPropagation` apretar dos veces seguidas
      `Ver` —para abrir y cerrar, que es lo natural— abría además la ventana de
@@ -816,27 +842,55 @@ function pPresupuesto() {
     p.otId = b.dataset.presuOt; p.presupuestoId = null; render();
   }));
 
-  /* `Ver` despliega la línea de abajo, y vuelve a apretarse para cerrarla. Se
-     abre una a la vez: con 60 filas, dejarlas todas abiertas convierte el
-     listado en una lista de presupuestos y se pierde la lista de órdenes. */
-  document.querySelectorAll('[data-presu-ver-fila]').forEach((b) => b.addEventListener('click', (ev) => {
-    // Mueve el MISMO estado que la flecha de la fila. Tenía el suyo y por eso
-    // se podían abrir los dos a la vez, pintando la lista dos veces.
-    ev.stopPropagation();
-    alternarDetalle(b.dataset.presuVerFila);
-  }));
-
   document.querySelectorAll('[data-pr-pdf]').forEach((b) => b.addEventListener('click', (ev) => {
     ev.stopPropagation();
     abrirImpreso('presupuesto', b.dataset.prOt, b.dataset.prPdf);
   }));
 
-  // `Editar Presupuesto` entra a ESE presupuesto, no al último de la orden:
-  // desde el listado se eligió cuál, y perder esa elección sería hacérsela
-  // repetir adentro.
+  /* `Editar Presupuesto` entra a ESE presupuesto, no al último de la orden:
+     desde el listado se eligió cuál, y perder esa elección sería hacérsela
+     repetir adentro.
+
+     🔴 PERO UN PRESUPUESTO QUE YA SALIÓ NO SE EDITA ENCIMA (C-18). Es la mejora
+     que se le vendió al cliente: la discusión con la compañía queda auditable
+     porque cada versión conserva lo que decía cuando se mandó. Editar sobre un
+     enviado o un aprobado borraría justamente eso.
+
+     Así que el botón se dibuja siempre —la regla no se enseña escondiéndolo—
+     pero hace lo que corresponde al estado: en borrador edita; en enviado o
+     aprobado ofrece la versión siguiente diciendo por qué; en anulado o
+     rechazado rechaza. */
   document.querySelectorAll('[data-pr-editar]').forEach((b) => b.addEventListener('click', (ev) => {
     ev.stopPropagation();
-    p.otId = b.dataset.prOt; p.presupuestoId = b.dataset.prEditar; render();
+    const o = Modelo.otPorId(b.dataset.prOt);
+    const pr = o && o.presupuestos.find((x) => x.id === b.dataset.prEditar);
+    if (!pr) return avisar({ ok: false, motivo: 'Ese presupuesto ya no está en esta orden.' });
+
+    if (pr.estado === 'borrador') {
+      p.otId = b.dataset.prOt; p.presupuestoId = pr.id; return render();
+    }
+
+    if (pr.estado === 'anulado')
+      return avisar({ ok: false, motivo: 'La OR ' + pr.numeroOR + ' está anulada: salió de la ' +
+        'venta de la orden y no vuelve. Para cotizar otra vez se abre una OR nueva con «Agregar OR».' });
+
+    if (pr.estado === 'rechazado')
+      return avisar({ ok: false, motivo: 'La compañía rechazó la OR ' + pr.numeroOR + '. Lo que ' +
+        'rechazó queda tal cual, que es lo que permite discutirlo. Si hay que volver a presentar, ' +
+        'se abre una OR nueva con «Agregar OR».' });
+
+    // Enviado o aprobado: se versiona, y se dice con todas las letras.
+    const esta = pr.estado === 'aprobado' ? 'aprobada' : 'enviada';
+    if (!confirm('La OR ' + pr.numeroOR + ' ya está ' + esta + ', así que no se edita encima.\n\n' +
+        '¿Crear la versión siguiente?\n\n' +
+        'La versión ' + pr.version + ' queda intacta, con sus líneas y sus montos tal como se ' +
+        'mandaron: es lo que permite responderle a la compañía qué se cotizó y cuándo. La versión ' +
+        'nueva nace en borrador, con el mismo número de OR — es el mismo trabajo, discutido otra vez.'))
+      return;
+
+    ejecutar(() => Modelo.nueva_version_presupuesto(pr.id),
+      'Versión nueva en borrador. La anterior quedó intacta.',
+      (r) => { p.otId = b.dataset.prOt; p.presupuestoId = r.presupuesto_id; render(); });
   }));
 
   document.querySelectorAll('[data-pr-enviar]').forEach((b) => b.addEventListener('click', (ev) => {
@@ -936,13 +990,6 @@ function pPresupuesto() {
      Se guardan al salir del campo, no en cada tecla: escribir «1,78» son
      cuatro pulsaciones y cuatro guardados serían cuatro hechos en el
      expediente para un solo dato. */
-  /* El desplegable de OP de cada línea. Va por `change` y no por `input`:
-     un select dispara los dos, y con `input` se guardaba mientras el usuario
-     todavía estaba recorriendo la lista con el teclado. */
-  document.querySelectorAll('select[data-op]').forEach((sel) => sel.addEventListener('change', () =>
-    ejecutar(() => Modelo.actualizar_linea_presupuesto(sel.dataset.op, { proceso: sel.value }),
-      'Operación actualizada.')));
-
   document.querySelectorAll('[data-horas]').forEach((inp) => {
     inp.addEventListener('change', () => {
       const cambios = {};

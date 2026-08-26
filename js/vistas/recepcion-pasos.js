@@ -20,10 +20,51 @@
    Y se fue `Celular`. El taller llama a UN número. Dos casillas para lo mismo
    terminan con una vacía y la otra con el número que sí contesta — o peor, con
    dos números y nadie sabiendo cuál es el bueno. */
+/* ── La línea de lo que se encontró ────────────────────────────────────
+   Se pinta desde el estado, no a mano sobre el DOM: así sobrevive al ir y
+   volver entre pasos. Si no hay nada encontrado, no ocupa lugar.
+
+   🔴 SIEMPRE CON SU «DESHACER». Nada de magia silenciosa: si aparecen datos
+   solos y nadie dice de dónde salieron, el recepcionista no sabe si creerles.
+   La línea dice qué se encontró, cuántos campos se llenaron y ofrece volver
+   atrás en un clic. */
+function recHallazgo(clave) {
+  const t = rec().traido[clave];
+  if (!t) return '';
+
+  const deshacer = (t.llenados && t.llenados.length)
+    ? '<button type="button" class="btn secundario chico" data-deshacer-traido="' + clave + '">' +
+      'Deshacer</button>' : '';
+  const cuantos = !t.llenados ? '' : t.llenados.length
+    ? ' · se ' + (t.llenados.length === 1 ? 'completó 1 campo' : 'completaron ' + t.llenados.length + ' campos')
+    : ' · no se completó nada: ya estaba todo escrito';
+
+  if (t.tipo === 'ocupada')
+    return '<div class="hallazgo malo">' + ico('alerta') +
+      '<span><strong>La patente ' + esc(t.patente) + ' ya tiene la orden ' + esc(t.numeroOT) +
+      ' abierta</strong> (' + esc(t.estadoNombre) + '). Una patente no puede tener dos órdenes ' +
+      'abiertas a la vez: hay que cerrar ésa antes de volver a ingresar el vehículo.' +
+      (t.avisoVin ? ' ' + esc(t.avisoVin) : '') + '</span></div>';
+
+  if (t.tipo === 'cliente')
+    return '<div class="hallazgo"><span><strong>Cliente encontrado</strong> · ' +
+      esc(t.nombre) + cuantos + '</span>' + deshacer + '</div>';
+
+  if (t.tipo === 'vehiculo')
+    return '<div class="hallazgo"><span><strong>Vehículo registrado</strong> · ' +
+      esc(t.resumen) + cuantos + '</span>' + deshacer +
+      (t.avisoVin ? '<span class="pie-nota" style="margin:0;flex-basis:100%">' +
+        esc(t.avisoVin) + '</span>' : '') + '</div>';
+
+  return '';
+}
+
 function recCliente() {
   return `
-  <div class="rejilla-campos">
-    ${recCampo('rut', 'RUT', { marcador: '11.111.111-1' })}
+  <div class="rejilla-campos campos-vertical">
+    ${recCampo('rut', 'RUT', { marcador: '11.111.111-1',
+      ayuda: 'Con el RUT completo se traen los datos que ya estén registrados' })}
+    ${recHallazgo('rut')}
     ${recCampo('nombre', 'Nombre completo', { marcador: 'Nombre y apellidos' })}
     ${recCampo('telefono', 'Teléfono')}
     ${recCampo('correo', 'Correo')}
@@ -84,6 +125,41 @@ function recVin() {
     '<span class="ayuda" data-ayuda="vin">' + esc(recAyudaLargo('vin')) + '</span></div>';
 }
 
+/* ── La fecha de ingreso ────────────────────────────────────────────────
+   🔴 ES EL CAMPO MÁS DELICADO DEL FORMULARIO, aunque no lo parezca.
+
+   Hasta el 16-08-2026 la ponía el sistema con la hora de guardar. El cliente
+   pidió poder escribirla, y tiene razón: la recepción se digita cuando hay un
+   rato libre, no cuando el auto entra, y con la fecha automática TODA orden
+   cargada tarde nacía con menos días de los que llevaba.
+
+   Lo que hay que tener presente al tocarlo: de acá salen los tres relojes, que
+   son la corrección central del proyecto. El motor valida —futura no, más de
+   30 días atrás avisa— y hace arrancar la estadía en esta misma fecha; ver
+   `fechaDeIngreso` en modelo.js.
+
+   Va con HORA y no solo día porque el original la lleva —`2026/08/26 10:48`— y
+   porque un taller que mide días de reparación necesita saber si el auto entró
+   a las 9 de la mañana o a las 6 de la tarde. */
+function recFechaIngreso() {
+  const r = rec();
+  const v = String(r.campos.fecha_ingreso || '');
+  const d = v ? new Date(v) : null;
+  const legible = (d && !isNaN(d.getTime()))
+    ? d.getFullYear() + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' +
+      String(d.getDate()).padStart(2, '0') + ' ' +
+      String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0')
+    : '';
+
+  return '<div class="campo' + (recMarcado('fecha_ingreso') ? ' falta' : '') + '">' +
+    '<label>Fecha de ingreso</label>' +
+    '<input type="datetime-local" data-rec="fecha_ingreso" value="' + esc(v) + '">' +
+    '<span class="ayuda" data-ayuda="fecha_ingreso">' +
+      (legible ? esc(legible) + ' · viene puesta con la hora de ahora; se puede corregir'
+               : 'Cuándo entró el vehículo. De acá salen los días de la orden') +
+    '</span></div>';
+}
+
 function recVehiculo() {
   const r = rec();
   const marcas = Modelo.catalogo('marca');
@@ -91,19 +167,25 @@ function recVehiculo() {
   const anios = [];
   for (let a = 2027; a >= 1979; a--) anios.push({ id: a, nombre: String(a) });
 
+  /* 🔶 EL ORDEN ES EL DEL ORIGINAL (16-08-2026): el VIN va DESPUÉS de Modelo
+     y no al final. Es el orden en que se lee el auto parado en el mesón —la
+     patente, qué es, y recién ahí el número que hay que ir a buscar al
+     chasis—, y era el único campo que estaba fuera de lugar. */
   return `
-  <div class="rejilla-campos">
+  <div class="rejilla-campos campos-vertical">
     ${recCampo('patente', 'Patente', {
       marcador: 'AABB11', largo: PATENTE_LARGO, normalizar: normalizarPatente,
       ayuda: recAyudaLargo('patente') })}
+    ${recHallazgo('patente')}
     ${recCombo('marca_id', 'Marca', marcas, 'marca', { marcador: 'Escribe la marca' })}
     ${recCombo('modelo_id', 'Modelo', modelos, 'modelo', {
       marcador: r.campos.marca_id ? 'Escribe el modelo' : 'Primero la marca',
       apagado: !r.campos.marca_id,
       ayuda: r.campos.marca_id ? '' : 'Depende de la marca' })}
+    ${recVin()}
     ${recCombo('color_id', 'Color', Modelo.catalogo('color_vehiculo'), 'color_vehiculo', { marcador: 'Escribe el color' })}
     ${recSelect('anio', 'Año', anios, { vacio: 'Seleccionar' })}
-    ${recVin()}
+    ${recFechaIngreso()}
   </div>`;
 }
 
@@ -154,7 +236,7 @@ function recOrdenes() {
       return `
       <fieldset class="bloque" style="margin-bottom:12px">
         <legend>Orden ${i + 1} de ${r.bloques.length}</legend>
-        <div class="rejilla-campos">${selTipo}</div>
+        <div class="rejilla-campos campos-vertical">${selTipo}</div>
         ${r.bloques.length > 1
           ? '<div style="margin-top:8px"><button class="btn secundario" data-quitar-blq="' + i + '">Quitar esta orden</button></div>'
           : ''}
@@ -180,10 +262,26 @@ function recOrdenes() {
     <fieldset class="bloque" style="margin-bottom:12px">
       <legend>Orden ${i + 1} de ${r.bloques.length}${r.bloques.length > 1 ? ' · genera su propia OT' : ''}
         · ${esc(t.nombre)}</legend>
-      <div class="rejilla-campos">
+      ${/* 🔶 UN SOLO BLOQUE VERTICAL Y EN EL ORDEN DEL ORIGINAL (16-08-2026):
+
+           Tipo · Compañía · Siniestro · Deducible · Liquidador ·
+           Descripción de daños · Prioridad · Estado · Descripción del estado
+
+           Antes iban en dos rejillas —los desplegables arriba, los textos
+           largos abajo— y eso partía la secuencia: el liquidador y la
+           descripción de daños son del siniestro y quedaban lejos de él, con
+           prioridad y estado metidos en el medio. Ahora se llena en el orden
+           en que se pregunta.
+
+           `N° de OR` va donde van los campos de compañía porque ocupa su mismo
+           lugar: es el dato que identifica la orden del cliente corporativo. */''}
+      <div class="rejilla-campos campos-vertical">
         ${selTipo}
         ${deCompania}
         ${deEmpresa}
+        ${t.exige_compania ? area(i, b, 'liquidador', 'Liquidador / evaluador de la OT') : ''}
+        ${area(i, b, 'descripcion_danos', 'Descripción de daños',
+          'En palabras. Las marcas de la silueta van en el paso 4')}
         ${campoBlq(i, 'prioridad_id', 'Prioridad',
           '<select data-blq="' + i + '" data-campo="prioridad_id">' +
           prios.map((p) => '<option value="' + esc(p.id) + '"' + (b.prioridad_id === p.id ? ' selected' : '') +
@@ -194,23 +292,19 @@ function recOrdenes() {
           estados.map((e) => '<option value="' + esc(e.codigo) + '"' + (b.estado === e.codigo ? ' selected' : '') +
             '>' + esc(e.nombre) + '</option>').join('') + '</select>',
           b.estado ? 'Del maestro, con su redacción exacta' : 'Sin elegir, la orden nace Recibido')}
-        ${/* ⚠️ NO está en la lista de campos que pidió el cliente para ninguno de
-             los tres tipos. Se mantiene porque es lo que convierte la recepción
-             en un TRASPASO y no en un aviso: la orden le aparece a esa persona
-             en su pantalla apenas se guarda. Si el taller lo quiere fuera, se
-             borra este bloque y nada más. */''}
-        ${campoBlq(i, 'responsable_id', 'Responsable de la orden',
-          '<select data-blq="' + i + '" data-campo="responsable_id"><option value="">Sin asignar todavía</option>' +
-          Modelo.sesionesPosibles().map((p) => '<option value="' + esc(p.id) + '"' +
-            (b.responsable_id === p.id ? ' selected' : '') + '>' + esc(p.nombre) + ' · ' +
-            esc(p.cargo) + '</option>').join('') + '</select>',
-          'Le aparece en su pantalla apenas se guarde')}
-      </div>
-      <div class="rejilla-campos" style="margin-top:8px">
-        ${t.exige_compania ? area(i, b, 'liquidador', 'Liquidador / evaluador de la OT') : ''}
-        ${area(i, b, 'descripcion_danos', 'Descripción de daños',
-          'En palabras. Las marcas de la silueta van en el paso 4')}
         ${area(i, b, 'descripcion_estado', 'Descripción del estado')}
+        ${/* ⛔ ACÁ IBA `Responsable de la orden`, y se eliminó el 16-08-2026 a
+             pedido del cliente. Nunca estuvo en la lista de campos que él pidió
+             para ninguno de los tres tipos: lo habíamos agregado nosotros para
+             que la recepción fuera un TRASPASO —la orden le aparecía a esa
+             persona apenas se guardaba— y no un simple aviso.
+
+             🔴 Tiene una consecuencia medida y hay que decirla: en el sistema
+             real 52 de 98 órdenes vivas están «Sin Asignar». Si nadie asigna
+             en la recepción, alguien tiene que hacerlo al abrir la primera
+             etapa, o la Torre no dice quién tiene el auto. Es réplica fiel del
+             original, pero conviene que el taller lo sepa antes y no lo
+             descubra. Anotado como pregunta abierta 18. */''}
       </div>
       ${r.bloques.length > 1
         ? '<div style="margin-top:8px"><button class="btn secundario" data-quitar-blq="' + i + '">Quitar esta orden</button></div>'
@@ -482,9 +576,6 @@ function recVerificar() {
           ${d('Prioridad', nom('prioridad', b.prioridad_id))}
           ${d('Estado', est ? esc(est.nombre)
             : '<span class="et gris">Sin datos</span> <span class="ayuda">nace Recibido</span>')}
-          ${d('Responsable', b.responsable_id
-            ? esc((Modelo.sesionesPosibles().find((p) => p.id === b.responsable_id) || {}).nombre || '')
-            : nada)}
         </div>
       </div>
       ${t && t.exige_compania ? '<div class="dato-largo"><span class="k">Liquidador / evaluador</span>' +
@@ -554,43 +645,23 @@ function recVerificar() {
   <h3 class="rot-seccion">3 · Solicitud de reparación</h3>
   ${r.bloques.map(orden).join('')}
 
-  ${/* 🔶 LA FIRMA DEL CLIENTE (15-08-2026). Se había sacado el 13-08 con el
-       argumento de que el comprobante se firma en papel; el cliente la pidió de
-       vuelta: quiere que firme en la tablet o el celular y que salga impresa.
+  ${/* ⛔ ACÁ VIVÍA EL RECUADRO PARA FIRMAR EN PANTALLA, y se eliminó el
+       26-08-2026 a pedido del cliente. Es la SEGUNDA vez: se había sacado el
+       13-08 con el mismo argumento —el comprobante se firma en papel— y el
+       cliente lo pidió de vuelta el 15-08.
 
-       Va en ESTE paso y no en otro: el cliente firma lo que acaba de revisar, y
-       lo que acaba de revisar es este resumen. Firmar antes de ver el resumen
-       sería firmar a ciegas. */''}
-  <fieldset class="bloque" style="margin-top:12px"><legend>Firma del cliente</legend>
-    <div class="firma-zona">
-      <canvas id="firma-lienzo" width="620" height="190"
-        class="${r.firma || (r.firmaTrazos || []).length ? 'firmado' : ''}" aria-label="Zona para firmar"></canvas>
-      <div class="firma-pie">
-        <span class="ayuda">${r.firma || (r.firmaTrazos || []).length
-          ? 'Firmado. Sale impreso en el comprobante de recepción.'
-          : 'El cliente firma con el dedo en la tablet o el celular, o con el mouse.'}</span>
-        ${/* 🔷 DESHACER (16-08-2026, Marco). Antes lo único que había era
-              «Borrar y volver a firmar»: si al cliente le salía mal el apellido
-              tenía que rehacer la firma entera. Deshacer saca el último trazo
-              —el que va desde que apoya el dedo hasta que lo levanta— y deja lo
-              anterior donde estaba.
+       La razón por la que esta vez se queda fuera está escrita en C-47, y es
+       la que faltaba las dos veces anteriores: el comprobante necesita TRES
+       firmas —quien recepciona, el cliente, quien entrega— y la captura digital
+       resolvía UNA. Las otras dos siempre fueron a mano. Una en pantalla y dos
+       en papel era el peor de los dos mundos.
 
-              Se aprieta siempre, también con el recuadro en blanco: ahí no se
-              queda mudo, dice que no hay nada que deshacer. */''}
-        <span class="acciones-firma">
-          <button type="button" class="btn secundario" id="firma-deshacer">Deshacer el último trazo</button>
-          <button type="button" class="btn secundario" id="firma-borrar">Borrar y volver a firmar</button>
-        </span>
-      </div>
-    </div>
-    <div class="pie-nota">La firma no es obligatoria para ingresar la recepción: si el cliente dejó
-      el auto y se fue, el vehículo entra igual. Lo que no se puede es decir que firmó sin que haya
-      firmado.</div>
-  </fieldset>
+       Si alguien vuelve a pedirla, lo que hay que discutir primero son las
+       tres, no una. */''}
 
   ${/* Las observaciones se escriben en el paso 4, junto al dibujo, que es donde
-       están mirando el auto. Acá se muestran para revisarlas antes de firmar,
-       no para escribirlas de nuevo. */''}
+       están mirando el auto. Acá se muestran para revisarlas antes de imprimir
+       el comprobante, no para escribirlas de nuevo. */''}
   <div class="dato-largo" style="margin-top:12px"><span class="k">Observaciones de la recepción</span>
     <span class="v">${v(r.campos.observaciones)}</span></div>
 

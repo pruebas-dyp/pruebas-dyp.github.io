@@ -1093,6 +1093,105 @@ svg.chispa.verde .chispa-punto { fill: var(--verde); }
 }
 .enlace-volver:hover { text-decoration: underline; }
 
+/* ───────── Las pantallas que cuelgan de una orden, en el expandible ─────────
+   La rejilla de botones grandes de la Torre: icono en un círculo y rótulo
+   debajo, como las ocho pantallas del sistema real.
+
+   `auto-fit` y no un número fijo de columnas: el expandible vive dentro de una
+   tabla que ya se puede ensanchar y achicar, así que la rejilla tiene que
+   acomodarse sola. En pantalla ancha entran cuatro; achicando baja a tres y a
+   dos sin que ningún rótulo se salga.
+
+   🔴 Ni un color escrito a mano: todos salen de las variables del tema. El
+   círculo tiene que leerse igual en oscuro y en claro, y un `#fff` acá se ve
+   bien en uno de los dos y desaparece en el otro. */
+/* ───────── Lo que se trajo del padrón ─────────
+   La línea que aparece bajo el RUT o la patente cuando se encontró algo. Es
+   discreta a propósito: informa, no interrumpe. La variante `malo` es para el
+   caso que SÍ frena —la patente con orden abierta—, y por eso cambia de color.
+
+   Todos los colores salen de las variables del tema: la línea tiene que
+   leerse igual en oscuro y en claro. */
+.hallazgo {
+  grid-column: 1 / -1;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin: -2px 0 2px; padding: 6px 9px;
+  border: 1px solid var(--verde-borde); border-radius: 3px;
+  background: var(--verde-bg); color: var(--verde-texto);
+  font-size: 11.5px; line-height: 1.45;
+}
+.hallazgo span { flex: 1 1 auto; min-width: 0; }
+.hallazgo .ico { flex: 0 0 auto; width: 14px; height: 14px; }
+.hallazgo.malo {
+  border-color: var(--ambar-borde); background: var(--ambar-bg); color: var(--ambar-texto);
+}
+/* En el bloque vertical la etiqueta ocupa la primera columna: la línea va
+   debajo del campo entero, no metida en la columna del valor. */
+.campos-vertical .hallazgo { margin-left: 0; }
+
+/* ───────── El expandible de la Torre, con dos paneles ─────────
+   🔴 CLASE PROPIA, y `.ficha-rejilla` NO SE TOCA: la comparten ocho pantallas
+   —la ficha, el histórico, la entrega, el personal, el presupuesto y los dos
+   pasos de la recepción—, así que cambiarla para acomodar la Torre las movería
+   todas.
+
+   `.ficha-rejilla` es `auto-fit` con `minmax(240px, 1fr)`: con cuatro paneles
+   repartía bien, pero al quedar DOS cada uno se estiraba a media pantalla
+   —más de 500 px para una columna de etiqueta y valor—, con el texto perdido a
+   la izquierda y una franja vacía a la derecha. El tope los deja del ancho que
+   ya tenían y los junta al comienzo, en vez de repartirlos a lo ancho. */
+.detalle-torre {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 360px));
+  justify-content: start;
+}
+
+.pantallas-ot {
+  display: grid;
+  /* Tope de 200px por tarjeta, y no `1fr`, POR EL CASO DE UNA SOLA. Un operario
+     de Pintura ve un botón: con `1fr` esa única tarjeta se estiraba a los 1.084
+     px del expandible —medido— y quedaba un rótulo perdido en medio de una
+     franja vacía. Con el tope mide 200 aunque esté sola.
+     El ancho máximo de la rejilla da las cuatro columnas en pantalla ancha:
+     4 × 200 + 3 × 8 de separación. Achicando baja a tres y a dos sola. */
+  grid-template-columns: repeat(auto-fit, minmax(150px, 200px));
+  justify-content: start;
+  /* 🔴 EL TOPE MIRA LA VENTANA, no al contenedor. El expandible vive en una
+     celda de la tabla de la torre, que tiene 17 columnas y scroll horizontal
+     propio: esa celda mide 1.800 px aunque la ventana mida 560, así que con un
+     tope fijo la rejilla nunca bajaba de cuatro columnas y en pantalla chica
+     había que scrollear la tabla para ver los últimos botones.
+     Atada al ancho visible, baja sola a tres y a dos. */
+  max-width: min(824px, calc(100vw - 120px));
+  gap: 8px;
+  margin-top: 10px;
+}
+.pantalla-ot {
+  display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
+  gap: 7px; padding: 12px 8px; min-height: 96px;
+  background: var(--superficie); border: 1px solid var(--borde); border-radius: 4px;
+  color: var(--texto); font-family: inherit; font-size: 11.5px; cursor: pointer;
+  text-align: center;
+}
+.pantalla-ot:hover { background: var(--superficie-2); border-color: var(--acento-borde); }
+.pantalla-ot:hover .aro { background: var(--acento-bg); border-color: var(--acento-borde); }
+.pantalla-ot:hover .aro .ico { color: var(--acento); }
+.pantalla-ot:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
+
+.pantalla-ot .aro {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; flex: 0 0 38px; border-radius: 50%;
+  background: var(--neutro-bg); border: 1px solid var(--borde);
+}
+.pantalla-ot .aro .ico { color: var(--gris); width: 18px; height: 18px; flex-basis: 18px; }
+
+/* El rótulo se parte en dos líneas cuando hace falta —«Ver/Subir Documentos o
+   imágenes» es largo— en vez de desbordar la tarjeta o cortarse con puntos. */
+.pantalla-ot .rot { line-height: 1.3; overflow-wrap: anywhere; }
+
+/* La que todavía no se construye: se ve que está y se ve que no anda. */
+.pantalla-ot.pendiente { opacity: .62; }
+.pantalla-ot.pendiente:hover { opacity: 1; }
+
 /* Formularios tipo ficha */
 .rejilla-campos { display: grid; grid-template-columns: repeat(auto-fit, minmax(172px, 1fr)); gap: 8px; }
 .campo { display: flex; flex-direction: column; gap: 2px; }
@@ -1106,6 +1205,45 @@ svg.chispa.verde .chispa-punto { fill: var(--verde); }
    escribir en ese campo, y solo en ése: los otros siguen señalados. */
 .campo.falta input, .campo.falta select, .campo.falta textarea { border-color: var(--rojo); background: var(--rojo-bg); }
 .campo.falta label { color: var(--rojo-texto); }
+
+/* ───────── Formulario en vertical, como el sistema original ─────────
+   Un campo por fila, el rótulo a la izquierda alineado a la derecha y el campo
+   a la derecha. Lo usan los pasos 1, 2 y 3 de Recepción.
+
+   🔴 ES UNA CLASE APARTE, y no un cambio a `.rejilla-campos`. Esa la usan el
+   presupuesto, bodega, configuración, documentos, entrega, etapas y seis
+   puntos más de la propia recepción: tocarla para acomodar una pantalla
+   descuadra otras diez que nadie va a mirar hasta que el cliente las abra.
+
+   El ancho tope existe porque un campo de texto de 1.400 px no se lee como un
+   campo: el ojo pierde de qué rótulo venía. Con el tope, la columna de rótulos
+   queda pegada a la de campos y el par se lee junto. */
+.campos-vertical { display: block; max-width: 860px; }
+.campos-vertical .campo {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  column-gap: 12px; row-gap: 2px;
+  align-items: center;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--borde);
+}
+.campos-vertical .campo:last-child { border-bottom: 0; }
+
+/* Todo va a la derecha salvo el rótulo del campo. `:first-child` y no `label`
+   a secas: adentro hay OTROS `<label>` —la casilla «No viene a la vista» del
+   VIN— que son contenido del campo y no su rótulo. */
+.campos-vertical .campo > * { grid-column: 2; }
+.campos-vertical .campo > label:first-child {
+  grid-column: 1; text-align: right; align-self: center;
+}
+
+/* En una fila angosta el rótulo arriba y el campo abajo: a 620 px las dos
+   columnas dejan al campo sin ancho para escribir. */
+@media (max-width: 620px) {
+  .campos-vertical .campo { grid-template-columns: minmax(0, 1fr); }
+  .campos-vertical .campo > *, 
+  .campos-vertical .campo > label:first-child { grid-column: 1; text-align: left; }
+}
 
 /* Rótulos internos de un paso del formulario, y el título de una sección del
    resumen. No son <h2>: el panel ya tiene el suyo. */
@@ -1665,7 +1803,7 @@ table.grid tr.fila-desplegable.solo-flecha td.flecha-col:hover .flecha { color: 
   background: var(--borde); border: 1px solid var(--borde);
   border-radius: 3px; overflow: hidden; margin-bottom: 14px;
 }
-.tira-tempario .celda { background: var(--superficie-2); padding: 13px 16px; }
+.tira-tempario .celda { background: var(--superficie-2); padding: 8px 11px; }
 .tira-tempario .celda.destacada { background: var(--acento-bg); }
 .tira-tempario .rot {
   display: block; font-size: 9.5px; font-weight: 700; letter-spacing: .7px;
@@ -1677,27 +1815,6 @@ table.grid tr.fila-desplegable.solo-flecha td.flecha-col:hover .flecha { color: 
 }
 .tira-tempario .pie { display: block; font-size: 10.5px; color: var(--gris); margin-top: 2px; }
 
-/* 🔴 EL PANEL DE PRESUPUESTO, MÁS AMPLIO (26-08-2026, Marco: «que se parezca un
-   poco más a lo que tienen hoy día… que quede como más amplio cada campo y así
-   para que tengan una visibilidad más fácil de hacer el trabajo»).
-
-   Es la pantalla donde más rato pasa el evaluador —presupuestos de hasta cien
-   ítems, según él mismo— y era la más apretada del sistema: filas de 9 px de
-   alto y casillas de horas de 80. Acá sólo se le da aire; lo que hace la
-   pantalla no cambia. */
-.bloque-presu table.grid td { padding-top: 9px; padding-bottom: 9px; }
-.bloque-presu table.grid th { padding-top: 8px; padding-bottom: 8px; }
-.bloque-presu table.grid input,
-.bloque-presu table.grid select { min-height: 34px; font-size: 13.5px; }
-
-/* La OP de cada línea: el desplegable con la palabra, no una letra. */
-select.op-linea {
-  width: 100%; min-height: 34px; padding: 5px 8px; font-size: 13px;
-  border: 1px solid var(--borde); border-radius: 3px;
-  background: var(--superficie); color: var(--texto);
-}
-select.op-linea:focus { outline: 2px solid var(--acento); outline-offset: -1px; }
-
 /* La franja de agregar línea, con la forma del sistema actual: encabezados
    arriba, el campo de descripción ANCHO —es el que más se escribe y el que
    más largo queda: «neumatico sailun terramax sv301 235/55R19 delantero
@@ -1706,18 +1823,13 @@ select.op-linea:focus { outline: 2px solid var(--acento); outline-offset: -1px; 
   border: 1px solid var(--borde); border-radius: 3px;
   background: var(--superficie); margin-bottom: 14px; overflow: hidden;
 }
-/* 🔴 MÁS AMPLIO (26-08-2026, Marco). Las tres celdas eran 1fr / 220 / 150 y el
-   desplegable y el botón quedaban chicos al lado de una descripción enorme. En
-   el sistema que usan hoy las tres se parecen bastante más. Se sube el mínimo
-   de las dos de la derecha sin quitarle a la descripción, que sigue siendo la
-   que más texto recibe. */
 .agregar-linea .rot,
-.agregar-linea .fila { display: grid; grid-template-columns: 1fr 300px 220px; }
+.agregar-linea .fila { display: grid; grid-template-columns: 1fr 220px 150px; }
 .agregar-linea .rot {
   background: var(--superficie-2); border-bottom: 1px solid var(--borde);
 }
 .agregar-linea .rot span {
-  padding: 8px 13px; font-size: 10.5px; font-weight: 700; letter-spacing: .4px;
+  padding: 5px 10px; font-size: 10.5px; font-weight: 700; letter-spacing: .4px;
   text-transform: uppercase; color: var(--gris);
   border-right: 1px solid var(--borde);
 }
@@ -1727,17 +1839,13 @@ select.op-linea:focus { outline: 2px solid var(--acento); outline-offset: -1px; 
 .agregar-linea .fila input,
 .agregar-linea .fila select {
   width: 100%; height: 100%; border: none; border-right: 1px solid var(--borde);
-  /* 44px de alto: es lo que mide la fila en el sistema que usan, y es la
-     medida con la que un campo se ve como un campo y no como una línea de
-     texto suelta. */
-  min-height: 44px; padding: 10px 13px; font-size: 14px;
-  background: var(--superficie); color: var(--texto);
+  padding: 8px 10px; font-size: 13px; background: var(--superficie); color: var(--texto);
 }
 .agregar-linea .fila input:focus,
 .agregar-linea .fila select:focus { outline: 2px solid var(--acento); outline-offset: -2px; }
 .agregar-linea .fila .btn { border-radius: 0; height: 100%; }
 .agregar-linea .pie {
-  padding: 9px 13px; font-size: 11px; color: var(--gris);
+  padding: 6px 10px; font-size: 11px; color: var(--gris);
   border-top: 1px solid var(--borde); background: var(--superficie-2);
 }
 @media (max-width: 820px) {
@@ -1809,20 +1917,6 @@ table.grid tfoot td { border-top: 1px solid var(--borde-fuerte);
    cifras se lean en columna. */
 table.grid td.num input[type="number"] { text-align: right; }
 
-/* ───────── Firma del cliente ─────────
-   `touch-action:none` es lo que hace que se pueda firmar con el dedo: sin eso
-   el gesto hace scroll de la página y el trazo sale cortado. */
-.firma-zona { display: flex; flex-direction: column; gap: 6px; }
-#firma-lienzo {
-  width: 100%; max-width: 620px; height: auto; aspect-ratio: 620 / 190;
-  background: #fff; border: 1px dashed var(--borde-fuerte); border-radius: 4px;
-  cursor: crosshair; touch-action: none;
-}
-#firma-lienzo.firmado { border-style: solid; border-color: var(--verde); }
-.firma-pie { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
-/* Los dos botones van juntos a la derecha. Sueltos, el `space-between` los
-   repartía a lo ancho y «Deshacer» quedaba flotando en medio del recuadro. */
-.acciones-firma { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .casilla { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--gris); cursor: pointer; }
 .casilla input { width: auto; margin: 0; }
 

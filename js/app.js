@@ -543,6 +543,20 @@ function pararEnLaOrden(numeroOT) {
     }
     case 'documentos':
       documentosEstado().otId = o.id; break;
+    /* Recepción parada en una orden significa CORREGIRLA: es lo único que se
+       puede hacer sobre una recepción que ya existe. Llegar al menú de los
+       cuatro botones obligaría a buscar la patente de nuevo teniendo el número
+       de la orden en la mano.
+
+       Sin `ot.editar` se queda en el menú en vez de rebotar: el motor rechaza
+       igual al guardar, y dejar a alguien mirando un formulario que no va a
+       poder guardar es peor que no abrírselo. */
+    case 'recepcion': {
+      if (!Modelo.puede('ot.editar')) return;
+      editRecCargar(o);
+      rec().pantalla = 'editar-ficha';
+      break;
+    }
     case 'entrega':
       ui.entrega = ui.entrega || {}; ui.entrega.patente = o.patente; ui.entrega.otId = o.id; break;
     default: return;
