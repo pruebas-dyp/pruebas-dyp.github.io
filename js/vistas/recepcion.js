@@ -428,7 +428,17 @@ function vRecepcionBuscar(modo) {
       <div class="desc">${esc(cfg.desc)}</div></div>
     </div>
     <div class="cuerpo">
-      <div class="rejilla-campos">
+      ${/* 🔴 EL CAMPO SE ACOTA ACÁ, NO EN `.rejilla-campos` (26-08-2026,
+           pedido del cliente: «que sea más corto, es súper largo»).
+
+           La clase la comparten ocho pantallas y es `auto-fit` con
+           `minmax(172px, 1fr)`: reparte bien con varios campos, pero con UNO
+           solo lo estira a todo el ancho del panel. Una patente son seis
+           caracteres y el recuadro medía más de mil píxeles.
+
+           Se acota esta instancia con un `max-width` y la clase queda intacta:
+           tocarla movería la recepción, la ficha, el histórico y las otras. */''}
+      <div class="rejilla-campos" style="max-width:240px">
         <div class="campo"><label>Patente</label>
           <input id="rec-buscar-patente" value="${esc(r.buscaEditar)}" placeholder="AABB11"
             autocomplete="off"></div>
@@ -456,15 +466,18 @@ function vRecepcionBuscar(modo) {
       <div class="nota" style="margin-top:11px">Ninguna orden abierta con esa patente.
         Si el vehículo ya se entregó, está en el Histórico.</div>`) : ''}
 
-      ${modo === 'editar' ? `
-      <div class="nota info" style="margin-top:12px">${ico('info')}
-        <strong>La recepción se corrige versionándola.</strong> Se cambia el cliente, el vehículo,
-        los datos de la recepción, el checklist y <strong>los daños de la silueta</strong>; lo que
-        estaba queda guardado con quién lo cambió, cuándo y por qué, y el comprobante impreso dice
-        qué versión es. <strong>El papel firmado no se toca</strong>: la hoja que el cliente
-        firmó en el mesón sigue siendo la original, y lo que se corrige es lo que el sistema dice
-        de ella. Si una corrección obliga a reimprimir y volver a firmar lo decide el taller.
-      </div>` : `
+      ${/* ⛔ ACÁ IBA EL CARTEL AZUL DE «la recepción se corrige versionándola»,
+           eliminado el 26-08-2026 a pedido del cliente. Eran seis renglones de
+           explicación sobre una pantalla cuyo único trabajo es escribir una
+           patente y apretar un botón.
+
+           No se pierde: el mismo aviso está DENTRO del editor, que es donde
+           importa —ahí es donde alguien está a punto de cambiar algo—, y ahí
+           también está la lista de correcciones anteriores con su motivo.
+
+           ⚠️ El cartel del modo `Agregar OR` (abajo) NO estaba marcado y se
+           queda. Si se quiere el mismo trato, es borrar el otro bloque. */''}
+      ${modo === 'editar' ? '' : `
       <div class="nota info" style="margin-top:12px">${ico('info')}
         <strong>Abrir la OR no es valorizarla.</strong> Acá se abre la orden de reparación sobre el
         vehículo —que es lo que hace el recepcionista— y queda en cero, esperando que el evaluador

@@ -166,7 +166,6 @@ function vPresupuestoListado() {
   const veMontos = Modelo.puede('presupuesto.montos');
   const q = p.busqueda.trim().toLowerCase();
   const filas = Modelo.torre()
-    .filter((o) => !p.soloSin || !o.presupuestos.length)
     .filter((o) => !q ||
       [o.numeroOT, o.patente, o.cliente, o.presupuestos.map((x) => x.numeroOR).join(' ')]
         .join(' ').toLowerCase().includes(q));
@@ -181,9 +180,16 @@ function vPresupuestoListado() {
   <div class="panel">
     <div class="cab">
       <div><h2>${ico('presupuesto', 'g')}Presupuesto</h2>
-        <div class="desc">Las 9 columnas del original, con el total neto por orden</div></div>
-      <div class="filtros"><input type="search" id="q-presu" placeholder="OT, OR, patente o cliente" value="${esc(p.busqueda)}">
-        <button class="btn secundario" id="presu-solo-sin" title="Ver solo las órdenes que todavía no tienen OR abierta">Sin OR</button></div>
+        ${/* ⛔ La bajada se eliminó el 26-08-2026, con la ruta y la barra. */''}</div>
+      ${/* ⛔ EL FILTRO «Sin OR» SE ELIMINÓ (26-08-2026, pedido del cliente).
+           Con él se fue `p.soloSin` entero: el estado, el filtro de la lista y
+           su manejador. Dejar el estado sin quién lo encienda es dejar una
+           rama que nunca corre.
+
+           Lo que el filtro buscaba se sigue viendo sin él: las órdenes sin OR
+           llevan la etiqueta ámbar «sin OR» en su columna, y son las únicas que
+           muestran `Generar` en la columna Acción. */''}
+      <div class="filtros"><input type="search" id="q-presu" placeholder="OT, OR, patente o cliente" value="${esc(p.busqueda)}"></div>
     </div>
     <div class="grid-envoltorio"><table class="grid">
       <thead><tr><th>OT</th><th>Cliente</th><th>Patente</th><th>Marca</th><th>Modelo</th>
@@ -826,12 +832,6 @@ function pPresupuesto() {
     const n = document.getElementById('q-presu');
     n.focus(); n.setSelectionRange(n.value.length, n.value.length);
   });
-
-  const soloSin = document.getElementById('presu-solo-sin');
-  if (soloSin) {
-    soloSin.classList.toggle('activo', !!p.soloSin);
-    soloSin.addEventListener('click', () => { p.soloSin = !p.soloSin; render(); });
-  }
 
   /* 🔴 LOS BOTONES DE FILA CORTAN EL EVENTO. La fila entera abre la orden con
      doble clic, así que sin `stopPropagation` apretar dos veces seguidas

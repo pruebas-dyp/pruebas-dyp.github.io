@@ -137,7 +137,8 @@ function vTorre() {
   <div class="panel">
     <div class="cab">
       <div><h2>${ico('torre', 'g')}Torre de control</h2>
-        <div class="desc">Las 17 columnas del sistema actual. Un clic despliega el expandible; doble clic abre la orden</div></div>
+        ${/* ⛔ La bajada se eliminó el 26-08-2026 con la ruta y la barra: contaba
+             cómo se usa la tabla, y eso se aprende al primer clic. */''}</div>
       <div class="filtros">
         <input type="search" id="q-torre" placeholder="OT, OR, patente, siniestro o cliente" value="${esc(f.busqueda)}">
         <select id="s-compania"><option value="todas">Todas las compañías</option>

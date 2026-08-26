@@ -112,15 +112,26 @@ const MODULOS = {
      palabras. */
   recepcion:   { ruta: [],
                  acciones: [['guardar', 'Ingresar recepción', 'guardar', 'F2']] },
-  torre:       { ruta: ['Operación diaria', 'Torre de control'],
-                 acciones: [['refrescar', 'Actualizar', 'refrescar', 'F5'],
-                            ['nuevo', 'Nuevo ingreso', 'nuevo'],
-                            ['editar', 'Abrir la orden', 'abrir'],
-                            ['exportar', 'Exportar', 'exportar'],
-                            ['imprimir', 'Imprimir', 'imprimir']] },
-  taller:      { ruta: ['Operación diaria', 'Taller'],
-                 acciones: [['refrescar', 'Actualizar', 'refrescar', 'F5'],
-                            ['exportar', 'Exportar', 'exportar']] },
+  /* ⛔ SIN RUTA Y SIN BARRA (26-08-2026, pedido del cliente). Los tres módulos
+     de tabla larga —Torre, Taller y Presupuesto— pierden las dos líneas de
+     encabezado, y con ellas dos pantallas de alto en un monitor de taller.
+
+     · La RUTA decía con otras palabras lo que ya dicen el título del módulo y
+       el renglón marcado en la barra lateral. Tres veces lo mismo.
+     · `Actualizar` era F5, que el navegador ya hace y que el sistema NO
+       intercepta a propósito, así que la tecla sigue funcionando igual.
+     · `Nuevo ingreso` y `Abrir la orden` tienen su camino de siempre: el módulo
+       Recepción en la barra lateral, y el doble clic en la fila.
+
+     🔴 `Exportar` e `Imprimir` SÍ se van sin reemplazo: estos botones eran los
+     únicos que llamaban a esas acciones. El despachador sigue entero, así que
+     devolverlas es una línea — pero mientras tanto no hay cómo exportar la
+     Torre, el Taller ni el Presupuesto. Anotado en C-50 y como pregunta
+     abierta 27, para que sea una decisión y no un descuido.
+
+     La fila NO desaparece: `Datos de demostración` vive ahí y se queda. */
+  torre:       { ruta: [], acciones: [] },
+  taller:      { ruta: [], acciones: [] },
   entrega:     { ruta: ['Recepción', 'Entregar Unidad'],
                  acciones: [['buscar', 'Buscar patente', 'buscar'],
                             ['refrescar', 'Actualizar', 'refrescar', 'F5']] },
@@ -132,10 +143,8 @@ const MODULOS = {
   detenidos:   { ruta: ['Seguimiento', 'Esperas'],
                  acciones: [['refrescar', 'Actualizar', 'refrescar', 'F5'],
                             ['exportar', 'Exportar', 'exportar']] },
-  presupuesto: { ruta: ['Seguimiento', 'Presupuesto'],
-                 acciones: [['refrescar', 'Actualizar', 'refrescar', 'F5'],
-                            ['exportar', 'Exportar', 'exportar'],
-                            ['imprimir', 'Imprimir', 'imprimir']] },
+  // Sin ruta ni barra, igual que Torre y Taller — ver el bloque de arriba.
+  presupuesto: { ruta: [], acciones: [] },
   bodega:      { ruta: ['Seguimiento', 'Bodega'],
                  acciones: [['buscar', 'Buscar patente', 'buscar'],
                             ['refrescar', 'Actualizar', 'refrescar', 'F5'],
