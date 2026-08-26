@@ -53,7 +53,17 @@ function fichaAplicarDireccion() {
   const tab = typeof PARAM_TAB === 'function' ? PARAM_TAB() : null;
   const modo = typeof PARAM_MODO === 'function' ? PARAM_MODO() : null;
   if (tab && FICHA_TABS.some((t) => t.id === tab)) f.tab = tab;
-  if (modo === 'asignar' || modo === 'finalizar') { f.modoEtapas = modo; f.soloEtapas = true; }
+  /* 🔴 SIN `modo` EN LA DIRECCIÓN, LA PANTALLA RECORTADA SE APAGA. No basta
+     con encenderla cuando el parámetro está: pegar el enlace de una orden
+     —`#ot=23344`, sin modo— en una pestaña que venía de asignar etapas dejaba
+     la pantalla recortada, o sea que el que recibía el enlace veía las etapas
+     en vez de la orden que le mandaron y sin forma de saber por qué.
+
+     Es la misma trampa que ya había pasado con `tab`: un parámetro que falta
+     tiene que APAGAR lo que enciende, no dejarlo como estaba. */
+  const pideEtapas = modo === 'asignar' || modo === 'finalizar';
+  if (pideEtapas) f.modoEtapas = modo;
+  f.soloEtapas = pideEtapas;
   return f;
 }
 
