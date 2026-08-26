@@ -10,10 +10,24 @@
 const CLAVE_VER_CREDENCIALES = 'dyp-ingreso-credenciales';
 
 const CSS_INGRESO = `
+/* 26-08-2026. Aca decia justify-content:center, y con las credenciales de
+   demostracion desplegadas la tarjeta mide 1.356 px: en una pantalla de 1.000
+   se salia 178 px POR ARRIBA, y esos 178 no habia forma de alcanzarlos. Medido:
+   scrollHeight 1210 contra clientHeight 1000, o sea 210 px de recorrido hacia
+   abajo, y el tope de la tarjeta en -178 con scrollTop ya en cero. El logo, el
+   titulo y la etiqueta USUARIO quedaban cortados y no se podia subir.
+
+   Es el centrado con flex: un hijo mas alto que el contenedor se desborda por
+   los dos lados, y lo que se sale por arriba del borde de inicio NO se puede
+   desplazar. Se centra con margin:auto en el HIJO, que reparte el espacio
+   sobrante cuando cabe y no roba nada cuando no cabe.
+
+   Los dialogos (.modal) no tienen este problema y por eso no se tocan: se
+   limitan solos con max-height:86vh. */
 .velo-ingreso{position:fixed;inset:0;z-index:9500;overflow:auto;
   background:radial-gradient(1200px 620px at 50% -10%, rgba(59,111,212,.16), transparent 62%), var(--fondo);
-  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 20px}
-.caja-ingreso{width:100%;max-width:392px}
+  display:flex;flex-direction:column;align-items:center;padding:32px 20px}
+.caja-ingreso{width:100%;max-width:392px;margin:auto}
 
 .marca-ing{text-align:center;margin-bottom:26px}
 .marca-ing .placa{display:inline-flex;align-items:center;justify-content:center;
