@@ -311,51 +311,33 @@ const Reglas = (function () {
   const tieneRepuestoPendiente = (db, ot_id) => repuestosPendientes(db, ot_id).length > 0;
   const estaFueraDeTaller = (db, ot_id) => !estadiaAbierta(db, ot_id);
 
-  /* ── Regla 11 · La OR es compuesta ─────────────────────────────────────
-        23488-18382-001
-          │      │     └── correlativo de la OR dentro de esa reparación
-          │      └──────── id de la reparación
-          └─────────────── número de OT
-     "El presupuesto genera el apellido de la OT." El correlativo es POR
-     ORDEN, no global: la versión anterior devolvía un consecutivo único
-     para todo el sistema y eso no reproduce el formato real. */
+  /* ── Regla 11 · La OR nace con la OT ─────────────────────────────
+     🔴 26-08-2026, Marco, después de la visita en terreno: «la OR se le debe
+     asignar automáticamente una vez que se genere la OT. Actualmente se genera
+     a través del presupuesto pero eso estaba mal».
 
-  /* La OR SIN el correlativo final. Pedido del cliente el 15-08-2026: antes
-     era `23368-18868-001` y ahora es `23368-18868`.
+     Lo que había: la OR era compuesta —`23368-18868`, número de OT más un id de
+     reparación— y se armaba al CREAR EL PRESUPUESTO. Dos consecuencias que en
+     terreno se vieron mal:
 
-     ⚠️ Esto se APARTA de la réplica y hay que decirlo: la OR compuesta con sus
-     tres partes es lo que muestra el sistema actual —verificado en pantalla, la
-     de repuestos titula "Repuestos Presupuesto Orden N° 23488-18382-001"—. En
-     `DECISIONES-REPLICA` estaba clasificada como Igual y pasa a Corregido.
+       · una orden sin presupuesto no tenía OR, y el taller la necesita antes;
+       · la OR no era un correlativo, era una cuenta sobre el número de OT.
 
-     Lo que hacía el correlativo era distinguir las VERSIONES de un mismo
-     presupuesto. Sacándolo, la OR identifica la reparación y las versiones la
-     comparten, que además calza mejor con la regla del propio cliente: el
-     presupuesto se versiona, no se edita, y las versiones son del mismo
-     trabajo. La versión se muestra aparte, que es donde corresponde.
+     Ahora la OR es un CORRELATIVO PROPIO, igual que la OT: 19810, 19811, 19812.
+     Sale del parámetro `correlativo_or` y se asigna en el mismo momento en que
+     nace la orden. Cada OT tiene una y sólo una; las versiones del presupuesto
+     la comparten, porque son el mismo trabajo.
 
-     El campo `correlativo` se sigue guardando en la fila. No se muestra, pero
-     al migrar hay presupuestos ya enviados a las compañías con el número viejo
-     impreso, y sin él no habría cómo reconstruirlo. */
-  function formatoOR(numero_ot, id_reparacion) {
-    return String(numero_ot) + '-' + String(id_reparacion);
-  }
-
-  function siguienteCorrelativoOR(db, ot_id, id_reparacion) {
-    const previos = db.presupuesto.filter(
-      (p) => p.ot_id === ot_id && String(p.id_reparacion) === String(id_reparacion));
-    return previos.reduce((m, p) => Math.max(m, Number(p.correlativo) || 0), 0) + 1;
-  }
-
-  /* Desde que la OR no lleva correlativo, sus VERSIONES la comparten a
-     propósito: son el mismo trabajo. Lo que no puede pasar es abrir un
-     presupuesto nuevo sobre una reparación que ya tiene uno — eso es
-     versionarlo, y hay una operación para eso. */
-  function numeroORDisponible(db, numero_or) {
-    return db.presupuesto.some((p) => p.numero_or === numero_or)
-      ? no('La OR ' + numero_or + ' ya existe para esta reparación. Un presupuesto no se ' +
-           'reemplaza con otro: se crea la versión siguiente, y la anterior queda intacta.')
-      : ok();
+     ⚠️ SE FUERON `formatoOR`, `siguienteCorrelativoOR` y `numeroORDisponible`.
+     La última comprobaba que dos presupuestos no chocaran con la misma OR: con
+     la OR colgando de la orden eso dejó de ser un choque y pasó a ser lo
+     correcto —la segunda es la versión 2 del mismo trabajo—. Dejarla habría
+     bloqueado versionar un presupuesto, que es la operación normal. */
+  function siguienteNumeroOR(db) {
+    const n = Number(parametro(db, 'correlativo_or', 19810));
+    const fila = db.parametro.find((x) => x.clave === 'correlativo_or');
+    if (fila) fila.valor = n + 1;
+    return n;
   }
 
   /* ── Regla 12 · Alertas ────────────────────────────────────────────────
@@ -783,7 +765,7 @@ const Reglas = (function () {
     puedeEscribirBitacora,
     puedeAbrirDetencion, puedeCerrarDetencion,
     // OR
-    formatoOR, siguienteCorrelativoOR, numeroORDisponible,
+    siguienteNumeroOR,
     // presupuesto
     PROVEEDOR_TALLER, normalizarProveedor, esProveedorTaller, cobroRepuesto,
     esManoObra, esRepuesto, esExterno,

@@ -53,14 +53,101 @@ function fichaAplicarDireccion() {
   return f;
 }
 
+/* 🔴 EDITAR LOS CAMPOS DE LA OR (26-08-2026, Marco: «deben siempre poder
+   editar los campos de una OR, pero con los campos que ya llenaron en su
+   momento»).
+
+   Lo segundo es la mitad que importa y por eso el formulario nace RELLENO con
+   lo que hay: se abre para corregir un dato, no para volver a escribir los
+   cinco. El caso de todos los días es el número de siniestro, que llega días
+   después del ingreso. */
+function dialogoEditarOR(o) {
+  const comps = Modelo.catalogo('compania').filter((x) => x.vigente !== false);
+  const tipos = Modelo.catalogo('tipo_ingreso').filter((x) => x.vigente !== false);
+  const velo = document.createElement('div');
+  velo.className = 'velo';
+  velo.innerHTML = `
+    <div class="modal" style="max-width:660px">
+      <div class="modal-cab">
+        <h2>OR ${esc(o.numeroOR || '—')} · ${esc(o.patente)}</h2>
+        <button class="cerrar" type="button" data-cerrar="1" aria-label="Cerrar">&times;</button>
+      </div>
+      <div class="modal-cuerpo" style="padding:16px 18px;overflow:auto">
+        <p class="ayuda" style="margin-top:0">Se corrige y queda anotado en la bitácora: qué campo,
+          qué decía antes y qué dice ahora.</p>
+        <div class="rejilla-2">
+          <div class="campo"><label for="or-siniestro">N° de siniestro</label>
+            <input id="or-siniestro" value="${esc(o.siniestro || '')}"
+              placeholder="Cuando la compañía lo abra"></div>
+          <div class="campo"><label for="or-compania">Compañía</label>
+            <select id="or-compania"><option value="">Particular / sin compañía</option>
+              ${comps.map((x) => '<option value="' + esc(x.id) + '"' +
+                (x.id === o.companiaId ? ' selected' : '') + '>' + esc(x.nombre) + '</option>').join('')}
+            </select></div>
+          <div class="campo"><label for="or-tipo">Tipo de ingreso</label>
+            <select id="or-tipo">
+              ${tipos.map((x) => '<option value="' + esc(x.id) + '"' +
+                (x.id === o.tipoIngresoId ? ' selected' : '') + '>' + esc(x.nombre) + '</option>').join('')}
+            </select></div>
+          <div class="campo"><label for="or-deducible">Deducible</label>
+            <input id="or-deducible" value="${o.deducible || 0}" inputmode="numeric"></div>
+          <div class="campo"><label for="or-liquidador">Liquidador</label>
+            <input id="or-liquidador" value="${esc(o.liquidador || '')}"></div>
+        </div>
+        <div class="campo"><label for="or-danos">Descripción de daños</label>
+          <textarea id="or-danos" rows="3">${esc(o.descripcionDanos || '')}</textarea></div>
+      </div>
+      <div class="modal-pie" style="padding:12px 18px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn secundario" type="button" data-cerrar="1">Cancelar</button>
+        <button class="btn" type="button" id="or-guardar">Guardar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(velo);
+
+  const cerrar = () => velo.remove();
+  velo.querySelectorAll('[data-cerrar]').forEach((b) => b.addEventListener('click', cerrar));
+  velo.addEventListener('click', (ev) => { if (ev.target === velo) cerrar(); });
+  const primero = document.getElementById('or-siniestro');
+  if (primero) primero.focus();
+
+  document.getElementById('or-guardar').addEventListener('click', () => {
+    const v = (id) => (document.getElementById(id) || {}).value || '';
+    const r = ejecutar(() => Modelo.editar_orden(o.id, {
+      siniestro: v('or-siniestro'),
+      compania_id: v('or-compania'),
+      tipo_ingreso_id: v('or-tipo'),
+      deducible: v('or-deducible'),
+      liquidador: v('or-liquidador'),
+      descripcion_danos: v('or-danos')
+    }), 'OR actualizada.');
+    if (r && r.ok === false) return;
+    cerrar();
+    refrescarFicha();
+  });
+}
+
 function refrescarFicha() {
   render();
 }
 
-/* Las OCHO pantallas que cuelgan de la ficha viven en `js/vistas/pantallas-ot.js`
-   desde el 16-08-2026, porque el expandible de la Torre ofrece las mismas y dos
-   copias de la misma lista terminan ofreciendo cosas distintas. Acá se leen; no
-   se redefinen. */
+/* Las OCHO pantallas que cuelgan de la ficha en el sistema actual, con su
+   rótulo literal. Las que todavía no se construyen se rotulan como tales:
+   un botón que no hace nada y no lo dice es peor que no tenerlo. */
+const FICHA_ENLACES = [
+  { rot: 'Ver recepción',                   imprimir: 'recepcion', permiso: 'ficha.completa' },
+  // El impreso del presupuesto es el documento comercial —cliente, RUT y
+  // valores—, así que pide `presupuesto.montos`. Quien solo tiene
+  // `presupuesto.ver` lee las líneas sin precio en la ficha.
+  { rot: 'Ver Presupuesto',                 imprimir: 'presupuesto', permiso: 'presupuesto.montos' },
+  { rot: 'Ver repuestos',                   tab: 'repuestos', permiso: 'repuesto.ver' },
+  { rot: 'Ver/Subir Documentos o imágenes', vista: 'documentos', permiso: 'documento.ver' },
+  { rot: 'Ver Fotografías',                 tab: 'fotos', permiso: 'foto.ver' },
+  { rot: 'Editar Recepción',                tab: null, tanda: 8, permiso: 'ot.editar',
+    nota: 'la recepción se edita desde su propia pantalla; editar una ya guardada exige política de versiones' },
+  { rot: 'Agregar OR',                      vista: 'presupuesto', permiso: 'presupuesto.crear' },
+  { rot: 'Bodega de esta orden',            vista: 'bodega', permiso: 'repuesto.cargar' },
+  { rot: 'Bitácora',                        tab: 'bitacora', permiso: 'ficha.completa' }
+];
 
 function vFichaOT(o) {
   const f = fichaEstado();
@@ -72,7 +159,7 @@ function vFichaOT(o) {
     bitacora: fichaBitacora, repuestos: fichaRepuestos, fotos: fichaFotos
   }[f.tab](o);
 
-  const enlaces = pantallasOtDe('ficha');
+  const enlaces = FICHA_ENLACES.filter((l) => !l.permiso || Modelo.puede(l.permiso));
 
   return `
   <div class="panel">
@@ -256,7 +343,11 @@ function fichaResumen(o) {
       ${dato('Inventario', fichaInventario(o.inventario))}
     </fieldset>
 
-    <fieldset class="bloque"><legend>Cliente y siniestro</legend>
+    <fieldset class="bloque"><legend>Cliente y siniestro${Modelo.puede('ot.editar')
+      ? ' <button class="btn secundario" type="button" id="or-editar" ' +
+        'title="Corregir los datos de la reparación: siniestro, compañía, deducible, liquidador y descripción">' +
+        'Editar la OR</button>'
+      : ''}</legend>
       ${dato('Cliente', esc(o.cliente))}
       ${dato('RUT', '<span title="' + (Modelo.puede('datos.rut_completo')
         ? 'Se ve completo porque el rol tiene el permiso'
@@ -266,8 +357,18 @@ function fichaResumen(o) {
       ${dato('Dirección', '<span title="Enmascarado por rol">' +
         esc(Modelo.velar(o.direccion, 'datos.rut_completo', 'todo')) + '</span>')}
       ${dato('Viene por', esc(o.origenIngresoNombre || '—'))}
-      ${o.siniestro ? dato('Compañía', esc(o.compania)) + dato('Siniestro', esc(o.siniestro)) +
-        dato('Deducible', fMonto(o.deducible)) + dato('Liquidador', esc(o.liquidador || '—')) : ''}
+      ${/* 🔴 ANTES ESTO ERA `o.siniestro ? … : ''` — el bloque entero desaparecía
+            cuando no había número de siniestro. Y ese es EXACTAMENTE el caso que
+            hay que atender: la compañía abre el siniestro días después del
+            ingreso, así que la orden recién creada no lo tiene y el usuario se
+            quedaba sin ver ni dónde anotarlo. Ahora se muestra siempre; lo que
+            falta se dice que falta. */''}
+      ${dato('Compañía', esc(o.compania && o.compania !== '—' ? o.compania : 'Particular'))}
+      ${dato('Siniestro', o.siniestro ? esc(o.siniestro)
+        : '<span style="color:var(--gris-2)">Todavía sin número</span>')}
+      ${dato('Deducible', fMonto(o.deducible))}
+      ${dato('Liquidador', esc(o.liquidador || '—'))}
+      ${dato('Descripción de daños', esc(o.descripcionDanos || '—'))}
       ${dato('Prioridad', o.prioridad === 'express'
         ? '<span class="et roja">Express</span>' : '<span class="et gris">Normal</span>')}
     </fieldset>
@@ -471,18 +572,13 @@ function fichaRepuestos(o) {
 /* ── Pestaña · Fotografías ─────────────────────────────────────────────── */
 
 function fichaFotos(o) {
-  /* ⛔ Las capturas de firma se descartan enteras desde el 26-08-2026, no solo
-     del resumen de tamaño como antes. La captura en pantalla se eliminó (C-47),
-     pero un navegador que la usó ayer todavía tiene esos PNG en IndexedDB: sin
-     esto le aparecían como un grupo de fotos rotulado «firma» —el rótulo se fue
-     con la función—, o sea una firma digital que el sistema ya no reconoce. */
-  const todas = Modelo.mediaDe(o.id).filter((m) => m.momento !== 'firma');
+  const todas = Modelo.mediaDe(o.id);
   const porMomento = {};
   todas.forEach((m) => { (porMomento[m.momento] = porMomento[m.momento] || []).push(m); });
-  const res = Media.resumen(todas);
+  const res = Media.resumen(todas.filter((m) => m.momento !== 'firma'));
 
   const ROTULOS = { ingreso: 'Imágenes de ingreso', proceso: 'Imágenes por etapa',
-                    entrega: 'Imágenes de entrega' };
+                    entrega: 'Imágenes de entrega', firma: 'Firma del cliente' };
 
   return `
   <div class="panel">
@@ -507,9 +603,21 @@ function fichaFotos(o) {
         ${zonaFotos({ id: 'fichafoto', fotos: [], titulo: 'Soltar las fotos acá' })}
       </fieldset>` : ''}
 
+      ${/* 🔴 BAJAR EL SET COMPLETO (26-08-2026, Marco). En la visita se dijo tres
+            veces: baja todas, borra las que no sirven y le manda el resto al
+            liquidador. El botón grande baja TODO —que es el pedido— y cada
+            bloque baja el suyo, porque a veces sólo hace falta el desarme. */''}
+      ${todas.length ? '<div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">' +
+        '<button class="btn" type="button" data-bajar-fotos="*">' +
+        'Guardar las ' + todas.length + ' en una carpeta</button>' +
+        '<span class="ayuda">Se baja un .zip con todas: recepción, presupuesto y etapas juntas</span>' +
+        '</div>' : ''}
+
       ${Object.keys(porMomento).length
         ? Object.keys(porMomento).map((k) => '<fieldset class="bloque" style="margin-bottom:10px">' +
-            '<legend>' + esc(ROTULOS[k] || k) + ' (' + porMomento[k].length + ')</legend>' +
+            '<legend>' + esc(ROTULOS[k] || k) + ' (' + porMomento[k].length + ')' +
+            ' <button class="btn secundario" type="button" data-bajar-fotos="' + esc(k) + '" ' +
+            'title="Baja sólo estas">Guardar estas</button></legend>' +
             '<div class="fotos-rejilla">' +
             porMomento[k].map((m) => '<figure class="foto-tarjeta">' +
               '<img data-media="' + esc(m.id) + '" alt="' + esc(m.nombre) + '">' +
@@ -539,6 +647,27 @@ function fichaFotos(o) {
 /* ── Cableado de la ficha ──────────────────────────────────────────────── */
 
 function pFichaOT(o) {
+  const btnOR = document.getElementById('or-editar');
+  if (btnOR) btnOR.addEventListener('click', () => dialogoEditarOR(o));
+
+  /* Bajar las fotos. `todas` se vuelve a pedir acá y no se guarda del pintado:
+     entre que se dibujó la pantalla y alguien aprieta el botón pueden haber
+     entrado fotos nuevas, y bajar una lista vieja es de las cosas que nadie
+     revisa hasta que falta una foto en el correo al liquidador. */
+  document.querySelectorAll('[data-bajar-fotos]').forEach((b) => b.addEventListener('click', () => {
+    const cual = b.dataset.bajarFotos;
+    const todas = Modelo.mediaDe(o.id) || [];
+    const set = cual === '*' ? todas : todas.filter((m) => m.momento === cual);
+    if (!set.length) return avisar({ ok: false, motivo: 'No hay fotos que guardar.' });
+    const rot = b.textContent;
+    b.disabled = true; b.textContent = 'Armando…';
+    Media.bajarCarpeta(set, 'Fotos ' + o.patente + ' OT ' + o.numeroOT +
+      (cual === '*' ? '' : ' - ' + (ROTULOS[cual] || cual)))
+      .then((n) => avisar({ ok: true, motivo: '' }, n + (n === 1 ? ' foto guardada' : ' fotos guardadas') + ' en una carpeta.'))
+      .catch((e) => avisar({ ok: false, motivo: 'No se pudo armar la carpeta: ' + (e && e.message) }))
+      .then(() => { b.disabled = false; b.textContent = rot; });
+  }));
+
   const f = fichaEstado();
 
   /* El ciclo del repuesto se opera desde la pestaña Repuestos, con los mismos
@@ -564,8 +693,29 @@ function pFichaOT(o) {
      Abría el ÚLTIMO sin decirlo, que es la peor de las respuestas: el que
      imprime cree que tiene el documento que pidió. Con una sola OR se abre
      directo, que es el caso de todos los días. */
-  document.querySelectorAll('#contenido [data-imprimir]').forEach((b) => b.addEventListener('click', () =>
-    abrirImpresoDeOT(b.dataset.imprimir, o)));
+  document.querySelectorAll('#contenido [data-imprimir]').forEach((b) => b.addEventListener('click', () => {
+    if (b.dataset.imprimir !== 'presupuesto' || o.presupuestos.length <= 1)
+      return abrirImpreso(b.dataset.imprimir, o.id);
+
+    dialogo('¿Qué presupuesto quieres abrir?',
+      '<p class="pie-nota" style="margin:0 0 10px">Esta orden tiene ' +
+      o.presupuestos.length + ' documentos. Se abren en otra pestaña.</p>' +
+      '<div class="grid-envoltorio"><table class="grid"><tbody>' +
+      o.presupuestos.map((pr) => {
+        const e = ESTADO_PRESUPUESTO[pr.estado] || { txt: pr.estado, clase: 'gris' };
+        return '<tr><td><span class="cod">OR ' + esc(pr.numeroOR) + '</span></td>' +
+          '<td><span class="et ' + esc(e.clase) + '">' + esc(e.txt) + '</span></td>' +
+          '<td class="num">' + fMonto(pr.total) + '</td>' +
+          '<td><button class="btn secundario chico" data-elegir-pr="' + esc(pr.id) + '">' +
+          'Abrir</button></td></tr>';
+      }).join('') + '</tbody></table></div>');
+
+    (dialogo.ultimo || document).querySelectorAll('[data-elegir-pr]').forEach((x) =>
+      x.addEventListener('click', () => {
+        if (dialogo.cerrar) dialogo.cerrar();
+        abrirImpreso('presupuesto', o.id, x.dataset.elegirPr);
+      }));
+  }));
 
   // Salir de la ficha hacia otro módulo: la ficha vive en su propia pestaña,
   // así que se abre el sistema completo en esa vista.

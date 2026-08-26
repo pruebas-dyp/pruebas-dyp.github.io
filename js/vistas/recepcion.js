@@ -13,30 +13,7 @@ const RECEPCION_PASOS = [
   { id: 'verificar', n: 'Verificar Orden' }
 ];
 
-/* 🔶 SUBE A -v2 (16-08-2026). Un borrador guardado con la forma anterior trae
-   el bloque con `responsable_id`, que ya no existe, y sin `fecha_ingreso`, que
-   ahora sí. Cambiar la llave lo deja atrás en vez de restaurar un formulario
-   que mezcla las dos formas: lo guardado a medias vale mucho menos que una
-   pantalla que se comporta como dice. */
-const CLAVE_BORRADOR = 'dyp-recepcion-borrador-v2';
-
-/* El mismo reloj que usa el motor: día del calendario de la demostración —que
-   se puede adelantar— y hora del reloj de verdad. Si la pantalla propusiera
-   `new Date()` a secas, con el calendario adelantado la fecha propuesta sería
-   PASADA respecto del sistema y la orden nacería con días de más. */
-function recAhora() {
-  const r = new Date();
-  const base = (typeof HOY !== 'undefined' && HOY instanceof Date) ? HOY : r;
-  return new Date(base.getFullYear(), base.getMonth(), base.getDate(),
-    r.getHours(), r.getMinutes());
-}
-
-// `YYYY-MM-DDTHH:mm`, que es lo único que acepta un `datetime-local`.
-function recIsoLocal(d) {
-  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' +
-    String(d.getDate()).padStart(2, '0') + 'T' +
-    String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-}
+const CLAVE_BORRADOR = 'dyp-recepcion-borrador';
 
 /* ── El menú del recepcionista ─────────────────────────────────────────
    🟰 SE COPIA DEL ORIGINAL (`miembros.php?ver=recepcionista`). Apretar
@@ -102,7 +79,7 @@ const normalizarVin = (t) =>
 function bloqueVacio() {
   return { tipo_ingreso_id: '', compania_id: '', siniestro: '', deducible: '',
            liquidador: '', numero_or: '', prioridad_id: 'pri-1', estado: '',
-           descripcion_danos: '', descripcion_estado: '' };
+           descripcion_danos: '', descripcion_estado: '', responsable_id: '' };
 }
 
 function rec() {
@@ -114,9 +91,7 @@ function rec() {
       llave: 'rec-' + Date.now().toString(36),
       campos: { patente: '', marca_id: '', modelo_id: '', color_id: '', anio: '', vin: '', km: '',
                 combustible: '4', rut: '', nombre: '', telefono: '',
-                correo: '', direccion: '', observaciones: '',
-                // Viene puesta con la fecha y hora de ahora, y se puede corregir.
-                fecha_ingreso: recIsoLocal(recAhora()) },
+                correo: '', direccion: '', observaciones: '' },
       // Lo que se escribió en cada combo. Se guarda aparte del id porque
       // mientras se teclea todavía no calza con ninguna fila del catálogo.
       textos: {},
@@ -128,15 +103,8 @@ function rec() {
       // item_id → la nota del recepcionista. Solo se pide en los ítems que
       // quedaron `no presente` o `dañado`, que son los que después se discuten.
       obsInventario: {},
-      /* Lo que se trajo del padrón, por identificador: qué se encontró y qué
-         campos se rellenaron. Sirve para pintar el aviso y para deshacerlo. */
-      traido: { rut: null, patente: null },
-      /* Qué identificador se consultó por última vez en cada campo. Va en el
-         BORRADOR y no en una variable del módulo: si vive fuera, descartar el
-         borrador y volver a escribir el mismo RUT no traía nada — el guardia
-         seguía creyendo que ya se había buscado, y el recepcionista veía los
-         campos vacíos sin ninguna explicación. */
-      buscado: { rut: '', patente: '' },
+      // La firma del cliente: el PNG para guardar y los trazos para repintar.
+      firma: null, firmaTrazos: [],
       fotos: []
     };
   }
@@ -163,11 +131,9 @@ function guardarBorrador() {
       danos: r.danos, textos: r.textos,
       inventario: r.inventario, obsInventario: r.obsInventario,
       fotos: r.fotos,
-      /* Lo encontrado viaja con el borrador. Sin esto, recargar la pantalla
-         borraba el aviso —incluido el de «esta patente ya tiene orden
-         abierta»— y con él el botón de deshacer, dejando los campos
-         rellenados sin decir de dónde salieron. */
-      traido: r.traido, buscado: r.buscado
+      // El Blob de la firma no es serializable; los trazos sí, y con ellos
+      // se vuelve a pintar el lienzo tal cual estaba.
+      firmaTrazos: r.firmaTrazos || []
     }));
   } catch (e) { /* sin almacenamiento: el formulario sigue vivo en memoria */ }
 }
@@ -194,14 +160,11 @@ function restaurarBorrador() {
     d.campos = Object.assign({}, d.campos);
     d.campos.patente = normalizarPatente(d.campos.patente);
     d.campos.vin = normalizarVin(d.campos.vin);
-    // Un borrador de antes del campo no traía fecha: se le pone la de ahora en
-    // vez de dejar el campo vacío y que la orden nazca sin fecha de entrada.
-    if (!d.campos.fecha_ingreso) d.campos.fecha_ingreso = recIsoLocal(recAhora());
 
     return Object.assign({
       paso: 'cliente', llave: 'rec-' + Date.now().toString(36),
       textos: {}, danos: [], inventario: {}, obsInventario: {}, fotos: [],
-      marcados: [], traido: { rut: null, patente: null }, buscado: { rut: '', patente: '' }
+      firmaTrazos: [], marcados: [], firma: null
     }, d);
   } catch (e) { return null; }
 }
@@ -442,17 +405,7 @@ function vRecepcionBuscar(modo) {
       <div class="desc">${esc(cfg.desc)}</div></div>
     </div>
     <div class="cuerpo">
-      ${/* 🔴 EL CAMPO SE ACOTA ACÁ, NO EN `.rejilla-campos` (26-08-2026,
-           pedido del cliente: «que sea más corto, es súper largo»).
-
-           La clase la comparten ocho pantallas y es `auto-fit` con
-           `minmax(172px, 1fr)`: reparte bien con varios campos, pero con UNO
-           solo lo estira a todo el ancho del panel. Una patente son seis
-           caracteres y el recuadro medía más de mil píxeles.
-
-           Se acota esta instancia con un `max-width` y la clase queda intacta:
-           tocarla movería la recepción, la ficha, el histórico y las otras. */''}
-      <div class="rejilla-campos" style="max-width:240px">
+      <div class="rejilla-campos">
         <div class="campo"><label>Patente</label>
           <input id="rec-buscar-patente" value="${esc(r.buscaEditar)}" placeholder="AABB11"
             autocomplete="off"></div>
@@ -480,18 +433,15 @@ function vRecepcionBuscar(modo) {
       <div class="nota" style="margin-top:11px">Ninguna orden abierta con esa patente.
         Si el vehículo ya se entregó, está en el Histórico.</div>`) : ''}
 
-      ${/* ⛔ ACÁ IBA EL CARTEL AZUL DE «la recepción se corrige versionándola»,
-           eliminado el 26-08-2026 a pedido del cliente. Eran seis renglones de
-           explicación sobre una pantalla cuyo único trabajo es escribir una
-           patente y apretar un botón.
-
-           No se pierde: el mismo aviso está DENTRO del editor, que es donde
-           importa —ahí es donde alguien está a punto de cambiar algo—, y ahí
-           también está la lista de correcciones anteriores con su motivo.
-
-           ⚠️ El cartel del modo `Agregar OR` (abajo) NO estaba marcado y se
-           queda. Si se quiere el mismo trato, es borrar el otro bloque. */''}
-      ${modo === 'editar' ? '' : `
+      ${modo === 'editar' ? `
+      <div class="nota info" style="margin-top:12px">${ico('info')}
+        <strong>La recepción se corrige versionándola.</strong> Se cambia el cliente, el vehículo,
+        los datos de la recepción, el checklist y <strong>los daños de la silueta</strong>; lo que
+        estaba queda guardado con quién lo cambió, cuándo y por qué, y el comprobante impreso dice
+        qué versión es. El papel que firmó el cliente no se toca. <strong>La firma no se vuelve a
+        pedir</strong>: si cada corrección se firma de nuevo o el original sigue valiendo lo decide
+        el taller.
+      </div>` : `
       <div class="nota info" style="margin-top:12px">${ico('info')}
         <strong>Abrir la OR no es valorizarla.</strong> Acá se abre la orden de reparación sobre el
         vehículo —que es lo que hace el recepcionista— y queda en cero, esperando que el evaluador
@@ -525,16 +475,10 @@ function vRecepcion() {
   return `
   <div class="panel">
     <div class="cab">
-      ${/* 🔶 SIN BAJADA Y SIN «VOLVER A LAS OPCIONES» (16-08-2026, pedido del
-           cliente). La bajada explicaba el mecanismo de los pasos —que no se
-           avanza incompleto, que se puede volver, que el borrador se guarda
-           solo—: es un instructivo, y se lee una vez. Las tres cosas se ven
-           igual usando la pantalla, que es donde hay que enseñarlas.
-
-           ⚠️ El «Volver a las opciones de Recepción» del BUSCADOR es otro
-           botón y se queda: comparte el `id` con éste porque nunca están los
-           dos en pantalla a la vez. */''}
-      <div><h2>${ico('recepcion', 'g')}Nuevo ingreso</h2></div>
+      <div><h2>${ico('recepcion', 'g')}Nuevo ingreso</h2>
+        <div class="desc">Cinco pasos. No se avanza con el paso incompleto; volver atrás se puede
+          siempre. El borrador se guarda solo.
+          <button class="enlace-volver" id="rec-volver">← Volver a las opciones</button></div></div>
       <div class="chips">
         ${RECEPCION_PASOS.map((p, k) => '<button class="chip' +
           (p.id === r.paso ? ' activo' : (recAlcanzable(k) ? '' : ' pendiente')) +

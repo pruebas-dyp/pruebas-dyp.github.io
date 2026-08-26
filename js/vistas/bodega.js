@@ -145,14 +145,13 @@ function bodegaChecklist() {
   const tabla = `
     <h3 style="font-size:13px;margin:14px 0 6px">Resultados de la patente &ldquo;${esc(q)}&rdquo;</h3>
     <div class="grid-envoltorio"><table class="grid">
-      <thead><tr><th>OT</th><th>Patente</th><th>Presupuesto</th><th>Reparación</th>
+      <thead><tr><th>OT</th><th>Patente</th><th>OR</th>
         <th style="min-width:240px">Repuestos que pide</th><th>Acción</th></tr></thead>
       <tbody>${filas.map(({ o, p, suyos, vieja, nPend }) => '<tr><td class="num">' + o.numeroOT + '</td>' +
         '<td><span class="patente">' + esc(o.patente) + '</span></td>' +
         '<td class="cod">' + esc(p.numeroOR) +
           (vieja ? ' <span class="et gris" title="Esta OR se recotizó: la que manda es la de ' +
             'abajo, con el mismo número">versión anterior</span>' : '') + '</td>' +
-        '<td class="num">' + esc(p.idReparacion || '—') + '</td>' +
         '<td>' + textoRepuestos(suyos) +
           (nPend ? ' <span class="et roja" title="' + nPend +
             (nPend === 1 ? ' sin llegar' : ' sin llegar') + '">' +

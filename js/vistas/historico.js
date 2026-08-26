@@ -112,8 +112,9 @@ function sinResultados(h) {
     }
 
     return caja('No aparece en ninguna parte',
-      'No hay ninguna orden —entregada ni en el taller— cuya patente, OT u OR contenga ' +
-      '<strong>' + esc(q) + '</strong>. El cuadro busca por las tres, y por parte del texto: ' +
+      'No hay ninguna orden —entregada ni en el taller— cuya patente, OT, OR o número de ' +
+      'siniestro contenga <strong>' + esc(q) + '</strong>. El cuadro busca por las cuatro, ' +
+      'y por parte del texto: ' +
       'con escribir <span class="cod">' + esc(q.slice(0, 3)) + '</span> basta.');
   }
 
@@ -186,7 +187,7 @@ function vHistorico() {
       <div class="desc" style="margin-bottom:9px">Cada parámetro es independiente de los otros,
         salvo <strong>marca</strong> y <strong>modelo</strong>: el modelo se ofrece según la marca elegida.</div>
       <div class="rejilla-campos">
-        <div class="campo"><label>Patente u OT</label><input id="h-patente" value="${esc(h.patente)}"></div>
+        <div class="campo"><label>Patente, OT, OR o siniestro</label><input id="h-patente" value="${esc(h.patente)}" placeholder="Cualquiera de los cuatro"></div>
         <div class="campo"><label>Cliente</label><input id="h-cliente" value="${esc(h.cliente)}"
           placeholder="Todos" autocomplete="off" list="h-clientes">
           <datalist id="h-clientes">${[...new Set(universo.map((o) => o.cliente))].sort()

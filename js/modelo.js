@@ -377,6 +377,10 @@ const Modelo = (function () {
 
     return {
       id: o.id, numeroOT: o.numero_ot,
+      /* 🔴 La OR es de la ORDEN desde el 26-08-2026, no del presupuesto. Sale
+         acá para que la torre la pueda mostrar aunque todavía no se haya
+         valorizado nada — que es el caso de toda orden recién ingresada. */
+      numeroOR: o.numero_or || null,
       patente: veh.patente,
       marca: (ix.marca.get(veh.marca_id) || {}).nombre,
       modelo: (ix.modelo.get(veh.modelo_id) || {}).nombre,
@@ -389,12 +393,10 @@ const Modelo = (function () {
       // Editar Recepción necesita saber cuál viene seleccionado.
       marcaId: veh.marca_id, modeloId: veh.modelo_id, colorId: veh.color_id,
       compania: comp ? comp.codigo : '—', companiaId: o.compania_id,
+      // Sale para que el editor de la OR pueda dejar marcado el que ya tiene.
+      tipoIngresoId: o.tipo_ingreso_id || null,
       origenIngreso: (ix.tipo_ingreso.get(o.tipo_ingreso_id) || {}).codigo,
       origenIngresoNombre: (ix.tipo_ingreso.get(o.tipo_ingreso_id) || {}).nombre,
-      // Los ids de los dos catálogos de la ORDEN, por la misma razón que los
-      // tres del vehículo de arriba: Editar Recepción tiene que saber cuál
-      // viene seleccionado, y del código no se puede volver al id.
-      tipoIngresoId: o.tipo_ingreso_id, prioridadId: o.prioridad_id,
       siniestro: o.siniestro, deducible: o.deducible, liquidador: o.liquidador,
       // Lo que se escribió en el ingreso, por orden. `orExterna` es la OR que
       // digita la recepción en las órdenes de empresa: no es la OR del taller.
@@ -550,7 +552,7 @@ const Modelo = (function () {
           const t = Reglas.totalesPresupuesto(lineas, tempario, o.deducible,
             Reglas.parametro(db, 'iva', 19));
           return {
-            id: p.id, version: p.version, numeroOR: p.numero_or, idReparacion: p.id_reparacion,
+            id: p.id, version: p.version, numeroOR: p.numero_or,
             correlativo: p.correlativo, estado: p.estado,
             neto: t.neto, iva: t.iva, total: t.total,
             tempario, observacion: p.observacion || '',
@@ -605,12 +607,18 @@ const Modelo = (function () {
            devolvía cero, y cero con el filtro puesto se lee como «esa orden no
            existe». Ahora el mismo cuadro acepta las tres formas en que en el
            taller se nombra un trabajo: la patente, el número de OT y el de la
-           OR. Marco lo vio el 17-08-2026. */
+           OR. Marco lo vio el 17-08-2026.
+
+           🔴 Y EL NÚMERO DE SINIESTRO (26-08-2026, Marco): «es importante ya
+           que lo necesitan buscar también de ahí». Tiene sentido y no lo
+           habíamos visto: cuando la compañía llama o escribe, lo que trae en la
+           mano es el siniestro — no la patente ni la OT. Sin esto había que
+           adivinar de qué auto hablaban. */
         if (f.patente) {
           const q = String(f.patente).trim().toUpperCase();
           const dice = (v) => String(v == null ? '' : v).toUpperCase().indexOf(q) >= 0;
-          const enAlgunaOR = (o.presupuestos || []).some((p) => dice(p.numeroOR));
-          if (!dice(o.patente) && !dice(o.numeroOT) && !enAlgunaOR) return false;
+          if (!dice(o.patente) && !dice(o.numeroOT) && !dice(o.numeroOR) && !dice(o.siniestro))
+            return false;
         }
         if (f.cliente && String(o.cliente || '').toLowerCase().indexOf(String(f.cliente).toLowerCase()) < 0) return false;
         if (f.compania_id && o.companiaId !== f.compania_id) return false;
@@ -1035,52 +1043,11 @@ const Modelo = (function () {
 
   /* Una recepción puede generar VARIAS órdenes (A-8). Por eso recibe un
      arreglo de bloques: cada uno con su siniestro, compañía y deducible. */
-  /* 🔴 LA FECHA DE INGRESO, Y POR QUÉ SE VALIDA ACÁ Y NO EN LA PANTALLA.
-
-     Desde el 16-08-2026 la escribe el recepcionista en vez de salir de
-     `ahora()`. Es el dato del que cuelga TODO el contador de días, que es la
-     corrección central del proyecto (C-1): si esta fecha entra mal, los tres
-     relojes quedan mal y nadie lo nota hasta que el dueño mira su meta.
-
-     · **Futura, rechazo.** Un ingreso con fecha de mañana deja el contador en
-       negativo, y un contador negativo no se "ve raro": se ve como cero.
-     · **Más de 30 días atrás, avisa y deja pasar.** Cargar tarde una recepción
-       es legítimo —el auto entró el lunes y se digita el jueves siguiente— así
-       que no se traba; pero quien la escribe tiene que ver que está fechando
-       un mes atrás y no ayer.
-     · **Sin fecha, `ahora()`**, que es lo que hacía antes.
-
-     Va en el motor y no en la pantalla porque la regla es del dato: mañana
-     esto entra por importación o por otra pantalla y la fecha tiene que
-     validarse igual. */
-  function fechaDeIngreso(valor) {
-    if (!valor) return { fecha: ahora(), avisos: [] };
-    const d = (valor instanceof Date) ? new Date(valor.getTime()) : new Date(valor);
-    if (isNaN(d.getTime()))
-      return { error: 'La fecha de ingreso no se entiende. Formato: 2026/08/26 10:48.' };
-
-    // El "hoy" es el del calendario del sistema, que la demostración adelanta.
-    const tope = ahora();
-    if (d.getTime() > tope.getTime() + 60000)
-      return { error: 'La fecha de ingreso no puede ser futura: el vehículo no puede haber ' +
-        'entrado mañana. Con una fecha futura el contador de días arranca en negativo.' };
-
-    const avisos = [];
-    const dias = Math.floor((tope.getTime() - d.getTime()) / 86400000);
-    if (dias > 30) avisos.push('La fecha de ingreso es de hace ' + dias + ' días. Se guardó igual, ' +
-      'pero los días de esta orden arrancan desde esa fecha, no desde hoy.');
-    return { fecha: d, avisos };
-  }
-
   function crear_ot_desde_recepcion(ficha, bloques, llave) {
     return conLlave(llave, function () {
       if (!ficha || !ficha.patente) return { ok: false, motivo: 'La patente es obligatoria.' };
       if (!bloques || !bloques.length)
         return { ok: false, motivo: 'Hay que declarar al menos una orden. Una recepción puede generar varias.' };
-
-      const ing = fechaDeIngreso(ficha.fecha_ingreso);
-      if (ing.error) return { ok: false, motivo: ing.error };
-      const entrada = ing.fecha;
 
       const pat = String(ficha.patente).toUpperCase().replace(/[^A-Z0-9]/g, '');
       let veh = db.vehiculo.find((v) => v.patente === pat);
@@ -1155,12 +1122,16 @@ const Modelo = (function () {
         if (p) p.valor = numero_ot + 1;
 
         const ot_id = 'ot-' + numero_ot;
+        /* 🔴 Y SU OR, EN EL MISMO ACTO (26-08-2026). Antes la OR aparecía
+           recién al crear el presupuesto, así que una orden recién ingresada no
+           tenía número de reparación que dar — y el taller lo pide antes. */
+        const numero_or = Reglas.siguienteNumeroOR(db);
         db.orden_trabajo.push({
-          id: ot_id, numero_ot, recepcion_id: rec_id, vehiculo_id: veh.id, cliente_id: cli.id,
+          id: ot_id, numero_ot, numero_or, recepcion_id: rec_id, vehiculo_id: veh.id, cliente_id: cli.id,
           tipo_ingreso_id: b.tipo_ingreso_id || 'ti-1', compania_id: b.compania_id || null,
           siniestro: b.siniestro || null, deducible: b.deducible || 0,
           liquidador: b.liquidador || null, prioridad_id: b.prioridad_id || 'pri-1',
-          fecha_ingreso: entrada, fecha_compromiso: b.fecha_compromiso || null,
+          fecha_ingreso: ahora(), fecha_compromiso: b.fecha_compromiso || null,
           /* Sin estado elegido, la orden nace `Recibido`. No es un dato
              inventado: es el estado inicial del maestro y la pantalla de
              Verificar lo dice con todas las letras antes de guardar. */
@@ -1186,18 +1157,13 @@ const Modelo = (function () {
         });
         // La estadía se abre acá. A partir de este momento los relojes se
         // calculan de esta tabla y de ninguna otra.
-        /* 🔴 LA ESTADÍA ARRANCA EN LA MISMA FECHA, y esto es lo que casi se
-           escapa: los tres relojes NO leen `orden_trabajo.fecha_ingreso`, leen
-           `ot_estadia`. Dejando acá `ahora()` la ficha habría mostrado la fecha
-           escrita y los días habrían contado desde el momento de guardar — dos
-           números que se contradicen, y el que manda es el que nadie ve. */
-        db.ot_estadia.push({ id: nuevoId('est'), ot_id, entro_at: entrada, salio_at: null, motivo_salida: null });
+        db.ot_estadia.push({ id: nuevoId('est'), ot_id, entro_at: ahora(), salio_at: null, motivo_salida: null });
         registrarEvento(ot_id, 'estado', 'Ingreso del vehículo. Estado: ' + Reglas.nombreEstado(db, b.estado || 'recibido'), null, 'pe-u-recepcion');
         creadas.push({ ot_id, numero_ot });
       });
 
       tocado();
-      return { ok: true, motivo: '', recepcion_id: rec_id, ordenes: creadas, avisos: ing.avisos };
+      return { ok: true, motivo: '', recepcion_id: rec_id, ordenes: creadas };
     });
   }
 
@@ -1292,6 +1258,79 @@ const Modelo = (function () {
      Se asigna al recibir, y desde ahí esa orden le aparece a esa persona en
      "Mi trabajo" aunque todavía no haya ninguna etapa abierta a su nombre. Es
      lo que convierte la recepción en un traspaso y no en un aviso. */
+  /* 🔴 LOS CAMPOS DE LA OR SE EDITAN SIEMPRE (26-08-2026, Marco).
+
+     «Deben siempre poder editar los campos de una OR, pero con los campos que
+     ya llenaron en su momento. Esto lo deben hacer cuando buscan la OT del
+     vehículo.»
+
+     Antes no había forma. `recepcion-editar.js` decía —y lo decía sin que fuera
+     cierto— que «compañía, siniestro y tipo de ingreso son de la ORDEN y se
+     cambian en la ficha»: la ficha los MUESTRA, nada más. Otro comentario que
+     describía una intención y no el sistema.
+
+     Lo que se vio en terreno explica por qué importa: el número de siniestro
+     casi nunca está el día que entra el auto. La compañía lo abre después, y
+     hasta hoy no había dónde anotarlo — Iván lo pidió él mismo, sin que nadie
+     preguntara: «después me llega el número de siniestro y tampoco lo puedo
+     poner».
+
+     ⚠️ Se edita, no se versiona, y es a propósito: esto no es el acta de
+     recepción que el cliente firmó —esa sí se versiona, en `editar_recepcion`—
+     sino los datos administrativos de la reparación. Lo que sí queda es la
+     TRAZA: cada campo tocado escribe su antes y su después en la bitácora. */
+  const CAMPOS_OR = [
+    ['siniestro', 'N° de siniestro'],
+    ['deducible', 'Deducible'],
+    ['liquidador', 'Liquidador'],
+    ['compania_id', 'Compañía'],
+    ['tipo_ingreso_id', 'Tipo de ingreso'],
+    ['descripcion_danos', 'Descripción de daños'],
+    ['fecha_compromiso', 'Fecha de compromiso']
+  ];
+
+  function editar_orden(ot_id, cambios = {}) {
+    const o = db.orden_trabajo.find((x) => x.id === ot_id);
+    if (!o) return { ok: false, motivo: 'La orden de trabajo no existe.' };
+
+    const rotulo = (k) => (CAMPOS_OR.find((x) => x[0] === k) || [k, k])[1];
+    const legible = (k, v) => {
+      if (v == null || v === '') return 'vacío';
+      if (k === 'compania_id') return (db.compania.find((x) => x.id === v) || {}).nombre || String(v);
+      if (k === 'tipo_ingreso_id') return (db.tipo_ingreso.find((x) => x.id === v) || {}).nombre || String(v);
+      if (k === 'deducible') return fPlata(Number(v) || 0);
+      if (k === 'fecha_compromiso') return v instanceof Date ? v.toLocaleDateString('es-CL') : String(v);
+      return String(v);
+    };
+
+    const tocados = [];
+    CAMPOS_OR.forEach(([k]) => {
+      if (!(k in cambios)) return;
+      let v = cambios[k];
+      if (k === 'deducible') v = Math.max(0, Math.round(Number(String(v).replace(/[$\s.]/g, '')) || 0));
+      else if (k === 'fecha_compromiso') v = v ? new Date(v) : null;
+      else if (k === 'compania_id' || k === 'tipo_ingreso_id') v = v || null;
+      else v = String(v == null ? '' : v).trim();
+
+      const iguales = (k === 'fecha_compromiso')
+        ? String(o[k] || '') === String(v || '')
+        : String(o[k] == null ? '' : o[k]) === String(v == null ? '' : v);
+      if (iguales) return;
+
+      tocados.push(rotulo(k) + ': ' + legible(k, o[k]) + ' → ' + legible(k, v));
+      o[k] = v;
+    });
+
+    /* Sin cambios NO se escribe un hecho. Un «editó la orden» que no dice qué
+       cambió ensucia la bitácora y hace más difícil encontrar el que sí importa. */
+    if (!tocados.length) return { ok: true, motivo: '', sinCambios: true };
+
+    registrarEvento(ot_id, 'estado', 'Datos de la OR ' + (o.numero_or || o.numero_ot) +
+      ' corregidos. ' + tocados.join(' · '));
+    tocado();
+    return { ok: true, motivo: '', cambiados: tocados.length };
+  }
+
   function asignar_responsable_ot(ot_id, persona_id) {
     const o = db.orden_trabajo.find((x) => x.id === ot_id);
     if (!o) return { ok: false, motivo: 'La orden no existe.' };
@@ -1719,106 +1758,6 @@ const Modelo = (function () {
     return { ok: true, motivo: '' };
   }
 
-  /* ══ BUSCAR POR IDENTIFICADOR COMPLETO ═══════════════════════════════
-     Las dos que usa la recepción para autocompletar: el cliente por su RUT y
-     el vehículo por su patente. Van acá y no en la pantalla porque ninguna
-     vista lee un arreglo crudo — es la regla del archivo.
-
-     🔴 COINCIDENCIA EXACTA, NUNCA POR PREFIJO, Y NUNCA UNA LISTA.
-
-     No es un detalle de implementación: es la diferencia entre una ayuda y una
-     fuga. Un autocompletar que sugiere mientras se escribe deja recorrer el
-     padrón entero probando prefijos, y el padrón de este cliente son **6.518
-     personas** con RUT, teléfono y domicilio. Es el hallazgo DP-3 de la
-     auditoría, y sería nuestro si lo construyéramos así.
-
-     Por eso las dos exigen el identificador COMPLETO y BIEN FORMADO —el RUT con
-     su dígito verificador comprobado, la patente con sus seis caracteres— y las
-     dos devuelven UNA coincidencia o ninguna. Quien no sabe el RUT entero no
-     saca nada de acá.
-
-     ⚠️ EN PRODUCCIÓN ESTO VA CONTRA EL PADRÓN. Acá está modelado; allá exige
-     permiso propio y **queda en la traza de lecturas** (requisito A-10 de la
-     auditoría), porque consultar quién es el dueño de una patente es un acceso
-     a datos personales aunque no modifique nada. Se garantiza con RLS y una
-     tabla de auditoría, no con este `if`.
-
-     ⚠️ `js/vistas/expediente.js` también busca por patente y NO se unificó: su
-     contrato es otro. Ahí se resuelve QUÉ ORDEN abrir —acepta además el número
-     de OT y mira el histórico completo— y acá se resuelve QUÉ VEHÍCULO es, para
-     rellenar un formulario. Unificarlas cambiaría cuál orden abre el expediente
-     cuando una patente tiene varias, que es una decisión de esa pantalla. */
-
-  /* El dígito verificador, calculado. Vive acá y no en la pantalla porque es
-     una regla del dato.
-
-     ⚠️ NO se usa para RECHAZAR el RUT que escribe el recepcionista: eso sigue
-     sin validarse a propósito —está dicho en `formatearRut`— porque rechazarle
-     el RUT a un cliente que está parado en el mesón es una decisión del taller
-     y no está tomada. Acá sirve para lo contrario: para decidir si vale la pena
-     ir a buscar, y para no salir a consultar el padrón con un número a medias. */
-  function rutValido(rut) {
-    const limpio = String(rut || '').toUpperCase().replace(/[^0-9K]/g, '');
-    if (limpio.length < 8 || limpio.length > 9) return false;
-    const cuerpo = limpio.slice(0, -1);
-    const dv = limpio.slice(-1);
-    if (!/^[0-9]+$/.test(cuerpo)) return false;
-    let suma = 0, mult = 2;
-    for (let i = cuerpo.length - 1; i >= 0; i--) {
-      suma += Number(cuerpo[i]) * mult;
-      mult = mult === 7 ? 2 : mult + 1;
-    }
-    const resto = 11 - (suma % 11);
-    const esperado = resto === 11 ? '0' : resto === 10 ? 'K' : String(resto);
-    return dv === esperado;
-  }
-
-  // El RUT sin puntos ni guión, que es como se compara: el mismo RUT escrito de
-  // cuatro formas tiene que encontrar a la misma persona.
-  const rutPlano = (r) => String(r || '').toUpperCase().replace(/[^0-9K]/g, '');
-
-  function cliente_por_rut(rut) {
-    if (!rutValido(rut)) return null;
-    const buscado = rutPlano(rut);
-    const p = db.persona.find((x) => x.tipo === 'cliente' && x.activo !== false &&
-      rutPlano(x.rut) === buscado);
-    if (!p) return null;
-    // Se devuelve lo que la recepción necesita y nada más. El resto de la ficha
-    // —qué órdenes tuvo, cuánto gastó— no es asunto de un formulario de ingreso.
-    return { id: p.id, rut: p.rut, nombre: nombreDe(p), telefono: p.telefono || '',
-             correo: p.correo || '', direccion: p.direccion || '' };
-  }
-
-  function vehiculo_por_patente(patente) {
-    const pat = String(patente || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (pat.length !== 6) return null;
-    const v = db.vehiculo.find((x) => x.patente === pat);
-    if (!v) return null;
-
-    const nom = (tabla, id) => { const f = (db[tabla] || []).find((x) => x.id === id); return f ? f.nombre : ''; };
-    const suyas = db.orden_trabajo.filter((o) => o.vehiculo_id === v.id)
-      .sort((a, b) => new Date(b.fecha_ingreso) - new Date(a.fecha_ingreso));
-    const abierta = suyas.find((o) => Reglas.estaAbierta(db, o.estado));
-
-    return {
-      vehiculo: { id: v.id, patente: v.patente, vin: v.vin || '', anio: v.anio || '',
-                  marca_id: v.marca_id || '', modelo_id: v.modelo_id || '', color_id: v.color_id || '',
-                  marca: nom('marca', v.marca_id), modelo: nom('modelo', v.modelo_id),
-                  color: nom('color_vehiculo', v.color_id) },
-      visitas: suyas.length,
-      ultimasOrdenes: suyas.slice(0, 3).map((o) => ({
-        id: o.id, numeroOT: o.numero_ot, fechaIngreso: o.fecha_ingreso,
-        estado: o.estado, estadoNombre: Reglas.nombreEstado(db, o.estado) })),
-      /* El tercer caso, que hoy se descubre recién al guardar: una patente no
-         puede tener dos órdenes abiertas (Regla 1). Detectarlo en el campo le
-         ahorra al recepcionista los otros cuatro pasos del formulario. */
-      otAbierta: abierta ? { id: abierta.id, numeroOT: abierta.numero_ot,
-                             estado: abierta.estado,
-                             estadoNombre: Reglas.nombreEstado(db, abierta.estado),
-                             fueraDeTaller: abierta.estado === 'fuera_taller' } : null
-    };
-  }
-
   /* ── Corregir una recepción ya guardada ───────────────────────────────
      Pedido de Marco el 15-08-2026. Faltaba, y no por tiempo: una recepción es
      lo que el cliente firmó, y para poder cambiarla había que decidir tres
@@ -1870,36 +1809,6 @@ const Modelo = (function () {
         ' ya tiene la orden ' + abierta.numero_ot + ' abierta. Una patente, una orden.' };
     }
 
-    /* Las dos correcciones del paso 3 que NO son escribir un campo, y por eso
-       se revisan antes de aplicar cualquier otra: si una de las dos rebota, la
-       corrección entera rebota sin haber dejado la mitad escrita.
-
-       🔴 EL ESTADO NO SE ESCRIBE A MANO ACÁ. Pasa por `cambiar_estado_ot`, que
-       es el mismo procedimiento del resto del sistema: revisa el maestro, cierra
-       la estadía si el estado es final y deja su hecho con autor. Asignarlo
-       directo dejaba mover una orden a «Entregado» desde una pantalla de
-       corrección sin fecha de salida y sin que el registro dijera quién. */
-    let estadoPedido = null;
-    if (c.orden && c.orden.estado && c.orden.estado !== o.estado) {
-      const permiso = Reglas.puedeCambiarEstado(db, { ot_id, nuevo_estado: c.orden.estado });
-      if (!permiso.ok) return permiso;
-      estadoPedido = c.orden.estado;
-    }
-
-    /* La fecha de ingreso pasa por la MISMA regla que el ingreso: ni futura, y
-       avisando si es de hace más de un mes. Corregir no puede aceptar lo que
-       crear rechaza. */
-    let entradaPedida = null;
-    const avisosFecha = [];
-    if (c.orden && c.orden.fecha_ingreso) {
-      const ing = fechaDeIngreso(c.orden.fecha_ingreso);
-      if (ing.error) return { ok: false, motivo: ing.error };
-      if (new Date(o.fecha_ingreso).getTime() !== ing.fecha.getTime()) {
-        entradaPedida = ing.fecha;
-        (ing.avisos || []).forEach((a) => avisosFecha.push(a));
-      }
-    }
-
     // Qué cambió de verdad. Lo que se manda igual a lo que ya había no es una
     // corrección y no ensucia el registro.
     const hechos = [];
@@ -1939,66 +1848,6 @@ const Modelo = (function () {
       if (c.recepcion[k] === undefined) return;
       if (anotar(RECEP[k], r[k], c.recepcion[k])) r[k] = c.recepcion[k];
     });
-
-    /* ── Paso 3 · Solicitud de reparación ────────────────────────────────
-       Pedido del cliente el 26-08-2026: *"en editar recepción te debe permitir
-       editar todo lo que se ingresa en recepción"*. Faltaba justo este bloque.
-
-       Se había dejado fuera con un argumento que suena bien y no lo es: que
-       compañía, siniestro y tipo de ingreso son de la ORDEN y no de la
-       recepción. Es verdad en el modelo de datos y da igual en el mesón — el
-       recepcionista los escribe en la misma pasada, y si se equivoca en el
-       número de siniestro tiene que poder arreglarlo donde lo escribió. La
-       pantalla sigue el gesto, no la tabla.
-
-       Se versiona igual que todo lo demás: el registro dice qué decía antes,
-       quién lo cambió y por qué. */
-    const ORDEN = { siniestro: 'N° de siniestro', deducible: 'Deducible neto',
-      liquidador: 'Liquidador / evaluador de la OT', or_externa: 'N° de OR',
-      descripcion_danos: 'Descripción de daños',
-      descripcion_estado: 'Descripción del estado' };
-    if (c.orden) {
-      Object.keys(ORDEN).forEach((k) => {
-        if (c.orden[k] === undefined) return;
-        if (anotar(ORDEN[k], o[k], c.orden[k])) o[k] = c.orden[k];
-      });
-
-      // Los tres de catálogo se anotan por su NOMBRE, igual que marca y color:
-      // el registro lo lee una persona, no la base.
-      [['tipo_ingreso_id', 'Tipo de ingreso', 'tipo_ingreso'],
-       ['compania_id', 'Compañía', 'compania'],
-       ['prioridad_id', 'Prioridad', 'prioridad']].forEach(([k, rotulo, tabla]) => {
-        if (c.orden[k] === undefined) return;
-        const nom = (id) => { const f = (db[tabla] || []).find((x) => x.id === id); return f ? f.nombre : ''; };
-        if (anotar(rotulo, nom(o[k]), nom(c.orden[k]))) o[k] = c.orden[k];
-      });
-
-      /* 🔴 LA FECHA DE INGRESO ARRASTRA LA ESTADÍA, Y ESE ES TODO EL PUNTO.
-         Los tres relojes de la torre NO leen `orden_trabajo.fecha_ingreso`:
-         leen `ot_estadia.entro_at`. Corrigiendo solo el campo, la ficha habría
-         mostrado la fecha nueva mientras los días seguían contando desde la
-         vieja — dos números que se contradicen, y manda el que nadie ve. Es la
-         misma trampa que en el ingreso (C-1).
-
-         Se mueve la PRIMERA estadía, no la abierta: la fecha que se corrige es
-         la de cuándo entró el auto por primera vez. Si salió y volvió, ese
-         segundo ingreso es un hecho aparte y no se toca desde acá. */
-      if (entradaPedida) {
-        const dia = (f) => (f ? new Date(f).toLocaleString('es-CL') : '');
-        anotar('Fecha de ingreso', dia(o.fecha_ingreso), dia(entradaPedida));
-        o.fecha_ingreso = entradaPedida;
-        const primera = db.ot_estadia.filter((x) => x.ot_id === ot_id)
-          .sort((a, b) => new Date(a.entro_at) - new Date(b.entro_at))[0];
-        if (primera) primera.entro_at = entradaPedida;
-      }
-
-      // El estado ya pasó su revisión arriba: acá solo se ejecuta, y lo hace
-      // el procedimiento de siempre para que deje su propio hecho.
-      if (estadoPedido) {
-        anotar('Estado', Reglas.nombreEstado(db, o.estado), Reglas.nombreEstado(db, estadoPedido));
-        cambiar_estado_ot(ot_id, estadoPedido, 'Corrección de la recepción: ' + String(motivo).trim());
-      }
-    }
 
     if (c.inventario) {
       const validos = INV_ESTADOS.map((e) => e.codigo);
@@ -2070,7 +1919,7 @@ const Modelo = (function () {
       hechos.map((h) => h.campo + ': «' + (h.antes || '—') + '» → «' + (h.despues || '—') + '»').join(' · ') +
       ' — ' + String(motivo).trim());
     tocado();
-    return { ok: true, motivo: '', version, cambios: hechos.length, avisos: avisosFecha };
+    return { ok: true, motivo: '', version, cambios: hechos.length };
   }
 
   /* Las correcciones de una recepción, de la más nueva a la más vieja, con el
@@ -2387,18 +2236,6 @@ const Modelo = (function () {
 
   /* ── Presupuesto ──────────────────────────────────────────────────────── */
 
-  /* El primero conserva la cuenta de siempre —para que los números de la
-     demostración no cambien de golpe— y de ahí en adelante busca el siguiente
-     que no esté tomado por esa orden. */
-  function siguienteReparacion(o) {
-    const base = 18000 + (o.numero_ot % 900);
-    const tomados = db.presupuesto.filter((p) => p.ot_id === o.id)
-      .map((p) => Number(p.id_reparacion));
-    let rep = base;
-    while (tomados.indexOf(rep) >= 0) rep++;
-    return rep;
-  }
-
   /* ⚠️ El `= {}` no es adorno (A-1 de la auditoría del 16-08-2026). Sin él,
      llamarla con un solo argumento lanza `TypeError: Cannot destructure
      property...` y deja la pantalla a medio pintar. La regla de la casa es la
@@ -2407,8 +2244,8 @@ const Modelo = (function () {
      desestructuran quedaron iguales, no sólo ésta. */
   /* ⚠️ ESTA NO LLEVA LLAVE DERIVADA, y la razón importa (SIS-3, 23-08-2026).
 
-     El primer intento fue `conLlave('presupuesto:' + ot_id + ':' + id_reparacion)`,
-     y está mal: cuando no se pasa `id_reparacion` el sistema lo asigna solo, así
+     El primer intento fue `conLlave('presupuesto:' + ot_id + ':' + reparacion)`,
+     y está mal: cuando no se pasaba la reparación el sistema la asignaba solo, así
      que la llave quedaba igual para todas las OR de la misma orden. Y «un
      vehículo tiene una sola OT y puede tener varias OR» es textual del cliente:
      dos presupuestos sobre la misma orden son legítimos. Lo cazó la prueba de
@@ -2416,33 +2253,27 @@ const Modelo = (function () {
 
      El doble clic acá se ataja donde de verdad ocurre, que es el clic, y está
      en `js/app/acciones.js`. */
-  function crear_presupuesto(ot_id, { id_reparacion, lineas } = {}) {
+  function crear_presupuesto(ot_id, { lineas } = {}) {
     const o = db.orden_trabajo.find((x) => x.id === ot_id);
     if (!o) return { ok: false, motivo: 'La orden de trabajo no existe.' };
     if (Reglas.esTerminal(db, o.estado))
       return { ok: false, motivo: 'La orden ' + o.numero_ot + ' está cerrada y no admite presupuestos nuevos.' };
 
-    /* El id de reparación distingue TRABAJOS distintos sobre la misma orden:
-       "un vehículo tiene una sola OT y puede tener varias OR", textual del
-       cliente. Antes salía de una cuenta fija sobre el número de OT, así que
-       toda reparación de una misma orden daba el mismo id — y no importaba,
-       porque el correlativo `-001`/`-002` las separaba igual.
+    /* 🔴 LA OR YA EXISTE: ES LA DE LA ORDEN (26-08-2026, Marco).
 
-       Sacado el correlativo, ese id pasa a ser lo ÚNICO que distingue una OR de
-       otra dentro de la misma orden. Si se repitiera, la segunda OR chocaría
-       con la primera y el taller no podría abrir un trabajo nuevo. Por eso
-       ahora avanza hasta encontrar uno libre. */
-    const rep = id_reparacion || siguienteReparacion(o);
-    const corr = Reglas.siguienteCorrelativoOR(db, ot_id, rep);
-    const numero_or = Reglas.formatoOR(o.numero_ot, rep);
-    const libre = Reglas.numeroORDisponible(db, numero_or);
-    if (!libre.ok) return libre;
+       Acá se armaba el número —`23368-18868`— y de paso se decidía qué
+       reparación era. Estaba al revés: en el taller la OR se asigna al ingresar
+       el vehículo, no al valorizarlo, y es un correlativo propio.
+
+       El presupuesto ya no inventa nada: toma la OR de su orden. Las versiones
+       la comparten a propósito, porque son el mismo trabajo. */
+    const numero_or = o.numero_or;
 
     const pid = nuevoId('pr');
     const previos = db.presupuesto.filter((p) => p.ot_id === ot_id);
 
     db.presupuesto.push({
-      id: pid, ot_id, id_reparacion: rep, correlativo: corr, numero_or,
+      id: pid, ot_id, numero_or,
       version: previos.length + 1, estado: 'borrador',
       // La tarifa vigente al abrir la OR, congelada en el documento.
       tempario: Number(Reglas.parametro(db, 'tempario', 10000)),
@@ -2557,6 +2388,36 @@ const Modelo = (function () {
       l.precio_unitario = isNaN(v) || v < 0 ? 0 : Math.round(v);
     }
 
+    /* 🔴 Y LA OP TAMBIÉN SE PUEDE CORREGIR (26-08-2026).
+
+       En la pantalla la OP se elige DESPUÉS de escribir la descripción, y se
+       cambia de opinión: lo que iba a repararse termina cambiándose. Si la
+       bajada a repuestos ocurriera sólo al agregar la línea, corregir la OP
+       dejaría la lista de compras mintiendo — de menos o de más.
+
+       Sacarlo tiene un límite y es el que importa: si bodega YA RECIBIÓ la
+       pieza, no se borra nada. Esa pieza llegó, está en la repisa y alguien la
+       pagó; que el presupuesto se haya corregido después no la hace
+       desaparecer. Ahí se deja y se avisa. */
+    if ('proceso' in cambios && cambios.proceso !== l.proceso &&
+        ['cambio', 'reparar', 'externo'].indexOf(cambios.proceso) >= 0) {
+      const antes = l.proceso;
+      const suyo = repuestoDeLinea(linea_id);
+      if (antes !== 'cambio' && cambios.proceso === 'cambio' && !suyo) {
+        l.proceso = cambios.proceso;
+        bajarRepuestoABodega(p, l);
+      } else if (antes === 'cambio' && cambios.proceso !== 'cambio' && suyo) {
+        if (suyo.fecha_bodega)
+          return { ok: false, motivo: 'El repuesto «' + suyo.descripcion + '» ya llegó a bodega. ' +
+            'Cambiarle la operación a esta línea lo dejaría fuera del presupuesto con la pieza ' +
+            'adentro del taller: primero hay que devolverlo desde Bodega.' };
+        db.repuesto = db.repuesto.filter((x) => x.id !== suyo.id);
+        l.proceso = cambios.proceso;
+      } else {
+        l.proceso = cambios.proceso;
+      }
+    }
+
     /* La pieza de bodega sigue a su línea: es la MISMA pieza. Sin esto,
        corregir el proveedor o el precio en el presupuesto dejaba a bodega con
        los datos viejos, que es la redigitación que este sistema vino a
@@ -2598,13 +2459,8 @@ const Modelo = (function () {
        Lo que sí se avisa, y en el momento de ENVIAR, es un presupuesto que
        sale en $0: ese es el error caro, no la línea a medio llenar. */
     const n = db.presupuesto_linea.filter((l) => l.presupuesto_id === pid).length;
-    db.presupuesto_linea.push(Object.assign({
+    const nueva = Object.assign({
       id: nuevoId('pl'), presupuesto_id: pid, orden: n + 1,
-      /* MANO DE OBRA. La OP clasifica este trabajo —cambiar la pieza,
-         repararla o mandarla afuera— y no crea nada en otro bloque:
-         Repuestos y Externos se escriben a mano, con su propio botón. Antes
-         una OP=Cambio inventaba sola su fila de repuesto, que es mezclar la
-         clasificación del trabajo con la lista de compras. */
       bloque: 'mano_obra',
       horas_dm: 0, horas_rep: 0, horas_pint: 0,
       codigo: '', cantidad: 1, proveedor: '', precio_unitario: 0
@@ -2612,7 +2468,33 @@ const Modelo = (function () {
       // El proveedor se normaliza SIEMPRE: es el campo donde el original
       // guarda cuatro formás de escribir el mismo taller.
       proveedor: Reglas.normalizarProveedor(linea.proveedor)
-    }));
+    });
+    db.presupuesto_linea.push(nueva);
+
+    /* 🔴 «CAMBIO» BAJA SOLO A REPUESTOS (26-08-2026, Marco).
+
+       ⚠️ ESTO REVIERTE UNA DECISIÓN NUESTRA, y por eso queda escrito. Acá
+       decía, con todas las letras: «la OP clasifica este trabajo y no crea nada
+       en otro bloque… antes una OP=Cambio inventaba sola su fila de repuesto,
+       que es mezclar la clasificación del trabajo con la lista de compras».
+
+       Sonaba bien y estaba mal. En la visita se vio a Iván presupuestando de
+       verdad: escribe «llanta aleación delantera derecha», marca Cambio, y
+       después vuelve a escribir lo mismo en la lista de repuestos. El mismo
+       texto, dos veces, cuarenta veces al día. Marco lo pidió textual: «cuando
+       ponen Cambio, lo que están colocando en Descripción debe fluir
+       directamente a Repuesto».
+
+       BAJA EN BLANCO, y también es textual: «con cantidad 1, sin proveedor y
+       sin monto». Es correcto además de pedido — al escribir la línea todavía
+       no se sabe quién lo vende ni en cuánto: eso lo cotiza bodega días
+       después. Lo que sí se sabe es QUÉ pieza hay que comprar, y eso es lo que
+       viaja.
+
+       Si después le cambian la OP, `actualizar_linea_presupuesto` deshace o
+       rehace la bajada. */
+    if (nueva.proceso === 'cambio') bajarRepuestoABodega(p, nueva);
+
     recalcularPresupuesto(pid);
 
     tocado();
@@ -2746,23 +2628,9 @@ const Modelo = (function () {
     if (!ESTADOS_PRESU.includes(estado)) return { ok: false, motivo: 'Ese estado no existe.' };
     if (p.estado === estado)
       return { ok: false, motivo: 'El presupuesto ' + p.numero_or + ' ya está ' + estado + '.' };
-    /* 🔴 DE `anulado` NO SE SALE, y esta guarda faltaba. Sin ella
-       `anulado → enviado` pasaba todas las revisiones y el documento VOLVÍA A
-       LA VIDA: `totalOT` excluye solo lo anulado, así que la OR resucitada
-       volvía a contar en la venta parada de la orden y del taller.
-
-       No se veía porque la pantalla escondía el botón `Enviar` fuera de
-       borrador. Al pasar los cuatro botones a dibujarse siempre (26-08-2026) la
-       puerta quedaba abierta, así que se cierra donde corresponde: en el motor,
-       que es quien tiene que rechazarlo aunque el botón se apriete. */
-    if (p.estado === 'anulado')
-      return { ok: false, motivo: 'El presupuesto ' + p.numero_or + ' está anulado y no vuelve a ' +
-        'circular: dejó de contar en la venta de la orden y del taller. Si hay que cotizar otra ' +
-        'vez, se abre una OR nueva.' };
     if (['aprobado', 'rechazado'].includes(p.estado))
       return { ok: false, motivo: 'El presupuesto ' + p.numero_or + ' ya está ' + p.estado +
-        ', y un documento resuelto no cambia de estado. Para modificar lo que dice se crea la ' +
-        'versión siguiente, y la anterior queda intacta.' };
+        '. Para cambiarlo se crea una versión nueva.' };
     if (estado === 'enviado' && !db.presupuesto_linea.some((l) => l.presupuesto_id === pid))
       return { ok: false, motivo: 'No se envía un presupuesto sin líneas.' };
     p.estado = estado;
@@ -2817,14 +2685,14 @@ const Modelo = (function () {
     const o = db.orden_trabajo.find((x) => x.id === p.ot_id);
     if (Reglas.esTerminal(db, o.estado))
       return { ok: false, motivo: 'La orden ' + o.numero_ot + ' está cerrada.' };
-    const corr = Reglas.siguienteCorrelativoOR(db, p.ot_id, p.id_reparacion);
     // La versión nueva CONSERVA la OR: es el mismo trabajo, discutido otra vez.
-    // Por eso acá no se pregunta si la OR esta libre — no lo esta, y esta bien.
-    const numero_or = Reglas.formatoOR(o.numero_ot, p.id_reparacion);
+    // Y desde el 26-08-2026 la OR es la de la ORDEN, así que conservarla no es
+    // una decisión de esta función: no hay otra que poner.
+    const numero_or = o.numero_or;
     const nid = nuevoId('pr');
     const previos = db.presupuesto.filter((x) => x.ot_id === p.ot_id);
     db.presupuesto.push({
-      id: nid, ot_id: p.ot_id, id_reparacion: p.id_reparacion, correlativo: corr, numero_or,
+      id: nid, ot_id: p.ot_id, numero_or,
       version: previos.length + 1, estado: 'borrador', neto: 0, iva: 0, total: 0,
       /* La versión nueva toma el tempario VIGENTE, no el de la versión que
          copia. Recotizar es volver a poner precio, y ponerlo con una tarifa
@@ -4017,6 +3885,7 @@ const Modelo = (function () {
     cambiar_estado_presupuesto: 'el cambio de estado del presupuesto',
     nueva_version_presupuesto: 'la versión nueva del presupuesto',
     agregar_costo_adicional: 'el costo adicional',
+    editar_orden: 'la corrección de los datos de la OR',
     guardar_persona: 'el cambio en una persona',
     dar_de_baja_persona: 'dar de baja a una persona',
     reactivar_persona: 'reactivar a una persona',
@@ -4115,6 +3984,7 @@ const Modelo = (function () {
     // Ver la ficha del personal y EDITARLA se separaron: el jefe de taller
     // necesita saber quién está y qué sabe hacer para repartir el trabajo,
     // pero los datos de un trabajador los toca administración.
+    editar_orden: 'ot.editar',
     guardar_persona: 'personal.editar',
     dar_de_baja_persona: 'personal.editar',
     reactivar_persona: 'personal.editar',
@@ -4183,7 +4053,7 @@ const Modelo = (function () {
   // no tocan una orden —catálogos, parámetros, personas— no aparecen acá: son
   // del sistema, no del vehículo, y no tienen por qué ensuciar su expediente.
   const OT_DEL_PRIMER_ARGUMENTO = [
-    'asignar_etapas', 'asignar_responsable_ot', 'tomar_etapa', 'soltar_etapa',
+    'asignar_etapas', 'asignar_responsable_ot', 'editar_orden', 'tomar_etapa', 'soltar_etapa',
     'validar_etapa', 'devolver_etapa',
     'finalizar_etapa', 'finalizar_etapas', 'quitar_etapa', 'fijar_fecha_compromiso',
     'registrar_salida', 'registrar_reingreso', 'cambiar_estado_ot', 'registrar_entrega',
@@ -4294,12 +4164,11 @@ const Modelo = (function () {
     personasParaEtapa, destinatarios, fijar_fecha_compromiso,
     registrar_salida, registrar_reingreso, cambiar_estado_ot, registrar_entrega,
     programar_entrega, corregir_recepcion, correccionesDeRecepcion,
-    // Las dos búsquedas por identificador completo que usa la recepción.
-    cliente_por_rut, vehiculo_por_patente, rutValido,
     cargar_repuesto, recibir_repuesto, entregar_repuesto_area, fijar_responsable_pago,
     adjuntar_vale_repuesto, devolver_repuesto, declarar_perdida_total,
     fijar_codigo_repuesto,
     avisos, avisosDe,
+    editar_orden,
     crear_presupuesto, agregar_linea_presupuesto, agregar_fila_presupuesto,
     quitar_linea_presupuesto,
     actualizar_linea_presupuesto, fijar_observacion_presupuesto,

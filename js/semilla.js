@@ -115,7 +115,11 @@ const Semilla = (function () {
      nada. Ese es todo el trabajo de este número. */
   /* 12: la Reportería pasa a ser un permiso RESERVADO, que ningún rol otorga,
      y nace dado a dos cuentas con nombre. */
-  const FORMA_DATOS = 13;
+  /* De dónde arranca el correlativo de OR. Marco dio el ejemplo con 19810 el
+     26-08-2026: «si cortamos en la OR 19810, la siguiente debe ser la 19811». */
+  const PRIMERA_OR = 19810;
+
+  const FORMA_DATOS = 14;
   // TEMPARIO_HORA ($10.000, reglas §C.15) se eliminó el 13-08-2026 junto con
   // el tempario entero. La cifra queda medida en `reglas`, no en el sistema.
 
@@ -838,32 +842,8 @@ const Semilla = (function () {
       'Quezada', 'Riquelme', 'Sepúlveda', 'Tapia', 'Urrutia', 'Vergara', 'Yáñez', 'Zúñiga'];
 
     // RUT ficticio de la serie 11.111.111-K. No corresponde a nadie.
-    /* 🔴 EL DÍGITO VERIFICADOR SE CALCULA, no se inventa (26-08-2026).
-
-       Era `n % 10`, o sea que casi ningún RUT de la demostración estaba bien
-       formado. Da igual mientras nadie lo comprueba — pero desde que la
-       recepción busca al cliente por RUT y **exige el DV correcto para
-       disparar** (C-51), un padrón con DV inventados es un padrón donde la
-       búsqueda no encuentra nunca, y el que prueba la demostración concluye
-       que la función no sirve.
-
-       El cuerpo sigue siendo ficticio, de la serie 11.1xx.yyy: no corresponde
-       a nadie. Lo que cambia es que ahora está bien escrito. */
-    const dvDe = (cuerpo) => {
-      let suma = 0, mult = 2;
-      for (let i = String(cuerpo).length - 1; i >= 0; i--) {
-        suma += Number(String(cuerpo)[i]) * mult;
-        mult = mult === 7 ? 2 : mult + 1;
-      }
-      const resto = 11 - (suma % 11);
-      return resto === 11 ? '0' : resto === 10 ? 'K' : String(resto);
-    };
-    const rutFalso = (n) => {
-      const cuerpo = '11' + String(100 + (n % 900)).padStart(3, '0') +
-        String(100 + ((n * 7) % 900)).padStart(3, '0');
-      return cuerpo.slice(0, 2) + '.' + cuerpo.slice(2, 5) + '.' + cuerpo.slice(5) +
-        '-' + dvDe(cuerpo);
-    };
+    const rutFalso = (n) => '11.' + String(100 + (n % 900)).padStart(3, '0') + '.' +
+      String(100 + ((n * 7) % 900)).padStart(3, '0') + '-' + (n % 10);
 
     const persona = [];
     const persona_etapa = [];
@@ -1033,6 +1013,12 @@ const Semilla = (function () {
                'queda esperando a que el jefe la reparta, y eso queda medido.' },
       { clave: 'correlativo_ot', nombre: 'Próximo número de OT', valor: ULTIMA_OT + 1, tipo: 'numero',
         ayuda: 'Correlativo de cinco dígitos, sin año ni local. Al 12-08-2026 el sistema real iba por ' + ULTIMA_OT + '.' },
+      /* 🔴 26-08-2026. La OR dejó de ser un número compuesto que armaba el
+         presupuesto y pasó a ser un correlativo propio, que se asigna al crear
+         la orden. Es un segundo contador, hermano del de arriba y separado a
+         propósito: la OR y la OT avanzan cada una por su lado. */
+      { clave: 'correlativo_or', nombre: 'Próximo número de OR', valor: PRIMERA_OR + TOTAL_TORRE + TOTAL_HISTORICO, tipo: 'numero',
+        ayuda: 'Correlativo de la orden de reparación. Se asigna solo al crear la OT, igual que el número de OT.' },
       { clave: 'iva', nombre: 'IVA', valor: 19, tipo: 'numero', ayuda: 'Porcentaje aplicado al neto del presupuesto.' },
       /* 🔶 EL TEMPARIO VUELVE (16-08-2026). Se había sacado el 13-08 creyendo
          que el taller cotizaba un precio por trabajo. El PDF de la OR
@@ -1281,7 +1267,8 @@ const Semilla = (function () {
       const deducibleOT = comp ? entre(0, 8) * 25000 : 0;
 
       orden_trabajo.push({
-        id: ot_id, numero_ot, recepcion_id: rec_id, vehiculo_id: veh_id, cliente_id: cli_id,
+        id: ot_id, numero_ot, numero_or: PRIMERA_OR + idx, recepcion_id: rec_id,
+        vehiculo_id: veh_id, cliente_id: cli_id,
         tipo_ingreso_id: tipo, compania_id: comp,
         siniestro: comp ? 'SIN-' + numero_ot : null,
         deducible: deducibleOT,
@@ -1545,8 +1532,6 @@ const Semilla = (function () {
          16-08-2026 mirando la demostración, y tenía razón. */
       const sinPresupuesto = viva && idx % 8 === 3 && !conRepPend;
 
-      /* Presupuesto con OR compuesta: <OT>-<id_reparacion>-<NNN>. */
-      const id_reparacion = 18000 + (numero_ot % 900);
       const pid = 'pr-' + (++seqPre);
       const nL = sinPresupuesto ? 0 : entre(2, 6);
       const PIEZAS = ['Paragolpes delantero', 'Tapabarro izquierdo', 'Foco delantero derecho',
@@ -1651,8 +1636,8 @@ const Semilla = (function () {
         tempario, deducibleOT, 19);
       if (sinPresupuesto) { seqPre--; } else
       presupuesto.push({
-        id: pid, ot_id, id_reparacion, correlativo: 1,
-        numero_or: Reglas.formatoOR(numero_ot, id_reparacion),
+        id: pid, ot_id,
+        numero_or: PRIMERA_OR + idx,
         version: 1, estado: estadoPre, tempario, observacion: '',
         neto: tot.neto, iva: tot.iva, total: tot.total,
         // Un borrador no se ha mandado y un enviado no tiene respuesta: las

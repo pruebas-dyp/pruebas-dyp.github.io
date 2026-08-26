@@ -168,6 +168,23 @@ const Media = (function () {
     });
   }
 
+  /* Guarda un blob ya listo (la firma del cliente, que sale de un canvas y
+     pesa unos pocos KB: no se comprime). */
+  function guardarBlob(blob, ficha) {
+    const id = 'me-' + Date.now().toString(36) + '-' + Math.round(performance.now() * 1000).toString(36);
+    return conAlmacen('readwrite', (st) => st.put(blob, id)).then(() => ({
+      id,
+      ot_id: (ficha && ficha.ot_id) || null,
+      recepcion_id: (ficha && ficha.recepcion_id) || null,
+      etapa_id: null,
+      momento: (ficha && ficha.momento) || 'firma',
+      nombre: (ficha && ficha.nombre) || 'firma.png',
+      mime: blob.type, bytes_original: blob.size, bytes: blob.size,
+      ancho: (ficha && ficha.ancho) || null, alto: (ficha && ficha.alto) || null,
+      creado_at: cuando()
+    }));
+  }
+
   const obtener = (id) => conAlmacen('readonly', (st) => st.get(id));
 
   /* Devuelve una URL utilizable en un <img>. Quien la pide se hace cargo de
@@ -209,15 +226,138 @@ const Media = (function () {
     : b < 1024 * 1024 ? (b / 1024).toFixed(0) + ' KB'
     : (b / (1024 * 1024)).toFixed(1).replace('.', ',') + ' MB');
 
+  /* ── Bajar un set de fotos en una sola carpeta ──────────────────────────
+     🔴 26-08-2026. Marco lo pidió por escrito y en la visita se dijo tres
+     veces, una de ellas textual: «agarrar todas estas fotos, las de recepción y
+     las que tomé yo, y guardarlas todas juntas. Eso, chiquillos, es muy
+     importante». Es su trabajo de todos los días: baja el set, borra las que no
+     sirven, y le manda el resto al liquidador.
+
+     ⚠️ EL ZIP ESTÁ ESCRITO ACÁ, A MANO, Y NO ES CAPRICHO. Este sistema no tiene
+     una sola dependencia y no la va a tener por esto: bajar una librería de
+     compresión para juntar diez JPG serían cientos de kilobytes que el taller
+     descarga cada vez, para ahorrar lo que un JPG —ya comprimido— no ahorra.
+
+     Por eso el ZIP va en modo ALMACENADO (método 0, sin comprimir): el formato
+     lo permite, cualquier Windows lo abre con doble clic, y son sesenta líneas
+     que se leen enteras. Lo único que hay que hacer bien es el CRC-32, que es
+     lo de abajo. */
+  const TABLA_CRC = (function () {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+      let c = n;
+      for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+      t[n] = c >>> 0;
+    }
+    return t;
+  })();
+
+  function crc32(bytes) {
+    let c = 0xFFFFFFFF;
+    for (let i = 0; i < bytes.length; i++) c = TABLA_CRC[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  /* Nombres de archivo: sin tildes, sin barras y sin dos iguales. Un ZIP con
+     dos entradas del mismo nombre lo abre igual, y deja una sola adentro. */
+  function nombresUnicos(fichas) {
+    const usados = {};
+    return fichas.map((f, i) => {
+      /* El campo es `mime`, no `tipo`. Escrito como `tipo` —que es como se
+         llama en media otras veces— la extensión salía SIEMPRE .jpg, y un PNG
+         renombrado a .jpg lo abre igual media cosa y ninguna otra. Lo cazó la
+         primera corrida en el navegador, no las pruebas. */
+      const m = String(f.mime || f.tipo || '');
+      const ext = m.indexOf('png') >= 0 ? '.png'
+        : m.indexOf('pdf') >= 0 ? '.pdf'
+        : m.indexOf('webp') >= 0 ? '.webp' : '.jpg';
+      let base = String((i + 1) + '-' + (f.momento || 'foto'))
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^A-Za-z0-9._-]/g, '-');
+      let nombre = base + ext, n = 2;
+      while (usados[nombre]) { nombre = base + '-' + (n++) + ext; }
+      usados[nombre] = true;
+      return nombre;
+    });
+  }
+
+  /* Arma el ZIP con los blobs que ya están en IndexedDB. Devuelve un Blob. */
+  function empaquetar(fichas) {
+    const nombres = nombresUnicos(fichas);
+    return Promise.all(fichas.map((f) => obtener(f.id)))
+      .then((blobs) => Promise.all(blobs.map((b) => (b ? b.arrayBuffer() : null))))
+      .then((bufs) => {
+        const partes = [], central = [];
+        let desplazamiento = 0;
+        const cod = new TextEncoder();
+
+        bufs.forEach((buf, i) => {
+          if (!buf) return;                       // la foto no está en este navegador
+          const datos = new Uint8Array(buf);
+          const nombre = cod.encode(nombres[i]);
+          const crc = crc32(datos);
+
+          const local = new DataView(new ArrayBuffer(30));
+          local.setUint32(0, 0x04034b50, true);   // firma de entrada local
+          local.setUint16(4, 20, true);           // versión necesaria
+          local.setUint16(6, 0, true);            // sin banderas
+          local.setUint16(8, 0, true);            // método 0 = almacenado
+          local.setUint16(10, 0, true); local.setUint16(12, 0, true);  // hora y fecha
+          local.setUint32(14, crc, true);
+          local.setUint32(18, datos.length, true);
+          local.setUint32(22, datos.length, true);
+          local.setUint16(26, nombre.length, true);
+          local.setUint16(28, 0, true);
+          partes.push(new Uint8Array(local.buffer), nombre, datos);
+
+          const dir = new DataView(new ArrayBuffer(46));
+          dir.setUint32(0, 0x02014b50, true);     // firma del directorio central
+          dir.setUint16(4, 20, true); dir.setUint16(6, 20, true);
+          dir.setUint16(8, 0, true); dir.setUint16(10, 0, true);
+          dir.setUint16(12, 0, true); dir.setUint16(14, 0, true);
+          dir.setUint32(16, crc, true);
+          dir.setUint32(20, datos.length, true);
+          dir.setUint32(24, datos.length, true);
+          dir.setUint16(28, nombre.length, true);
+          dir.setUint32(42, desplazamiento, true);
+          central.push(new Uint8Array(dir.buffer), nombre);
+
+          desplazamiento += 30 + nombre.length + datos.length;
+        });
+
+        const largoCentral = central.reduce((n, p) => n + p.length, 0);
+        const fin = new DataView(new ArrayBuffer(22));
+        fin.setUint32(0, 0x06054b50, true);       // firma del cierre
+        fin.setUint16(8, central.length / 2, true);
+        fin.setUint16(10, central.length / 2, true);
+        fin.setUint32(12, largoCentral, true);
+        fin.setUint32(16, desplazamiento, true);
+
+        return new Blob(partes.concat(central, [new Uint8Array(fin.buffer)]),
+          { type: 'application/zip' });
+      });
+  }
+
+  /* Lo baja con el nombre que le sirve al taller: la patente y la fecha. */
+  function bajarCarpeta(fichas, nombre) {
+    if (!fichas || !fichas.length) return Promise.resolve(0);
+    return empaquetar(fichas).then((zip) => {
+      const u = URL.createObjectURL(zip);
+      const a = document.createElement('a');
+      a.href = u; a.download = (nombre || 'fotos') + '.zip';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(u), 30000);
+      return fichas.length;
+    });
+  }
+
   /* Borra TODO lo binario. Lo usa Archivo → Reiniciar a datos de demostración:
      si no, las fotos quedarían huérfanas en IndexedDB para siempre. */
   function vaciar() {
     return conAlmacen('readwrite', (st) => st.clear());
   }
 
-  /* ⛔ `guardarBlob` salió el 26-08-2026 con la captura de firma: era su
-     único llamador. Guardaba un Blob ya armado, sin comprimir. Si vuelve a
-     hacer falta, está en el historial. */
-  return { guardar, subir, obtener, url, eliminar, pintar, resumen, fPeso, vaciar,
+  return { guardar, guardarBlob, subir, obtener, url, eliminar, pintar, resumen, fPeso, vaciar,
+    empaquetar, bajarCarpeta,
            ladoMax, objetivoBytes, comprimeSiempre };
 })();

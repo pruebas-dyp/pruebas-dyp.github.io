@@ -16,7 +16,8 @@
    encabezado no se vuelve clicable. */
 const ORDEN_TORRE = {
   ot:         (o) => Number(o.numeroOT) || 0,
-  or:         (o) => (o.presupuestos[0] || {}).numeroOR || '',
+  or:         (o) => Number(o.numeroOR) || 0,
+  reppend:    (o) => o.repuestos.filter((r) => !r.fechaBodega).length,
   patente:    (o) => o.patente || '',
   siniestro:  (o) => o.siniestro || '',
   cliente:    (o) => o.cliente || '',
@@ -81,7 +82,7 @@ function cuentasSituacion() {
     if (f.compania !== 'todas' && o.compania !== f.compania) return false;
     if (f.etapa !== 'todas' && o.etapa !== f.etapa) return false;
     if (q) {
-      const ors = o.presupuestos.map((p) => p.numeroOR).join(' ');
+      const ors = [o.numeroOR].concat(o.presupuestos.map((p) => p.numeroOR)).join(' ');
       const heno = [o.numeroOT, ors, o.patente, o.siniestro, o.cliente, o.marca, o.modelo]
         .join(' ').toLowerCase();
       if (!heno.includes(q)) return false;
@@ -103,7 +104,7 @@ function filtrarTorre() {
     if (f.etapa !== 'todas' && o.etapa !== f.etapa) return false;
     if (!situacion(o)) return false;
     if (q) {
-      const ors = o.presupuestos.map((p) => p.numeroOR).join(' ');
+      const ors = [o.numeroOR].concat(o.presupuestos.map((p) => p.numeroOR)).join(' ');
       const heno = [o.numeroOT, ors, o.patente, o.siniestro, o.cliente, o.marca, o.modelo].join(' ').toLowerCase();
       if (!heno.includes(q)) return false;
     }
@@ -137,8 +138,7 @@ function vTorre() {
   <div class="panel">
     <div class="cab">
       <div><h2>${ico('torre', 'g')}Torre de control</h2>
-        ${/* ⛔ La bajada se eliminó el 26-08-2026 con la ruta y la barra: contaba
-             cómo se usa la tabla, y eso se aprende al primer clic. */''}</div>
+        <div class="desc">Las 17 columnas del sistema actual. Un clic despliega el expandible; doble clic abre la orden</div></div>
       <div class="filtros">
         <input type="search" id="q-torre" placeholder="OT, OR, patente, siniestro o cliente" value="${esc(f.busqueda)}">
         <select id="s-compania"><option value="todas">Todas las compañías</option>
@@ -167,7 +167,10 @@ function vTorre() {
       <table class="grid">
         <thead><tr>
           <th style="width:26px"></th>
-          ${thOrden('ot', 'OT')}${thOrden('or', 'OR')}${thOrden('patente', 'Patente')}
+          ${thOrden('ot', 'OT')}${thOrden('or', 'OR')}
+          ${thOrden('reppend', 'Rep. pend.', 'Repuestos que todavía no llegan a bodega. ' +
+            'Mientras haya uno, el vehículo no puede entrar a taller.')}
+          ${thOrden('patente', 'Patente')}
           ${thOrden('siniestro', 'N° Siniestro')}${thOrden('cliente', 'Cliente')}
           ${thOrden('compania', 'Compañia')}${thOrden('marca', 'Marca')}${thOrden('modelo', 'Modelo')}
           ${thOrden('color', 'Color')}${thOrden('ingreso', 'Fecha de Ingreso')}${thOrden('tipo', 'Tipo')}
@@ -178,7 +181,7 @@ function vTorre() {
           <th title="La inicial del asunto de cada mensaje de bitácora">Alerta</th>
         </tr></thead>
         <tbody>${pagina.length ? pagina.map(filaTorre).join('') :
-          '<tr><td colspan="19"><div class="vacio"><div class="titulo">Sin resultados</div>' +
+          '<tr><td colspan="20"><div class="vacio"><div class="titulo">Sin resultados</div>' +
           '<div class="texto">Ninguna orden coincide con el filtro.</div></div></td></tr>'}</tbody>
       </table>
     </div>
@@ -217,20 +220,36 @@ function filaTorre(o) {
   const sobreMeta = !fuera && o.sobreMeta;
   const abierta = ui.torre.abierta === o.id;
 
-  // La OR es "el apellido" de la OT y la genera cada presupuesto: puede haber
-  // varias, y por eso el original muestra la cantidad en esta columna.
-  const ors = o.presupuestos.map((p) => p.numeroOR);
+  /* 🔴 LA OR ES UNA Y ES DE LA ORDEN (26-08-2026, Marco).
+
+     Acá decía que la OR «la genera cada presupuesto: puede haber varias», y por
+     eso la celda mostraba la primera con un «+2» al lado. Era el modelo viejo.
+     Ahora la OR se asigna al crear la OT y es un correlativo propio, así que
+     hay exactamente una y se ve siempre — incluso en una orden que todavía no
+     tiene presupuesto, que antes salía con un guión. */
+  const or = o.numeroOR;
+
+  // Lo que bodega debe y la torre no decía: por qué este auto sigue afuera.
+  const repPend = o.repuestos.filter((r) => !r.fechaBodega).length;
 
   let html = '<tr class="fila' + (abierta ? ' abierta' : '') + '" data-ot="' + esc(o.id) + '">' +
     '<td><span class="flecha">&#9656;</span></td>' +
     '<td class="num"><strong>' + o.numeroOT + '</strong></td>' +
     // El mouse sobre la OR muestra el detalle de ese presupuesto sin abrir la
     // orden: es lo que pidió el cliente el 15-08-2026.
-    '<td class="num">' + (ors[0]
-      ? '<span data-or="' + esc(ors[0]) + '">' + esc(ors[0]) + '</span>'
-      : '—') +
-      (ors.length > 1 ? ' <span class="et gris" title="' + esc(ors.join(' · ')) +
-        '">+' + (ors.length - 1) + '</span>' : '') + '</td>' +
+    '<td class="num">' + (or
+      ? '<span data-or="' + esc(or) + '">' + esc(or) + '</span>'
+      : '<span style="color:var(--gris-2)">—</span>') + '</td>' +
+    /* 🔴 REPUESTOS PENDIENTES (26-08-2026, Marco): «para que ellos tengan la
+       visibilidad de que si un vehículo está fuera de taller es porque tiene
+       una X cantidad de repuestos pendientes». El número solo no alcanzaba: se
+       pinta rojo cuando hay algo esperando, que es lo que se busca de un
+       vistazo en una tabla de diecinueve columnas. */
+    '<td class="num">' + (repPend
+      ? '<span class="et roja" title="' + repPend + ' repuesto' + (repPend === 1 ? '' : 's') +
+        ' sin llegar. Hasta que no lleguen todos, el vehículo no entra a taller">' +
+        repPend + '</span>'
+      : '<span style="color:var(--gris-2)">—</span>') + '</td>' +
     '<td><span class="patente">' + esc(o.patente) + '</span></td>' +
     '<td class="num">' + (o.siniestro ? esc(o.siniestro) : '<span style="color:var(--gris-2)">—</span>') + '</td>' +
     '<td>' + esc(o.cliente) +
@@ -259,46 +278,29 @@ function filaTorre(o) {
   return html;
 }
 
-/* 🔶 DOS PANELES, NO CUATRO (26-08-2026, pedido del cliente).
-
-   Se fueron «Los tres relojes» y «Repuestos, presupuestos y fotos». La mayor
-   parte de lo que mostraban NO se pierde: se mudó, y por eso sobraban acá.
-
-   | Lo que salía             | Dónde sigue estando                          |
-   |--------------------------|----------------------------------------------|
-   | Repuestos, OR, fotos     | Los botones grandes de la rejilla de abajo   |
-   | Situación en taller      | Columna ESTADO y las pestañas del panel      |
-   | Etapa y encargado        | Columnas ETAPA y ENCARGADO                   |
-   | Fecha de entrega         | Columna FECHA DE ENTREGA                     |
-   | Días y días totales      | Columnas DÍAS y DÍAS TOT.                    |
-
-   🔴 Lo único que SÍ desaparece de la Torre son los tres relojes EXPLICADOS
-   —«nunca se reinicia», «se reanuda al reingresar», «vuelve a cero»— y el aviso
-   ámbar de sobre la meta. Siguen completos en la ficha de la OT, y la pestaña
-   «Sobre los 15 días» sigue filtrando las que se pasaron. Es una decisión
-   tomada y no un descuido: los tres relojes son la corrección C-1, el argumento
-   central del proyecto. Anotado en C-49.
-
-   Con los paneles se fueron `e`, `pend`, `fuera`, `hitos`, `fotos` y la llamada
-   a `totalOT(o)`: calcular algo que nadie mira es lo que después hace creer que
-   una función sigue viva. */
 function detalleOT(o) {
+  const e = o.etapa ? etapaPorCodigo(o.etapa) : null;
+  const pend = o.repuestos.filter((r) => !r.fechaBodega);
   const dato = (k, v) => '<div class="dato"><span class="k">' + esc(k) + '</span><span class="v">' + v + '</span></div>';
+  const fuera = o.fueraDeTaller;
 
-  return '<div class="ficha-detalle"><div class="ficha-rejilla detalle-torre">' +
+  const hitos = ETAPAS.map((et) => {
+    const asignada = o.etapasAsignadas.find((x) => x.codigo === et.codigo);
+    const cls = !asignada ? '' : asignada.finalizada ? 'hecho' : 'actual';
+    return '<div class="hito ' + cls + '" title="' + esc(et.nombre) +
+      (asignada ? (asignada.finalizada ? ' · cerrada' : ' · abierta') : ' · no asignada') + '"></div>';
+  }).join('');
+
+  const fotos = Modelo.mediaDe(o.id).filter((m) => m.momento === 'ingreso');
+
+  return '<div class="ficha-detalle"><div class="ficha-rejilla">' +
     '<fieldset class="bloque"><legend>Vehículo</legend>' +
       dato('Patente', '<span class="patente">' + esc(o.patente) + '</span>') +
       dato('Marca y modelo', esc([o.marca, o.modelo].filter(Boolean).join(' ') || '—')) +
       dato('Año', o.anio || '—') + dato('Color', esc(o.color || '—')) +
       dato('VIN', esc(o.vin || '—')) +
       dato('Kilometraje', fKm(o.recepcion && o.recepcion.km)) +
-      dato('Combustible', fComb(o.recepcion && o.recepcion.combustible)) +
-      /* 🔴 LA FECHA DE INGRESO SE QUEDA, y se muda acá. Vivía en el panel de los
-         relojes, que se fue. Va con hora y no solo con día —`fFechaHora`—
-         porque el original la guarda al segundo y es el ORIGEN de los tres
-         contadores: sin la hora, un auto que entró a las 18:40 y otro que entró
-         a las 08:10 del mismo día se leen igual. */
-      dato('Fecha de Ingreso', fFechaHora(o.fechaIngreso)) + '</fieldset>' +
+      dato('Combustible', fComb(o.recepcion && o.recepcion.combustible)) + '</fieldset>' +
 
     '<fieldset class="bloque"><legend>Cliente y siniestro</legend>' +
       dato('Cliente', esc(o.cliente)) +
@@ -312,26 +314,54 @@ function detalleOT(o) {
       dato('Prioridad', o.prioridad === 'express'
         ? '<span class="et roja">Express</span>' : '<span class="et gris">Normal</span>') + '</fieldset>' +
 
+    '<fieldset class="bloque"><legend>Los tres relojes</legend>' +
+      dato('Situación', fuera
+        ? '<span class="et ambar">Fuera de taller</span>'
+        : '<span class="et verde">En taller</span>') +
+      (e ? dato('Etapa actual', '<i class="punto" style="background:' + e.color + '"></i>' + esc(e.nombre))
+         : dato('Etapa actual', '<span class="et gris">Sin asignar</span>')) +
+      dato('Días desde el ingreso', '<strong>' + o.diasTotales + '</strong> · nunca se reinicia') +
+      dato('Reparación acumulada', o.diasReparacion + ' · se reanuda al reingresar') +
+      dato('Estadía actual', fuera
+        ? '<span style="color:var(--gris)">0 · detenido</span>'
+        : o.diasEstadiaActual + ' · vuelve a cero al reingresar') +
+      dato('Contra la meta', o.sobreMeta
+        ? '<span style="color:var(--ambar)">' + o.diasKpi + ' de ' + META_DIAS_REPARACION + ' · sobre la meta</span>'
+        : o.diasKpi + ' de ' + META_DIAS_REPARACION) +
+      (fuera ? dato('Fuera de taller hace', '<span style="color:var(--ambar)">' + o.diasFuera + ' días</span>') : '') +
+      dato('Fecha de Ingreso', fFechaHora(o.fechaIngreso)) +
+      dato('Fecha de Entrega', o.fechaCompromiso
+        ? fFechaHora(o.fechaCompromiso) + ' <span style="color:var(--gris-2)">· probable</span>'
+        : '<span style="color:var(--gris-2)">sin comprometer</span>') +
+      '<div class="linea-tiempo">' + hitos + '</div></fieldset>' +
+
+    '<fieldset class="bloque"><legend>Repuestos, presupuestos y fotos</legend>' +
+      dato('Repuestos pendientes', pend.length
+        ? '<span style="color:var(--rojo)">' + pend.length + ' de ' + o.repuestos.length + '</span>'
+        : (o.repuestos.length ? 'Todos recibidos' : 'No requiere')) +
+      (pend.length ? pend.slice(0, 3).map((r) =>
+        '<div class="dato"><span class="k" style="padding-left:8px">' + esc(r.descripcion) + '</span>' +
+        '<span class="v"><span class="et gris">' + esc(r.responsablePago || 'sin pagador') + '</span></span></div>').join('') : '') +
+      o.presupuestos.map((p) => '<div class="dato"><span class="k">OR ' + esc(p.numeroOR) + '</span>' +
+        '<span class="v">' + fMonto(p.total) + ' <span class="et ' + ESTADO_PRESUPUESTO[p.estado].clase +
+        '">' + esc(ESTADO_PRESUPUESTO[p.estado].txt) + '</span></span></div>').join('') +
+      dato('Total de la OT', '<strong>' + fMonto(totalOT(o)) + '</strong>') +
+      dato('Daños registrados', o.danos.length) +
+      dato('Fotografías', fotos.length
+        ? fotos.length + ' · ' + Media.fPeso(Media.resumen(fotos).bytes)
+        : '<span style="color:var(--gris-2)">ninguna</span>') +
+      (fotos.length ? '<div style="display:flex;gap:5px;margin-top:6px;flex-wrap:wrap">' +
+        fotos.slice(0, 6).map((f) => '<img data-media="' + esc(f.id) +
+          '" alt="" style="width:52px;height:40px;object-fit:cover;border-radius:3px;border:1px solid var(--borde)">').join('') +
+        '</div>' : '') + '</fieldset>' +
     '</div>' +
 
-    /* 🔶 LA REJILLA DE LAS PANTALLAS DE LA ORDEN (16-08-2026, pedido del
-       cliente). Reemplaza a `Ver repuestos` y `Ver presupuesto`, que eran dos
-       botones de texto sueltos: ahora están las ocho pantallas que cuelgan de
-       la orden en el sistema real, con su icono y su rótulo literal.
-
-       Salen de `PANTALLAS_OT`, la MISMA lista que usa la ficha — ver
-       `js/vistas/pantallas-ot.js` y por qué no está copiada acá.
-
-       ⚠️ `Abrir en pestaña nueva` y `Ver en Taller` quedan ARRIBA y como
-       botones de texto, fuera de la rejilla. No son pantallas de la orden:
-       uno es otra forma de abrir la misma orden —el gesto que el dueño usa
-       todos los días— y el otro es un módulo. Meterlos entre los ocho haría
-       creer que son lo mismo. */
     '<div class="acciones-ficha">' +
       '<button class="btn" data-abrir="' + o.numeroOT + '">Abrir en pestaña nueva</button>' +
       '<button class="btn secundario" data-ver="taller">Ver en Taller</button>' +
-    '</div>' +
-    rejillaPantallasOT(o) + '</div>';
+      '<button class="btn secundario" data-ver="repuestos">Ver repuestos</button>' +
+      '<button class="btn secundario" data-ver="presupuesto">Ver presupuesto</button>' +
+    '</div></div>';
 }
 
 function pTorre() {
@@ -408,7 +438,6 @@ function pTorre() {
   document.querySelectorAll('[data-abrir]').forEach((b) => b.addEventListener('click', (ev) => {
     ev.stopPropagation(); abrirFicha(b.dataset.abrir);
   }));
-  pRejillaPantallasOT();
 
   const ant = document.getElementById('pag-ant'), sig = document.getElementById('pag-sig');
   if (ant) ant.addEventListener('click', () => { ui.torre.pagina--; ui.torre.abierta = null; render(); });

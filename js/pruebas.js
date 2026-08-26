@@ -1088,9 +1088,14 @@ const Pruebas = (function () {
         const pid = cre.presupuesto_id;
         const lin = Modelo.agregar_linea_presupuesto(pid, {
           proceso: 'cambio', descripcion: 'Paragolpes delantero', horas_dm: 1.2 });
-        // La pieza va en su tabla, que es de donde sale el pedido a bodega.
-        Modelo.agregar_fila_presupuesto(pid, 'repuesto',
-          { descripcion: 'Paragolpes delantero', cantidad: 1, proveedor: 'DYP', precio_unitario: 180000 });
+        /* 🔴 Y NADA MÁS. Acá había un `agregar_fila_presupuesto` que escribía
+           la pieza A MANO, porque hasta el 26-08-2026 el sistema no la bajaba
+           solo. Ahora la baja la OP «Cambio», así que escribirla otra vez
+           duplicaría — y la prueba lo cazó apenas se hizo el cambio.
+
+           Dejarla habría sido peor que un falso rojo: la prueba estaría
+           montando un flujo que ya no existe, y de paso tapando justo lo que
+           ahora hay que comprobar — que la línea SOLA alcanza. */
         const env = Modelo.cambiar_estado_presupuesto(pid, 'enviado');
         const apr = Modelo.cambiar_estado_presupuesto(pid, 'aprobado');
 
@@ -1099,14 +1104,104 @@ const Pruebas = (function () {
 
         push({
           nombre: '🔴 Aprobar un presupuesto pide sus repuestos a bodega',
-          intento: 'En la OT ' + o.numero_ot + ': crear la OR, agregarle una línea de proceso ' +
-                   'Cambio, enviarla y aprobarla — sin pedir los repuestos a mano',
+          intento: 'En la OT ' + o.numero_ot + ': crear la OR, agregarle UNA línea de proceso ' +
+                   'Cambio, enviarla y aprobarla — sin escribir el repuesto en ninguna parte',
           esperado: 'Un repuesto pendiente, ligado a la línea de presupuesto que lo originó',
           paso: cre.ok && lin.ok && env.ok && apr.ok && pedidos.length === 1 && ligado === 1,
           detalle: !apr.ok ? ('La aprobación falló: ' + apr.motivo)
             : (pedidos.length + ' repuesto(s), ' + ligado + ' ligado(s) a su línea' +
               (pedidos.length ? ' · ' + pedidos.map((r) => r.descripcion).join(', ')
                 : '  ·  NADIE los pidió: el bodeguero tendría que escribirlos de nuevo a mano.'))
+        });
+      })();
+
+      /* 🔴 «CAMBIO» BAJA LA DESCRIPCIÓN A REPUESTOS, EN BLANCO (26-08-2026).
+
+         Marco, después de ver presupuestar en terreno: «cuando ponen Cambio,
+         lo que están colocando en Descripción debe fluir directamente a
+         Repuesto, con cantidad 1, sin proveedor y sin monto».
+
+         Las tres condiciones se comprueban por separado a propósito. Que baje
+         es la mitad fácil; que baje EN BLANCO es la otra mitad, y es la que se
+         rompe sola el día que alguien decida «aprovechar» y copiarle el precio
+         de la mano de obra. */
+      (function () {
+        restaurarSesion();
+        const admin = db.persona.find((p) => p.correo === 'gabriel.diaz@dyp.cl');
+        Modelo.fijar_persona_actual(admin ? admin.id : null);
+        const o = db.orden_trabajo.find((x) => Reglas.estaAbierta(db, x.estado) &&
+          !db.repuesto.some((r) => r.ot_id === x.id));
+        if (!o) return;
+
+        const pid = Modelo.crear_presupuesto(o.id, { lineas: [] }).presupuesto_id;
+        const DESC = 'Llanta aleación delantera derecha aro 18';
+        const r1 = Modelo.agregar_linea_presupuesto(pid, { proceso: 'cambio', descripcion: DESC });
+        const bajo = db.repuesto.filter((r) => r.ot_id === o.id);
+        const uno = bajo[0] || {};
+
+        // Y una de Reparar NO puede bajar nada.
+        const antes = bajo.length;
+        Modelo.agregar_linea_presupuesto(pid, { proceso: 'reparar', descripcion: 'Pulir costado' });
+        const trasReparar = db.repuesto.filter((r) => r.ot_id === o.id).length;
+
+        push({
+          nombre: '🔴 La OP «Cambio» baja la descripción a Repuestos, en blanco',
+          intento: 'Agregar una línea de Cambio con la descripción y mirar la tabla de repuestos',
+          esperado: 'Un repuesto con esa misma descripción, cantidad 1, sin proveedor y sin precio. Reparar no baja nada',
+          paso: r1.ok && bajo.length === 1 && uno.descripcion === DESC &&
+                uno.cantidad === 1 && !uno.proveedor && !uno.precio_unitario &&
+                trasReparar === antes,
+          detalle: !bajo.length
+            ? 'No bajó nada: el evaluador tendría que escribir la pieza otra vez, a mano'
+            : (uno.descripcion !== DESC ? 'Bajó con otra descripción: «' + uno.descripcion + '»'
+              : (uno.proveedor || uno.precio_unitario
+                ? 'Bajó con proveedor o precio puestos, y eso lo cotiza bodega después'
+                : (trasReparar !== antes ? 'Una línea de Reparar también bajó un repuesto'
+                  : 'Baja sola, en blanco, y sólo la de Cambio')))
+        });
+      })();
+
+      /* 🔶 Y SI DESPUÉS LE CAMBIAN LA OP, LA LISTA DE COMPRAS SIGUE.
+
+         En la pantalla la OP se elige después de escribir, y se cambia de
+         opinión. Lo que no puede pasar es que la lista de repuestos quede
+         mintiendo — ni de más ni de menos. */
+      (function () {
+        restaurarSesion();
+        const admin = db.persona.find((p) => p.correo === 'gabriel.diaz@dyp.cl');
+        Modelo.fijar_persona_actual(admin ? admin.id : null);
+        const o = db.orden_trabajo.find((x) => Reglas.estaAbierta(db, x.estado) &&
+          !db.repuesto.some((r) => r.ot_id === x.id));
+        if (!o) return;
+
+        const pid = Modelo.crear_presupuesto(o.id, { lineas: [] }).presupuesto_id;
+        Modelo.agregar_linea_presupuesto(pid, { proceso: 'reparar', descripcion: 'Foco trasero derecho' });
+        const linea = db.presupuesto_linea.filter((l) => l.presupuesto_id === pid).pop();
+        const cuantos = () => db.repuesto.filter((r) => r.ot_id === o.id).length;
+
+        const conReparar = cuantos();
+        Modelo.actualizar_linea_presupuesto(linea.id, { proceso: 'cambio' });
+        const conCambio = cuantos();
+        Modelo.actualizar_linea_presupuesto(linea.id, { proceso: 'reparar' });
+        const deVuelta = cuantos();
+
+        // Y con la pieza YA RECIBIDA, no se borra: llegó y está en la repisa.
+        Modelo.actualizar_linea_presupuesto(linea.id, { proceso: 'cambio' });
+        const suyo = db.repuesto.filter((r) => r.ot_id === o.id)[0];
+        if (suyo) Modelo.recibir_repuesto(suyo.id);
+        const rechaza = Modelo.actualizar_linea_presupuesto(linea.id, { proceso: 'reparar' });
+        const trasRecibido = cuantos();
+
+        push({
+          nombre: '🔶 Cambiarle la OP a una línea corrige la lista de repuestos',
+          intento: 'Reparar → Cambio → Reparar, y después con la pieza ya recibida en bodega',
+          esperado: '0 → 1 → 0, y con la pieza recibida se niega y la deja donde está',
+          paso: conReparar === 0 && conCambio === 1 && deVuelta === 0 &&
+                rechaza.ok === false && trasRecibido === 1,
+          detalle: conCambio !== 1 ? 'Pasar a Cambio no bajó el repuesto'
+            : (deVuelta !== 0 ? 'Volver a Reparar dejó el repuesto colgado en la lista de compras'
+              : (rechaza.ok !== false ? 'Borró un repuesto que bodega ya había recibido'
+                : 'Sigue a la OP, y se planta cuando la pieza ya llegó'))
         });
       })();
 
