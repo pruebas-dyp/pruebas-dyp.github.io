@@ -187,6 +187,15 @@ function vHistorico() {
       <div class="desc" style="margin-bottom:9px">Cada parámetro es independiente de los otros,
         salvo <strong>marca</strong> y <strong>modelo</strong>: el modelo se ofrece según la marca elegida.</div>
       <div class="rejilla-campos">
+        ${/* 🔴 EL RÓTULO DICE LAS CUATRO COSAS QUE BUSCA. Este mismo cuadro
+             decía «Patente u OT» mientras buscaba SOLO la patente, y escribir
+             el número de la orden devolvía cero — que con el filtro puesto se
+             lee como «esa orden no existe». Lo vio Marco el 17-08-2026, y al
+             sumar el siniestro se aprovechó de nombrar también la OR.
+
+             🔶 El siniestro lo pedimos los dos por separado el 26-08-2026 y
+             lo construimos los dos: al fusionar quedó SU línea, que es la que
+             calza con su modelo nuevo de OR. */''}
         <div class="campo"><label>Patente, OT, OR o siniestro</label><input id="h-patente" value="${esc(h.patente)}" placeholder="Cualquiera de los cuatro"></div>
         <div class="campo"><label>Cliente</label><input id="h-cliente" value="${esc(h.cliente)}"
           placeholder="Todos" autocomplete="off" list="h-clientes">
@@ -221,7 +230,15 @@ function vHistorico() {
 
     <div class="grid-envoltorio"><table class="grid">
       <thead><tr>
-        <th>OT</th><th title="Cantidad de repuestos">Qty Rep</th><th>Patente</th><th>Cliente</th>
+        ${/* 🔶 `N° Siniestro` entra el 26-08-2026 a pedido del cliente. Va
+             después de Patente, igual que en la Torre, y con su mismo rótulo.
+
+             ⚠️ En el Consolidado de más abajo y en Bodega la misma columna se
+             rotula «Siniestro» a secas. Son dos nombres para un concepto, que
+             es exactamente lo que este proyecto le audita al original; queda
+             señalado para unificarlo de una vez, en los tres. */''}
+        <th>OT</th><th title="Cantidad de repuestos">Qty Rep</th><th>Patente</th>
+        <th>N° Siniestro</th><th>Cliente</th>
         <th>Marca</th><th>Modelo</th><th>Color</th><th>Fecha de Ingreso</th><th>Tipo</th><th>Estado</th>
         <th>Fecha de Entrega</th>
         <th title="El original NO tiene esta columna: al entregar, el contador desaparece">Días tot.</th>
@@ -234,6 +251,11 @@ function vHistorico() {
         return '<tr class="fila" data-ot="' + esc(o.numeroOT) + '"><td class="num"><strong>' + o.numeroOT + '</strong></td>' +
           '<td class="num">' + o.repuestos.length + '</td>' +
           '<td><span class="patente">' + esc(o.patente) + '</span></td>' +
+          /* La raya y no la celda vacía: casi un tercio de la cartera no tiene
+             compañía —las de tipo Empresa y Particular— y una celda en blanco
+             se lee como un dato que FALTA en vez de uno que no aplica. Mismo
+             formato que la columna del Consolidado. */
+          '<td class="num">' + esc(o.siniestro || '—') + '</td>' +
           '<td>' + esc(o.cliente) + '</td>' +
           '<td>' + esc(o.marca || '—') + '</td><td>' + esc(o.modelo || '—') + '</td>' +
           '<td>' + esc(o.color || '—') + '</td>' +
@@ -250,13 +272,24 @@ function vHistorico() {
           '<td>' + esc(((o.recepcion || {}).observaciones || '').slice(0, 90) ||
             '—') + '</td>' +
           '<td>' + chipsAlerta(o) + '</td></tr>';
-      }).join('') : '<tr><td colspan="19">' +
+      }).join('') : '<tr><td colspan="20">' +
         (hayFiltro || h.todos ? sinResultados(h) :
           '<div class="vacio"><div class="titulo">Escribe un filtro y aprieta Buscar</div>' +
           '<div class="texto">El Histórico es un buscador, no un listado. ' +
           'Así es el sistema actual y así se replica — y para verlo entero está <strong>Ver todos</strong>.</div></div>') +
         '</td></tr>'}</tbody>
-      ${todas.length ? '<tfoot><tr><td colspan="16" style="text-align:right">Venta de las ' +
+      ${/* 🔴 EL COLSPAN CUENTA 18, NO 17, Y ES UNA CORRECCIÓN. El total caía
+             bajo «Venta ToT» —trabajos a terceros— en vez de bajo «Venta
+             Total», que es lo que suma: un total puesto bajo la columna
+             equivocada es un número que miente.
+
+             Venía de antes: la tabla inyecta una columna más, la de la flecha
+             que despliega la fila, y este `colspan` escrito a mano nunca la
+             contó. Se corrige ahora porque al agregar el siniestro había que
+             tocar igual esta línea, y dejarla mal sabiendo que está mal es
+             peor que no haberla mirado. Verificado midiendo dónde cae la
+             celda contra dónde está su encabezado. */''}
+      ${todas.length ? '<tfoot><tr><td colspan="18" style="text-align:right">Venta de las ' +
         todas.length + ' órdenes filtradas</td>' +
         '<td class="num"><strong>' + fMonto(suma.venta) + '</strong></td></tr></tfoot>' : ''}
     </table></div>

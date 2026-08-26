@@ -26,7 +26,11 @@ const tabsVisibles = () => FICHA_TABS.filter((t) => !t.permiso || Modelo.puede(t
 function fichaEstado() {
   if (!ui.ficha) {
     ui.ficha = {
-      tab: 'ficha', modoEtapas: null,
+      /* `soloEtapas` lo enciende SOLO la dirección con `modo=` —o sea llegar
+         desde Taller—, nunca el conmutador Asignar/Finalizar de adentro de la
+         ficha: si colgara de `modoEtapas`, tocar ese botón dentro de la ficha
+         le desarmaría la pantalla al que está mirando la orden completa. */
+      tab: 'ficha', modoEtapas: null, soloEtapas: false,
       // Los dos arrancan sin elegir, como el original: `Seleccionar`.
       bitacora: { asunto: null, destinatario: null, mensaje: '' }
     };
@@ -49,7 +53,7 @@ function fichaAplicarDireccion() {
   const tab = typeof PARAM_TAB === 'function' ? PARAM_TAB() : null;
   const modo = typeof PARAM_MODO === 'function' ? PARAM_MODO() : null;
   if (tab && FICHA_TABS.some((t) => t.id === tab)) f.tab = tab;
-  if (modo === 'asignar' || modo === 'finalizar') f.modoEtapas = modo;
+  if (modo === 'asignar' || modo === 'finalizar') { f.modoEtapas = modo; f.soloEtapas = true; }
   return f;
 }
 
@@ -130,36 +134,45 @@ function refrescarFicha() {
   render();
 }
 
-/* Las OCHO pantallas que cuelgan de la ficha en el sistema actual, con su
-   rótulo literal. Las que todavía no se construyen se rotulan como tales:
-   un botón que no hace nada y no lo dice es peor que no tenerlo. */
-const FICHA_ENLACES = [
-  { rot: 'Ver recepción',                   imprimir: 'recepcion', permiso: 'ficha.completa' },
-  // El impreso del presupuesto es el documento comercial —cliente, RUT y
-  // valores—, así que pide `presupuesto.montos`. Quien solo tiene
-  // `presupuesto.ver` lee las líneas sin precio en la ficha.
-  { rot: 'Ver Presupuesto',                 imprimir: 'presupuesto', permiso: 'presupuesto.montos' },
-  { rot: 'Ver repuestos',                   tab: 'repuestos', permiso: 'repuesto.ver' },
-  { rot: 'Ver/Subir Documentos o imágenes', vista: 'documentos', permiso: 'documento.ver' },
-  { rot: 'Ver Fotografías',                 tab: 'fotos', permiso: 'foto.ver' },
-  { rot: 'Editar Recepción',                tab: null, tanda: 8, permiso: 'ot.editar',
-    nota: 'la recepción se edita desde su propia pantalla; editar una ya guardada exige política de versiones' },
-  { rot: 'Agregar OR',                      vista: 'presupuesto', permiso: 'presupuesto.crear' },
-  { rot: 'Bodega de esta orden',            vista: 'bodega', permiso: 'repuesto.cargar' },
-  { rot: 'Bitácora',                        tab: 'bitacora', permiso: 'ficha.completa' }
-];
+/* Las OCHO pantallas que cuelgan de la ficha viven en `js/vistas/pantallas-ot.js`
+   desde el 16-08-2026, porque el expandible de la Torre ofrece las mismas y dos
+   copias de la misma lista terminan ofreciendo cosas distintas. Acá se leen; no
+   se redefinen. */
 
 function vFichaOT(o) {
   const f = fichaEstado();
   const completa = Modelo.puede('ficha.completa');
   const campoCab = (k, v) => '<div class="dato"><span class="k">' + esc(k) + '</span><span class="v">' + v + '</span></div>';
 
+  /* 🔶 ASIGNAR ETAPAS ES UNA PANTALLA PROPIA (26-08-2026, pedido del cliente).
+
+     Llegando desde Taller, todo lo que rodea a las etapas sobra: el encabezado
+     de la orden, los dos paneles, la fila de nueve enlaces y la barra de
+     pestañas. La pantalla del sistema real tiene tres cosas —la tabla, el
+     historial y la bitácora— y nada más.
+
+     No se duplica nada: es el MISMO `vEtapas` de la pestaña, pintado sin la
+     ficha alrededor. La pestaña Etapas de la ficha completa sigue igual.
+
+     🔴 Y queda una salida a la vista. Nadie puede quedar encerrado: está el
+     enlace a la ficha completa acá arriba y el botón `Cancelar` al pie de la
+     tabla, que devuelve al Taller. */
+  if (f.soloEtapas && f.tab === 'etapas') {
+    return `
+    <div class="cab-etapas">
+      <div><h2>${ico('taller', 'g')}Orden N° ${o.numeroOT} ·
+        <span class="patente">${esc(o.patente)}</span></h2></div>
+      <button class="btn secundario chico" id="ir-ficha-completa">Ver la ficha completa</button>
+    </div>
+    ${vEtapas(o)}`;
+  }
+
   const cuerpo = {
     ficha: fichaResumen, etapas: vEtapas, historial: fichaHistorial,
     bitacora: fichaBitacora, repuestos: fichaRepuestos, fotos: fichaFotos
   }[f.tab](o);
 
-  const enlaces = FICHA_ENLACES.filter((l) => !l.permiso || Modelo.puede(l.permiso));
+  const enlaces = pantallasOtDe('ficha');
 
   return `
   <div class="panel">
@@ -572,13 +585,18 @@ function fichaRepuestos(o) {
 /* ── Pestaña · Fotografías ─────────────────────────────────────────────── */
 
 function fichaFotos(o) {
-  const todas = Modelo.mediaDe(o.id);
+  /* ⛔ Las capturas de firma se descartan enteras desde el 26-08-2026, no solo
+     del resumen de tamaño como antes. La captura en pantalla se eliminó (C-47),
+     pero un navegador que la usó ayer todavía tiene esos PNG en IndexedDB: sin
+     esto le aparecían como un grupo de fotos rotulado «firma» —el rótulo se fue
+     con la función—, o sea una firma digital que el sistema ya no reconoce. */
+  const todas = Modelo.mediaDe(o.id).filter((m) => m.momento !== 'firma');
   const porMomento = {};
   todas.forEach((m) => { (porMomento[m.momento] = porMomento[m.momento] || []).push(m); });
-  const res = Media.resumen(todas.filter((m) => m.momento !== 'firma'));
+  const res = Media.resumen(todas);
 
   const ROTULOS = { ingreso: 'Imágenes de ingreso', proceso: 'Imágenes por etapa',
-                    entrega: 'Imágenes de entrega', firma: 'Firma del cliente' };
+                    entrega: 'Imágenes de entrega' };
 
   return `
   <div class="panel">
@@ -652,6 +670,15 @@ function fichaFotos(o) {
 /* ── Cableado de la ficha ──────────────────────────────────────────────── */
 
 function pFichaOT(o) {
+  /* La salida de la pantalla de etapas: devuelve la ficha entera sin cambiar
+     de orden ni de pestaña. El que llegó a asignar y quiere ver el resto la
+     tiene a un clic, y no hay que explicarle que cierre y vuelva a entrar. */
+  const verFicha = document.getElementById('ir-ficha-completa');
+  if (verFicha) verFicha.addEventListener('click', () => {
+    fichaEstado().soloEtapas = false;
+    refrescarFicha();
+  });
+
   const btnOR = document.getElementById('or-editar');
   if (btnOR) btnOR.addEventListener('click', () => dialogoEditarOR(o));
 
@@ -698,29 +725,8 @@ function pFichaOT(o) {
      Abría el ÚLTIMO sin decirlo, que es la peor de las respuestas: el que
      imprime cree que tiene el documento que pidió. Con una sola OR se abre
      directo, que es el caso de todos los días. */
-  document.querySelectorAll('#contenido [data-imprimir]').forEach((b) => b.addEventListener('click', () => {
-    if (b.dataset.imprimir !== 'presupuesto' || o.presupuestos.length <= 1)
-      return abrirImpreso(b.dataset.imprimir, o.id);
-
-    dialogo('¿Qué presupuesto quieres abrir?',
-      '<p class="pie-nota" style="margin:0 0 10px">Esta orden tiene ' +
-      o.presupuestos.length + ' documentos. Se abren en otra pestaña.</p>' +
-      '<div class="grid-envoltorio"><table class="grid"><tbody>' +
-      o.presupuestos.map((pr) => {
-        const e = ESTADO_PRESUPUESTO[pr.estado] || { txt: pr.estado, clase: 'gris' };
-        return '<tr><td><span class="cod">OR ' + esc(pr.numeroOR) + '</span></td>' +
-          '<td><span class="et ' + esc(e.clase) + '">' + esc(e.txt) + '</span></td>' +
-          '<td class="num">' + fMonto(pr.total) + '</td>' +
-          '<td><button class="btn secundario chico" data-elegir-pr="' + esc(pr.id) + '">' +
-          'Abrir</button></td></tr>';
-      }).join('') + '</tbody></table></div>');
-
-    (dialogo.ultimo || document).querySelectorAll('[data-elegir-pr]').forEach((x) =>
-      x.addEventListener('click', () => {
-        if (dialogo.cerrar) dialogo.cerrar();
-        abrirImpreso('presupuesto', o.id, x.dataset.elegirPr);
-      }));
-  }));
+  document.querySelectorAll('#contenido [data-imprimir]').forEach((b) => b.addEventListener('click', () =>
+    abrirImpresoDeOT(b.dataset.imprimir, o)));
 
   // Salir de la ficha hacia otro módulo: la ficha vive en su propia pestaña,
   // así que se abre el sistema completo en esa vista.

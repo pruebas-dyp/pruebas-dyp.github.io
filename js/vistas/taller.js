@@ -57,7 +57,9 @@ function vTaller() {
   <div class="panel">
     <div class="cab">
       <div><h2>${ico('taller', 'g')}Taller</h2>
-        <div class="desc">${m.enTaller} en taller · ${m.fueraDeTaller} más están fuera de taller y no ocupan box</div></div>
+        ${/* ⛔ La bajada se eliminó el 26-08-2026. Los dos números que daba
+             —cuántos adentro y cuántos afuera— ya están en las pestañas de la
+             Torre, contados y filtrables. */''}</div>
       <div class="chips">${TALLER_APARTADOS.map(chip).join('')}</div>
     </div>
     <div class="cuerpo">${t.pantalla === 'tablero' ? vTallerTablero() : vTallerListado()}</div>
@@ -107,8 +109,10 @@ function vTallerListado() {
   <div class="filtros" style="margin-bottom:10px">
     <input type="search" id="q-taller" placeholder="OT, patente, cliente, marca o etapa"
       value="${esc(t.busqueda)}">
-    <span class="pie-nota" style="margin:0">${filas.length}
-      ${filas.length === 1 ? 'orden' : 'órdenes'}${t.busqueda ? ' de ' + Modelo.torre().length : ''}</span>
+    ${/* ⛔ El contador «102 órdenes» se eliminó el 26-08-2026 con la bajada:
+         decía lo mismo que el número que la barra lateral ya lleva al lado de
+         «Torre de control», y con el buscador escrito repetía además lo que la
+         tabla muestra debajo. */''}
   </div>
 
   ${filas.length ? `<div class="grid-envoltorio"><table class="grid">

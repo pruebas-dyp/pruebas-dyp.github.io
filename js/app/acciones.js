@@ -96,6 +96,10 @@ function accionModulo(accion) {
       }
       return avisar({ ok: false, motivo: 'En esta pantalla los cambios se guardan en cada tabla, no con un botón global.' });
 
+    /* ⚠️ SIN BOTÓN QUE LA LLAME desde el 16-08-2026: `Agregar fotos` se sacó de
+       la barra de Recepción y ningún otro módulo declara esta acción. Se deja
+       porque las fotos siguen estando en el paso 4 y si el botón vuelve, esto
+       es lo que tiene que hacer. Si pasa otra tanda sin volver, se borra. */
     case 'fotos': {
       const r = rec();
       // Las fotos viven dentro del formulario: si estamos en el menú, se entra.
