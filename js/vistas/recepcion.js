@@ -128,8 +128,6 @@ function rec() {
       // item_id → la nota del recepcionista. Solo se pide en los ítems que
       // quedaron `no presente` o `dañado`, que son los que después se discuten.
       obsInventario: {},
-      // La firma del cliente: el PNG para guardar y los trazos para repintar.
-      firma: null, firmaTrazos: [],
       fotos: []
     };
   }
@@ -155,10 +153,7 @@ function guardarBorrador() {
       paso: r.paso, llave: r.llave, campos: r.campos, bloques: r.bloques,
       danos: r.danos, textos: r.textos,
       inventario: r.inventario, obsInventario: r.obsInventario,
-      fotos: r.fotos,
-      // El Blob de la firma no es serializable; los trazos sí, y con ellos
-      // se vuelve a pintar el lienzo tal cual estaba.
-      firmaTrazos: r.firmaTrazos || []
+      fotos: r.fotos
     }));
   } catch (e) { /* sin almacenamiento: el formulario sigue vivo en memoria */ }
 }
@@ -192,7 +187,7 @@ function restaurarBorrador() {
     return Object.assign({
       paso: 'cliente', llave: 'rec-' + Date.now().toString(36),
       textos: {}, danos: [], inventario: {}, obsInventario: {}, fotos: [],
-      firmaTrazos: [], marcados: [], firma: null
+      marcados: []
     }, d);
   } catch (e) { return null; }
 }
@@ -466,9 +461,9 @@ function vRecepcionBuscar(modo) {
         <strong>La recepción se corrige versionándola.</strong> Se cambia el cliente, el vehículo,
         los datos de la recepción, el checklist y <strong>los daños de la silueta</strong>; lo que
         estaba queda guardado con quién lo cambió, cuándo y por qué, y el comprobante impreso dice
-        qué versión es. El papel que firmó el cliente no se toca. <strong>La firma no se vuelve a
-        pedir</strong>: si cada corrección se firma de nuevo o el original sigue valiendo lo decide
-        el taller.
+        qué versión es. <strong>El papel firmado no se toca</strong>: la hoja que el cliente
+        firmó en el mesón sigue siendo la original, y lo que se corrige es lo que el sistema dice
+        de ella. Si una corrección obliga a reimprimir y volver a firmar lo decide el taller.
       </div>` : `
       <div class="nota info" style="margin-top:12px">${ico('info')}
         <strong>Abrir la OR no es valorizarla.</strong> Acá se abre la orden de reparación sobre el

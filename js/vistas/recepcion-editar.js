@@ -166,11 +166,12 @@ function vRecepcionEditarFicha() {
         </tbody></table></div>` : ''}
 
       <div class="nota" style="margin-top:12px">
-        <strong>La firma no se vuelve a pedir acá, y no es un pendiente técnico.</strong> Volver a
-        firmar es tener al cliente otra vez adelante, y si hay que hacerlo o no es la pregunta que
-        está sobre la mesa del taller: si el papel de la versión 1 sigue valiendo, o cada corrección
-        se firma de nuevo. Mientras no se responda, la firma que hay es la de la versión 1 y el
-        comprobante lo dice.
+        <strong>Corregir acá no reimprime nada.</strong> El comprobante se firma en papel —los tres
+        recuadros—, así que la hoja que el cliente firmó en el mesón sigue valiendo tal cual. Lo que
+        cambia es lo que el sistema dice de ella, y el impreso declara qué versión es.
+        <strong>Si una corrección obliga a imprimir de nuevo y volver a pedir las firmas</strong>
+        —o si la hoja original sigue sirviendo— lo decide el taller: es la pregunta que quedó
+        abierta cuando se eliminó la captura de firma en pantalla.
       </div>
     </div>
   </div>`;

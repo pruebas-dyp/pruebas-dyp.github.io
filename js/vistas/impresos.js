@@ -338,11 +338,6 @@ function impresoRecepcion(o) {
     sin_verificar:'<span class="sinver">–</span>'
   };
   const cuenta = (cod) => inv.filter((i) => (i.estado || (i.presente ? 'presente' : 'no_presente')) === cod).length;
-  /* La firma: de la OT sale de los adjuntos, con su propio momento; del
-     borrador viene ya resuelta como URL, porque todavía no está guardada. */
-  const firma = o.firmaSrc
-    ? { src: o.firmaSrc }
-    : (o.id ? Modelo.mediaDe(o.id).find((m) => m.momento === 'firma') : null);
   /* 🔶 QUÉ VERSIÓN ES ESTE COMPROBANTE (15-08-2026).
      Desde que la recepción se puede corregir, el papel tiene que decir cuál
      es. Si no, quedan dos comprobantes de la misma recepción con datos
@@ -416,16 +411,16 @@ function impresoRecepcion(o) {
   ${fotos.length ? '<h2>Fotografías de ingreso</h2><div class="fotos">' +
     fotos.slice(0, 6).map((f) => '<img data-media="' + esc(f.id) + '" alt="">').join('') + '</div>' : ''}
 
-  ${/* 🔶 LA FIRMA SE ESTAMPA (15-08-2026). El cliente pidió las dos mitades:
-       firmar en pantalla Y que esa firma salga impresa. Estaba construida la
-       primera y el recuadro seguía saliendo en blanco.
+  ${/* 🔴 LOS TRES RECUADROS SE QUEDAN. Lo que se eliminó el 26-08-2026 es la
+       CAPTURA EN PANTALLA (C-47), no la firma: el comprobante se imprime y se
+       firma a mano, los tres.
 
-       Si no hay firma tomada, el recuadro queda vacío como antes: el
-       comprobante se puede seguir imprimiendo para firmarlo a mano, que es como
-       trabaja el taller cuando el cliente no está con el teléfono en la mano. */''}
+       Acá vivía el estampado de la firma digital dentro del recuadro del medio.
+       Se sacó entero en vez de dejarlo buscando un adjunto que ya nadie crea:
+       media función viva que nunca encuentra nada hace creer al que lee el
+       archivo que la firma digital sigue existiendo. */''}
   ${/* 🔶 TRES RECUADROS, no uno (16-08-2026, pedido del cliente): quien
-       recepciona, el cliente, y quien entrega. El del cliente es el único que
-       puede venir firmado desde la pantalla; los otros dos van en blanco para
+       recepciona, el cliente, y quien entrega. Los tres van en blanco para
        firmar sobre el papel.
 
        ⚠️ El recuadro `ENTREGA` se firma cuando el vehículo se DEVUELVE, no al
@@ -440,10 +435,7 @@ function impresoRecepcion(o) {
       <div class="rot">Recepcionado<br>Nombre ingresa</div>
     </div>
     <div class="col">
-      <div class="firma">${firma
-        ? '<img ' + (firma.src ? 'src="' + esc(firma.src) + '"' : 'data-media="' + esc(firma.id) + '"') +
-          ' alt="Firma del cliente" style="height:100%;width:auto;display:block;margin:0 auto">'
-        : ''}</div>
+      <div class="firma"></div>
       <div class="rot">Nombre y firma<br>Cliente</div>
     </div>
     <div class="col">
@@ -452,7 +444,7 @@ function impresoRecepcion(o) {
     </div>
   </div>
   ${/* El nombre, el RUT y la fecha se conservan: son los que identifican a
-       quien firmó el recuadro del medio. */''}
+       quien firma el recuadro del medio. */''}
   <div class="rej" style="margin-top:3mm">
     ${campoImpreso('Nombre', esc(o.cliente))}
     ${campoImpreso('RUT', esc(o.rut || '—'))}

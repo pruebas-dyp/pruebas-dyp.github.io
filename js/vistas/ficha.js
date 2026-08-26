@@ -471,13 +471,18 @@ function fichaRepuestos(o) {
 /* ── Pestaña · Fotografías ─────────────────────────────────────────────── */
 
 function fichaFotos(o) {
-  const todas = Modelo.mediaDe(o.id);
+  /* ⛔ Las capturas de firma se descartan enteras desde el 26-08-2026, no solo
+     del resumen de tamaño como antes. La captura en pantalla se eliminó (C-47),
+     pero un navegador que la usó ayer todavía tiene esos PNG en IndexedDB: sin
+     esto le aparecían como un grupo de fotos rotulado «firma» —el rótulo se fue
+     con la función—, o sea una firma digital que el sistema ya no reconoce. */
+  const todas = Modelo.mediaDe(o.id).filter((m) => m.momento !== 'firma');
   const porMomento = {};
   todas.forEach((m) => { (porMomento[m.momento] = porMomento[m.momento] || []).push(m); });
-  const res = Media.resumen(todas.filter((m) => m.momento !== 'firma'));
+  const res = Media.resumen(todas);
 
   const ROTULOS = { ingreso: 'Imágenes de ingreso', proceso: 'Imágenes por etapa',
-                    entrega: 'Imágenes de entrega', firma: 'Firma del cliente' };
+                    entrega: 'Imágenes de entrega' };
 
   return `
   <div class="panel">
