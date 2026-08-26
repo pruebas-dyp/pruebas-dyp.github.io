@@ -57,24 +57,10 @@ function refrescarFicha() {
   render();
 }
 
-/* Las OCHO pantallas que cuelgan de la ficha en el sistema actual, con su
-   rótulo literal. Las que todavía no se construyen se rotulan como tales:
-   un botón que no hace nada y no lo dice es peor que no tenerlo. */
-const FICHA_ENLACES = [
-  { rot: 'Ver recepción',                   imprimir: 'recepcion', permiso: 'ficha.completa' },
-  // El impreso del presupuesto es el documento comercial —cliente, RUT y
-  // valores—, así que pide `presupuesto.montos`. Quien solo tiene
-  // `presupuesto.ver` lee las líneas sin precio en la ficha.
-  { rot: 'Ver Presupuesto',                 imprimir: 'presupuesto', permiso: 'presupuesto.montos' },
-  { rot: 'Ver repuestos',                   tab: 'repuestos', permiso: 'repuesto.ver' },
-  { rot: 'Ver/Subir Documentos o imágenes', vista: 'documentos', permiso: 'documento.ver' },
-  { rot: 'Ver Fotografías',                 tab: 'fotos', permiso: 'foto.ver' },
-  { rot: 'Editar Recepción',                tab: null, tanda: 8, permiso: 'ot.editar',
-    nota: 'la recepción se edita desde su propia pantalla; editar una ya guardada exige política de versiones' },
-  { rot: 'Agregar OR',                      vista: 'presupuesto', permiso: 'presupuesto.crear' },
-  { rot: 'Bodega de esta orden',            vista: 'bodega', permiso: 'repuesto.cargar' },
-  { rot: 'Bitácora',                        tab: 'bitacora', permiso: 'ficha.completa' }
-];
+/* Las OCHO pantallas que cuelgan de la ficha viven en `js/vistas/pantallas-ot.js`
+   desde el 16-08-2026, porque el expandible de la Torre ofrece las mismas y dos
+   copias de la misma lista terminan ofreciendo cosas distintas. Acá se leen; no
+   se redefinen. */
 
 function vFichaOT(o) {
   const f = fichaEstado();
@@ -86,7 +72,7 @@ function vFichaOT(o) {
     bitacora: fichaBitacora, repuestos: fichaRepuestos, fotos: fichaFotos
   }[f.tab](o);
 
-  const enlaces = FICHA_ENLACES.filter((l) => !l.permiso || Modelo.puede(l.permiso));
+  const enlaces = pantallasOtDe('ficha');
 
   return `
   <div class="panel">
@@ -573,29 +559,8 @@ function pFichaOT(o) {
      Abría el ÚLTIMO sin decirlo, que es la peor de las respuestas: el que
      imprime cree que tiene el documento que pidió. Con una sola OR se abre
      directo, que es el caso de todos los días. */
-  document.querySelectorAll('#contenido [data-imprimir]').forEach((b) => b.addEventListener('click', () => {
-    if (b.dataset.imprimir !== 'presupuesto' || o.presupuestos.length <= 1)
-      return abrirImpreso(b.dataset.imprimir, o.id);
-
-    dialogo('¿Qué presupuesto quieres abrir?',
-      '<p class="pie-nota" style="margin:0 0 10px">Esta orden tiene ' +
-      o.presupuestos.length + ' documentos. Se abren en otra pestaña.</p>' +
-      '<div class="grid-envoltorio"><table class="grid"><tbody>' +
-      o.presupuestos.map((pr) => {
-        const e = ESTADO_PRESUPUESTO[pr.estado] || { txt: pr.estado, clase: 'gris' };
-        return '<tr><td><span class="cod">OR ' + esc(pr.numeroOR) + '</span></td>' +
-          '<td><span class="et ' + esc(e.clase) + '">' + esc(e.txt) + '</span></td>' +
-          '<td class="num">' + fMonto(pr.total) + '</td>' +
-          '<td><button class="btn secundario chico" data-elegir-pr="' + esc(pr.id) + '">' +
-          'Abrir</button></td></tr>';
-      }).join('') + '</tbody></table></div>');
-
-    (dialogo.ultimo || document).querySelectorAll('[data-elegir-pr]').forEach((x) =>
-      x.addEventListener('click', () => {
-        if (dialogo.cerrar) dialogo.cerrar();
-        abrirImpreso('presupuesto', o.id, x.dataset.elegirPr);
-      }));
-  }));
+  document.querySelectorAll('#contenido [data-imprimir]').forEach((b) => b.addEventListener('click', () =>
+    abrirImpresoDeOT(b.dataset.imprimir, o)));
 
   // Salir de la ficha hacia otro módulo: la ficha vive en su propia pestaña,
   // así que se abre el sistema completo en esa vista.

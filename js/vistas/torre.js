@@ -336,12 +336,24 @@ function detalleOT(o) {
         '</div>' : '') + '</fieldset>' +
     '</div>' +
 
+    /* 🔶 LA REJILLA DE LAS PANTALLAS DE LA ORDEN (16-08-2026, pedido del
+       cliente). Reemplaza a `Ver repuestos` y `Ver presupuesto`, que eran dos
+       botones de texto sueltos: ahora están las ocho pantallas que cuelgan de
+       la orden en el sistema real, con su icono y su rótulo literal.
+
+       Salen de `PANTALLAS_OT`, la MISMA lista que usa la ficha — ver
+       `js/vistas/pantallas-ot.js` y por qué no está copiada acá.
+
+       ⚠️ `Abrir en pestaña nueva` y `Ver en Taller` quedan ARRIBA y como
+       botones de texto, fuera de la rejilla. No son pantallas de la orden:
+       uno es otra forma de abrir la misma orden —el gesto que el dueño usa
+       todos los días— y el otro es un módulo. Meterlos entre los ocho haría
+       creer que son lo mismo. */
     '<div class="acciones-ficha">' +
       '<button class="btn" data-abrir="' + o.numeroOT + '">Abrir en pestaña nueva</button>' +
       '<button class="btn secundario" data-ver="taller">Ver en Taller</button>' +
-      '<button class="btn secundario" data-ver="repuestos">Ver repuestos</button>' +
-      '<button class="btn secundario" data-ver="presupuesto">Ver presupuesto</button>' +
-    '</div></div>';
+    '</div>' +
+    rejillaPantallasOT(o) + '</div>';
 }
 
 function pTorre() {
@@ -418,6 +430,7 @@ function pTorre() {
   document.querySelectorAll('[data-abrir]').forEach((b) => b.addEventListener('click', (ev) => {
     ev.stopPropagation(); abrirFicha(b.dataset.abrir);
   }));
+  pRejillaPantallasOT();
 
   const ant = document.getElementById('pag-ant'), sig = document.getElementById('pag-sig');
   if (ant) ant.addEventListener('click', () => { ui.torre.pagina--; ui.torre.abierta = null; render(); });

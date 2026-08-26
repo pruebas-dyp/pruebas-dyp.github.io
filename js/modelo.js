@@ -1031,11 +1031,52 @@ const Modelo = (function () {
 
   /* Una recepción puede generar VARIAS órdenes (A-8). Por eso recibe un
      arreglo de bloques: cada uno con su siniestro, compañía y deducible. */
+  /* 🔴 LA FECHA DE INGRESO, Y POR QUÉ SE VALIDA ACÁ Y NO EN LA PANTALLA.
+
+     Desde el 16-08-2026 la escribe el recepcionista en vez de salir de
+     `ahora()`. Es el dato del que cuelga TODO el contador de días, que es la
+     corrección central del proyecto (C-1): si esta fecha entra mal, los tres
+     relojes quedan mal y nadie lo nota hasta que el dueño mira su meta.
+
+     · **Futura, rechazo.** Un ingreso con fecha de mañana deja el contador en
+       negativo, y un contador negativo no se "ve raro": se ve como cero.
+     · **Más de 30 días atrás, avisa y deja pasar.** Cargar tarde una recepción
+       es legítimo —el auto entró el lunes y se digita el jueves siguiente— así
+       que no se traba; pero quien la escribe tiene que ver que está fechando
+       un mes atrás y no ayer.
+     · **Sin fecha, `ahora()`**, que es lo que hacía antes.
+
+     Va en el motor y no en la pantalla porque la regla es del dato: mañana
+     esto entra por importación o por otra pantalla y la fecha tiene que
+     validarse igual. */
+  function fechaDeIngreso(valor) {
+    if (!valor) return { fecha: ahora(), avisos: [] };
+    const d = (valor instanceof Date) ? new Date(valor.getTime()) : new Date(valor);
+    if (isNaN(d.getTime()))
+      return { error: 'La fecha de ingreso no se entiende. Formato: 2026/08/26 10:48.' };
+
+    // El "hoy" es el del calendario del sistema, que la demostración adelanta.
+    const tope = ahora();
+    if (d.getTime() > tope.getTime() + 60000)
+      return { error: 'La fecha de ingreso no puede ser futura: el vehículo no puede haber ' +
+        'entrado mañana. Con una fecha futura el contador de días arranca en negativo.' };
+
+    const avisos = [];
+    const dias = Math.floor((tope.getTime() - d.getTime()) / 86400000);
+    if (dias > 30) avisos.push('La fecha de ingreso es de hace ' + dias + ' días. Se guardó igual, ' +
+      'pero los días de esta orden arrancan desde esa fecha, no desde hoy.');
+    return { fecha: d, avisos };
+  }
+
   function crear_ot_desde_recepcion(ficha, bloques, llave) {
     return conLlave(llave, function () {
       if (!ficha || !ficha.patente) return { ok: false, motivo: 'La patente es obligatoria.' };
       if (!bloques || !bloques.length)
         return { ok: false, motivo: 'Hay que declarar al menos una orden. Una recepción puede generar varias.' };
+
+      const ing = fechaDeIngreso(ficha.fecha_ingreso);
+      if (ing.error) return { ok: false, motivo: ing.error };
+      const entrada = ing.fecha;
 
       const pat = String(ficha.patente).toUpperCase().replace(/[^A-Z0-9]/g, '');
       let veh = db.vehiculo.find((v) => v.patente === pat);
@@ -1115,7 +1156,7 @@ const Modelo = (function () {
           tipo_ingreso_id: b.tipo_ingreso_id || 'ti-1', compania_id: b.compania_id || null,
           siniestro: b.siniestro || null, deducible: b.deducible || 0,
           liquidador: b.liquidador || null, prioridad_id: b.prioridad_id || 'pri-1',
-          fecha_ingreso: ahora(), fecha_compromiso: b.fecha_compromiso || null,
+          fecha_ingreso: entrada, fecha_compromiso: b.fecha_compromiso || null,
           /* Sin estado elegido, la orden nace `Recibido`. No es un dato
              inventado: es el estado inicial del maestro y la pantalla de
              Verificar lo dice con todas las letras antes de guardar. */
@@ -1141,13 +1182,18 @@ const Modelo = (function () {
         });
         // La estadía se abre acá. A partir de este momento los relojes se
         // calculan de esta tabla y de ninguna otra.
-        db.ot_estadia.push({ id: nuevoId('est'), ot_id, entro_at: ahora(), salio_at: null, motivo_salida: null });
+        /* 🔴 LA ESTADÍA ARRANCA EN LA MISMA FECHA, y esto es lo que casi se
+           escapa: los tres relojes NO leen `orden_trabajo.fecha_ingreso`, leen
+           `ot_estadia`. Dejando acá `ahora()` la ficha habría mostrado la fecha
+           escrita y los días habrían contado desde el momento de guardar — dos
+           números que se contradicen, y el que manda es el que nadie ve. */
+        db.ot_estadia.push({ id: nuevoId('est'), ot_id, entro_at: entrada, salio_at: null, motivo_salida: null });
         registrarEvento(ot_id, 'estado', 'Ingreso del vehículo. Estado: ' + Reglas.nombreEstado(db, b.estado || 'recibido'), null, 'pe-u-recepcion');
         creadas.push({ ot_id, numero_ot });
       });
 
       tocado();
-      return { ok: true, motivo: '', recepcion_id: rec_id, ordenes: creadas };
+      return { ok: true, motivo: '', recepcion_id: rec_id, ordenes: creadas, avisos: ing.avisos };
     });
   }
 

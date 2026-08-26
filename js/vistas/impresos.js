@@ -56,6 +56,13 @@ const CSS_IMPRESO = `
 .impreso .leyenda-inv{font-size:8.5px;color:#666;margin-top:3px}
 /* Recuadro en blanco: el documento se imprime y se firma a mano. */
 .impreso .firma{border:1px solid #999;height:26mm}
+/* Los TRES recuadros de firma, en una fila. Un fr cada uno y no un ancho
+   fijo: carta y oficio tienen anchos distintos y con medidas duras el
+   tercero se salia de la hoja. El rotulo va en dos lineas debajo, como en
+   el formulario de papel del taller. */
+.impreso .firmas{display:grid;grid-template-columns:repeat(3,1fr);gap:0 6mm;margin-top:2mm}
+.impreso .firmas .col{min-width:0}
+.impreso .firmas .rot{text-align:center;font-size:8px;font-weight:700;letter-spacing:.3px;line-height:1.25;margin-top:1.5mm;text-transform:uppercase}
 .impreso .fotos{display:flex;gap:4px;flex-wrap:wrap}
 .impreso .fotos img{width:44mm;height:32mm;object-fit:cover;border:1px solid #ccc}
 /* Acá vivía la regla del sello «MODELO BORRADOR». Se borró con el rótulo el
@@ -416,17 +423,40 @@ function impresoRecepcion(o) {
        Si no hay firma tomada, el recuadro queda vacío como antes: el
        comprobante se puede seguir imprimiendo para firmarlo a mano, que es como
        trabaja el taller cuando el cliente no está con el teléfono en la mano. */''}
-  <h2>Firma del cliente</h2>
-  <div class="rej dos" style="align-items:end">
-    <div class="firma">${firma
-      ? '<img ' + (firma.src ? 'src="' + esc(firma.src) + '"' : 'data-media="' + esc(firma.id) + '"') +
-        ' alt="Firma del cliente" style="height:100%;width:auto;display:block;margin:0 auto">'
-      : ''}</div>
-    <div>
-      ${campoImpreso('Nombre', esc(o.cliente))}
-      ${campoImpreso('RUT', esc(o.rut || '—'))}
-      ${campoImpreso('Fecha', fFechaHora(o.fechaIngreso))}
+  ${/* 🔶 TRES RECUADROS, no uno (16-08-2026, pedido del cliente): quien
+       recepciona, el cliente, y quien entrega. El del cliente es el único que
+       puede venir firmado desde la pantalla; los otros dos van en blanco para
+       firmar sobre el papel.
+
+       ⚠️ El recuadro `ENTREGA` se firma cuando el vehículo se DEVUELVE, no al
+       recibirlo. O sea que esta hoja está pensada para acompañar al auto todo
+       su paso por el taller y firmarse en dos momentos, o el bloque de entrega
+       debería estar en el Acta de entrega y no acá. Se implementan los tres
+       porque así se pidió; queda como pregunta abierta 19. */''}
+  <h2>Firmas</h2>
+  <div class="firmas">
+    <div class="col">
+      <div class="firma"></div>
+      <div class="rot">Recepcionado<br>Nombre ingresa</div>
     </div>
+    <div class="col">
+      <div class="firma">${firma
+        ? '<img ' + (firma.src ? 'src="' + esc(firma.src) + '"' : 'data-media="' + esc(firma.id) + '"') +
+          ' alt="Firma del cliente" style="height:100%;width:auto;display:block;margin:0 auto">'
+        : ''}</div>
+      <div class="rot">Nombre y firma<br>Cliente</div>
+    </div>
+    <div class="col">
+      <div class="firma"></div>
+      <div class="rot">Nombre y firma<br>Entrega</div>
+    </div>
+  </div>
+  ${/* El nombre, el RUT y la fecha se conservan: son los que identifican a
+       quien firmó el recuadro del medio. */''}
+  <div class="rej" style="margin-top:3mm">
+    ${campoImpreso('Nombre', esc(o.cliente))}
+    ${campoImpreso('RUT', esc(o.rut || '—'))}
+    ${campoImpreso('Fecha', fFechaHora(o.fechaIngreso))}
   </div>
   <div style="font-size:8.5px;color:#666;margin-top:6px">
     El cliente declara haber revisado el inventario y el estado descriptivo del vehículo.

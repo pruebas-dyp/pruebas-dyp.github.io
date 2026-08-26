@@ -95,12 +95,23 @@ const MODULOS = {
   /* `Ingresar recepción` se llama igual que el botón del paso Verificar: es la
      misma operación y no puede tener dos nombres. Desde cualquier otro paso
      lleva a Verificar si está todo completo, y si no, dice qué falta.
-     `Agregar fotos` lleva al paso Estado descriptivo, que es donde viven las
-     fotos desde el 15-08-2026 — no abre una pantalla que ya no existe. */
-  recepcion:   { ruta: ['Operación diaria', 'Recepción'],
-                 acciones: [['guardar', 'Ingresar recepción', 'guardar', 'F2'],
-                            ['camara', 'Agregar fotos', 'fotos'],
-                            ['refrescar', 'Descartar borrador', 'limpiar']] },
+
+     🔶 SE QUEDÓ CON UNA SOLA ACCIÓN (16-08-2026, pedido del cliente). Se
+     fueron `Agregar fotos` y `Descartar borrador` de la barra de arriba.
+
+     Las dos seguían existiendo abajo, dentro del formulario, donde están en su
+     contexto: las fotos en el paso que las pide y el descarte al pie. Tenerlas
+     además arriba repetía la misma acción en dos lugares de la pantalla, y la
+     de arriba era la que no decía sobre qué actuaba.
+
+     ⚠️ `Descartar borrador` del PIE se queda. Son dos botones distintos y solo
+     se sacó el de la barra.
+
+     Y la ruta va vacía: el título de la pantalla ya dice `Nuevo ingreso`, así
+     que «Operación diaria › Recepción» encima repetía dónde estás con otras
+     palabras. */
+  recepcion:   { ruta: [],
+                 acciones: [['guardar', 'Ingresar recepción', 'guardar', 'F2']] },
   torre:       { ruta: ['Operación diaria', 'Torre de control'],
                  acciones: [['refrescar', 'Actualizar', 'refrescar', 'F5'],
                             ['nuevo', 'Nuevo ingreso', 'nuevo'],
@@ -343,7 +354,11 @@ function enReporteria() {
 
 function pintarShell() {
   const m = MODULOS[ui.vista] || { ruta: [], acciones: [] };
-  const ruta = enReporteria() ? m.ruta.slice(0, -1).concat('Reportería') : m.ruta;
+  // `|| []` y no `m.ruta` a secas: desde que Recepción no lleva ruta, un módulo
+  // puede no traerla, y sin esto la shell entera se cae por un `.slice` de
+  // `undefined` — el menú, las herramientas y el contenido, todo junto.
+  const suya = m.ruta || [];
+  const ruta = enReporteria() ? suya.slice(0, -1).concat('Reportería') : suya;
 
   document.getElementById('ruta').innerHTML =
     ruta.map((r, i) => (i ? ico('chevron') : '') + '<span>' + esc(r) + '</span>').join('');

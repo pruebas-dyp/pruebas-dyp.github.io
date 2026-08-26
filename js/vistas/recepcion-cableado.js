@@ -624,6 +624,8 @@ function recComprobanteBorrador() {
     marca: nom('marca', r.campos.marca_id), modelo: nom('modelo', r.campos.modelo_id),
     anio: r.campos.anio || null, color: nom('color_vehiculo', r.campos.color_id),
     vin: normalizarVin(r.campos.vin) || null,
+    // La fecha escrita manda: el motor la valida y con ella arranca la estadía.
+    fecha_ingreso: r.campos.fecha_ingreso || null,
     cliente: r.campos.nombre || '', rut: r.campos.rut || null,
     telefono: r.campos.telefono || null, direccion: r.campos.direccion || null,
     origenIngresoNombre: t ? t.nombre : null,
@@ -687,8 +689,7 @@ function guardarRecepcion() {
 
   const bloques = r.bloques.map((b) => Object.assign({}, b, {
     deducible: b.deducible ? Number(b.deducible) : 0,
-    compania_id: b.compania_id || null,
-    responsable_id: b.responsable_id || null
+    compania_id: b.compania_id || null
   }));
 
   Promise.resolve().then(() => {
@@ -731,5 +732,10 @@ function guardarRecepcion() {
         : (res.ordenes.length === 1
             ? 'Recepción ingresada. Quedó la orden ' + nombra + '.'
             : 'Recepción ingresada. Quedaron las órdenes ' + nombra + ' desde un solo ingreso.'));
+
+    /* Y el aviso de la fecha, si lo hubo. Va DESPUÉS y aparte del «se guardó»
+       para que no se lean como una sola cosa: uno confirma y el otro advierte,
+       y mezclados el que advierte se pierde. */
+    (res.avisos || []).forEach((a) => avisar({ ok: false, motivo: a }));
   });
 }

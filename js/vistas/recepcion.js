@@ -13,7 +13,30 @@ const RECEPCION_PASOS = [
   { id: 'verificar', n: 'Verificar Orden' }
 ];
 
-const CLAVE_BORRADOR = 'dyp-recepcion-borrador';
+/* 🔶 SUBE A -v2 (16-08-2026). Un borrador guardado con la forma anterior trae
+   el bloque con `responsable_id`, que ya no existe, y sin `fecha_ingreso`, que
+   ahora sí. Cambiar la llave lo deja atrás en vez de restaurar un formulario
+   que mezcla las dos formas: lo guardado a medias vale mucho menos que una
+   pantalla que se comporta como dice. */
+const CLAVE_BORRADOR = 'dyp-recepcion-borrador-v2';
+
+/* El mismo reloj que usa el motor: día del calendario de la demostración —que
+   se puede adelantar— y hora del reloj de verdad. Si la pantalla propusiera
+   `new Date()` a secas, con el calendario adelantado la fecha propuesta sería
+   PASADA respecto del sistema y la orden nacería con días de más. */
+function recAhora() {
+  const r = new Date();
+  const base = (typeof HOY !== 'undefined' && HOY instanceof Date) ? HOY : r;
+  return new Date(base.getFullYear(), base.getMonth(), base.getDate(),
+    r.getHours(), r.getMinutes());
+}
+
+// `YYYY-MM-DDTHH:mm`, que es lo único que acepta un `datetime-local`.
+function recIsoLocal(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0') + 'T' +
+    String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
 
 /* ── El menú del recepcionista ─────────────────────────────────────────
    🟰 SE COPIA DEL ORIGINAL (`miembros.php?ver=recepcionista`). Apretar
@@ -79,7 +102,7 @@ const normalizarVin = (t) =>
 function bloqueVacio() {
   return { tipo_ingreso_id: '', compania_id: '', siniestro: '', deducible: '',
            liquidador: '', numero_or: '', prioridad_id: 'pri-1', estado: '',
-           descripcion_danos: '', descripcion_estado: '', responsable_id: '' };
+           descripcion_danos: '', descripcion_estado: '' };
 }
 
 function rec() {
@@ -91,7 +114,9 @@ function rec() {
       llave: 'rec-' + Date.now().toString(36),
       campos: { patente: '', marca_id: '', modelo_id: '', color_id: '', anio: '', vin: '', km: '',
                 combustible: '4', rut: '', nombre: '', telefono: '',
-                correo: '', direccion: '', observaciones: '' },
+                correo: '', direccion: '', observaciones: '',
+                // Viene puesta con la fecha y hora de ahora, y se puede corregir.
+                fecha_ingreso: recIsoLocal(recAhora()) },
       // Lo que se escribió en cada combo. Se guarda aparte del id porque
       // mientras se teclea todavía no calza con ninguna fila del catálogo.
       textos: {},
@@ -160,6 +185,9 @@ function restaurarBorrador() {
     d.campos = Object.assign({}, d.campos);
     d.campos.patente = normalizarPatente(d.campos.patente);
     d.campos.vin = normalizarVin(d.campos.vin);
+    // Un borrador de antes del campo no traía fecha: se le pone la de ahora en
+    // vez de dejar el campo vacío y que la orden nazca sin fecha de entrada.
+    if (!d.campos.fecha_ingreso) d.campos.fecha_ingreso = recIsoLocal(recAhora());
 
     return Object.assign({
       paso: 'cliente', llave: 'rec-' + Date.now().toString(36),
@@ -475,10 +503,16 @@ function vRecepcion() {
   return `
   <div class="panel">
     <div class="cab">
-      <div><h2>${ico('recepcion', 'g')}Nuevo ingreso</h2>
-        <div class="desc">Cinco pasos. No se avanza con el paso incompleto; volver atrás se puede
-          siempre. El borrador se guarda solo.
-          <button class="enlace-volver" id="rec-volver">← Volver a las opciones</button></div></div>
+      ${/* 🔶 SIN BAJADA Y SIN «VOLVER A LAS OPCIONES» (16-08-2026, pedido del
+           cliente). La bajada explicaba el mecanismo de los pasos —que no se
+           avanza incompleto, que se puede volver, que el borrador se guarda
+           solo—: es un instructivo, y se lee una vez. Las tres cosas se ven
+           igual usando la pantalla, que es donde hay que enseñarlas.
+
+           ⚠️ El «Volver a las opciones de Recepción» del BUSCADOR es otro
+           botón y se queda: comparte el `id` con éste porque nunca están los
+           dos en pantalla a la vez. */''}
+      <div><h2>${ico('recepcion', 'g')}Nuevo ingreso</h2></div>
       <div class="chips">
         ${RECEPCION_PASOS.map((p, k) => '<button class="chip' +
           (p.id === r.paso ? ' activo' : (recAlcanzable(k) ? '' : ' pendiente')) +
