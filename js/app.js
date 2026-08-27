@@ -1,6 +1,6 @@
 /* ETIQUETA, TEMA, ROL Y ARRANQUE.
 
-   La etiqueta de datos, el tema, quién mira, la barra lateral y el cajón del celular.
+   La etiqueta de datos, el tema, quién mira y la barra lateral.
 
    ⚠️ Este archivo se carga SIEMPRE AL FINAL. Es el único que EJECUTA algo al cargar
    —monta el tema, retoma la sesión, pinta la primera pantalla— así que necesita que todo
@@ -749,59 +749,20 @@ function montarLateral() {
 
 montarLateral();
 
-/* ── EL CAJÓN DE MÓDULOS EN PANTALLA CHICA ─────────────────────────────
-   🔴 EL PROBLEMA QUE ESTO RESUELVE (21-08-2026). El CSS escondía la barra
-   lateral bajo los 860 px con un `display:none` y nada la reemplazaba. En un
-   celular —y en una tablet vertical, que son 768— el sistema quedaba con UN
-   módulo: el que se abría al entrar, y de ahí no se salía. No es que se viera
-   mal: no se podía usar.
+/* 🔴 ACÁ VIVÍA `montarCajonModulos()` (27-08-2026, Marco: «quiero que el
+   sistema del celular funcione de la misma forma como funciona el sistema
+   actual... ellos tienen los módulos arriba»).
 
-   Ahora la misma barra, sin duplicar nada, se corre a un cajón. Tres formas de
-   cerrarlo, que es lo mínimo para que nadie quede atrapado: tocar un módulo,
-   tocar el velo de al lado, o Escape.
+   Eran 40 líneas para abrir y cerrar un cajón: el botón de tres rayas, el velo,
+   Escape, el cierre al elegir un módulo y el desarme al girar el teléfono. Todo
+   correcto y todo innecesario, porque ahora los módulos no se esconden: bajo los
+   860 px la misma barra lateral se acuesta y queda de tira arriba, siempre a la
+   vista. No hay nada que abrir.
 
-   ⚠️ Lo que se cierra es una CLASE en el `body`, no un estilo escrito a mano.
-   Escrito a mano hay que acordarse de deshacerlo en cada camino de salida —y
-   siempre queda uno afuera—; con la clase, el CSS decide y los tres caminos
-   hacen exactamente lo mismo. */
-function montarCajonModulos() {
-  const boton = document.getElementById('btn-nav');
-  const velo = document.getElementById('velo-nav');
-  const nav = document.getElementById('nav');
-  if (!boton || !velo) return;
-
-  const abierto = () => document.body.classList.contains('nav-abierta');
-  const poner = (v) => {
-    document.body.classList.toggle('nav-abierta', v);
-    velo.hidden = !v;
-    boton.setAttribute('aria-expanded', v ? 'true' : 'false');
-    boton.setAttribute('aria-label', v ? 'Cerrar el menú de módulos' : 'Abrir el menú de módulos');
-    /* Con el cajón abierto, el fondo NO se desplaza: en un teléfono, arrastrar
-       sobre el velo movía la tabla de atrás y daba la sensación de que la
-       aplicación se había roto. */
-    document.body.classList.toggle('sin-desplazar', v);
-  };
-
-  boton.addEventListener('click', () => poner(!abierto()));
-  velo.addEventListener('click', () => poner(false));
-  document.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Escape' && abierto()) { poner(false); boton.focus(); }
-  });
-  // Elegir un módulo cierra el cajón. Va por delegación: la lista se repinta
-  // en cada render y un oyente por enlace se perdería en el primer repintado.
-  if (nav) nav.addEventListener('click', (ev) => {
-    if (ev.target.closest && ev.target.closest('a')) poner(false);
-  });
-  /* Al pasar a una pantalla ancha el cajón deja de existir. Si quedara la
-     clase puesta, el `body` seguiría sin poder desplazarse en el escritorio y
-     nadie ataría ese síntoma con haber girado el teléfono. */
-  const ancha = window.matchMedia('(min-width: 861px)');
-  const alGirar = (e) => { if (e.matches) poner(false); };
-  if (ancha.addEventListener) ancha.addEventListener('change', alGirar);
-  else if (ancha.addListener) ancha.addListener(alGirar);   // navegadores viejos
-}
-
-montarCajonModulos();
+   El cajón resolvía un problema real —antes del 21-08-2026 la barra se escondía
+   con `display:none` y el sistema quedaba con UN módulo—. La tira lo resuelve
+   sin puerta de por medio, que es como lo resuelve el sistema que ellos usan
+   todos los días. */
 
 /* La sala compartida se enciende al final, cuando el modelo y las pantallas ya
    están en pie: al arrancar puede traer el estado de la sala y repintar, y para

@@ -128,8 +128,8 @@ svg.ico.g { width: 16px; height: 16px; flex-basis: 16px; }
 
 /* Barra de menú superior */
 /* El alto va en una variable porque NO es sólo el alto de la barra: es dónde
-   empieza el cajón del celular y dónde empieza su velo. Escrito como número en
-   los tres sitios, el primer ajuste de la barra deja el cajón montado encima o
+   empieza el contenido debajo de ella. Escrito como número en los tres sitios,
+   el primer ajuste de la barra deja lo de abajo montado encima o
    con una franja muerta debajo. */
 :root { --alto-barra: 48px; }
 .barra-menu {
@@ -1320,62 +1320,22 @@ svg.chispa.verde .chispa-punto { fill: var(--verde); }
 
    Tres anchos, y cada uno responde a un aparato de verdad:
      · hasta 1100 px  tablet acostada — cabe todo, sólo se junta el aire
-     · hasta  860 px  tablet parada y celular — la barra pasa a cajón
+     · hasta  860 px  tablet parada y celular — la barra se acuesta arriba
      · hasta  560 px  celular — una columna, y el pulgar manda
 
-   El botón de módulos y el velo viven en `index.html` y se manejan en
-   `montarCajonModulos()`. Acá va sólo lo visual. */
+   🔴 Y DESDE EL 27-08-2026 LA BARRA NO SE ESCONDE (Marco: «quiero que el
+   sistema del celular funcione de la misma forma como funciona el sistema
+   actual... ellos tienen los módulos arriba, y por qué lo tienen arriba: porque
+   así se les amplía el panel donde ven las tablas»).
 
-/* ── El botón de módulos ── */
-.btn-nav {
-  display: none; flex: 0 0 auto; width: 38px; height: 34px; margin-right: 4px;
-  align-items: center; justify-content: center;
-  background: transparent; border: 1px solid transparent; border-radius: 4px;
-  color: var(--menu-texto); cursor: pointer; padding: 0;
-}
-.btn-nav:hover { background: rgba(255, 255, 255, .10); color: #fff; }
-.btn-nav:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
-/* Las tres rayas, dibujadas con bordes: no hace falta un icono ni una fuente
-   para tres líneas, y así siguen el color del texto de la barra. */
-.btn-nav .rayas,
-.btn-nav .rayas::before,
-.btn-nav .rayas::after {
-  display: block; width: 17px; height: 2px; border-radius: 2px;
-  background: currentColor; content: '';
-}
-.btn-nav .rayas { position: relative; }
-.btn-nav .rayas::before { position: absolute; top: -5px; }
-.btn-nav .rayas::after { position: absolute; top: 5px; }
-/* Abierto, las rayas se cruzan: el mismo botón cierra. */
-body.nav-abierta .btn-nav .rayas { background: transparent; }
-body.nav-abierta .btn-nav .rayas::before { top: 0; transform: rotate(45deg); }
-body.nav-abierta .btn-nav .rayas::after { top: 0; transform: rotate(-45deg); }
+   Entre el 21 y el 26 de agosto los módulos vivieron en un cajón que se abría
+   con tres rayas. Funcionaba, pero cobraba un toque por cada cambio de módulo
+   —abrir, elegir, y el cajón tapando media pantalla mientras tanto— y ese peaje
+   no existe en el sistema que ellos usan. Ahora la MISMA barra lateral se
+   acuesta: mismo HTML, mismo `pintarMenu()`, mismos permisos. Cambia el eje. */
 
-/* 🔴 EL VELO NO TAPA LA BARRA DE ARRIBA (26-08-2026, Marco: «mira cómo se
-   ve»). Decía `inset: 0`, o sea de la esquina a la esquina, y con el cajón
-   encima la barra quedaba amputada: el logo y el botón de módulos escondidos
-   detrás del cajón, y a la derecha «Clave / Salir / Oscuro» flotando sin nada
-   al lado. Y el botón de módulos es el que se convierte en ✕ para cerrar: el
-   único cierre a la vista estaba tapado por lo que tenía que cerrar.
-
-   Ahora la barra queda entera y encima de todo. El cajón cuelga de ella. */
-.velo-nav {
-  position: fixed; top: var(--alto-barra); left: 0; right: 0; bottom: 0;
-  z-index: 60;
-  /* 🔶 .72 y no .5. Medido: con .5 cada píxel de atrás queda EXACTAMENTE a
-     la mitad (34,39,44 → 17,19,22), y sobre el tema oscuro la mitad de casi
-     negro se sigue leyendo perfecto. El resultado era que la franja de la
-     derecha —tarjetas cortadas a media palabra— competía con el menú en vez de
-     quedarse atrás. En el tema claro .5 alcanzaba de sobra; el que manda es el
-     oscuro, que es el que Marco usa en el teléfono. */
-  background: rgba(0, 0, 0, .72);
-}
-.velo-nav[hidden] { display: none; }
 /* El rótulo corto de un botón sólo aparece en pantalla chica. */
 .barra-menu .der .corto { display: none; }
-/* Con el cajón abierto el fondo no se desplaza: en un teléfono, arrastrar
-   sobre el velo movía la tabla de atrás y parecía que algo se había roto. */
-body.sin-desplazar { overflow: hidden; }
 
 /* ───────── Tablet acostada y monitores angostos ───────── */
 @media (max-width: 1100px) {
@@ -1387,7 +1347,6 @@ body.sin-desplazar { overflow: hidden; }
 
 /* ───────── Tablet parada y celular ───────── */
 @media (max-width: 860px) {
-  .btn-nav { display: flex; }
   .barra-menu .mnu { display: none; }
   /* Los tres botones de la derecha se quedan: se ACORTAN. Ninguno se apaga
      -la regla de la casa-. Con el texto largo, a 768 px envolvian en dos
@@ -1396,40 +1355,67 @@ body.sin-desplazar { overflow: hidden; }
   .barra-menu .der .corto { display: inline; }
   .barra-menu .der button { white-space: nowrap; }
 
-  /* La barra lateral SE CORRE, no desaparece. Es la misma lista, el mismo
-     HTML y el mismo JavaScript: un segundo menú sólo para el teléfono se
-     habría desincronizado del de escritorio en la primera semana. */
+  /* ── La barra lateral se acuesta ─────────────────────────────────
+     No es otro menú: es el de siempre girado. `.marco` pasa de fila a columna
+     y la barra queda arriba de la pantalla, no al lado. Lo que se gana es
+     ancho —que es lo que le falta a la tabla de la torre, 20 columnas— y lo
+     que se pierde es alto, que es lo que sobra en un teléfono. */
+  .marco { flex-direction: column; }
   .sidebar {
-    /* Cuelga de la barra, no la tapa: `top` es el alto de la barra, el mismo
-       número que ella usa. Así el logo se sigue viendo y el botón de módulos
-       —que abierto es una ✕— queda a la mano para cerrar. */
-    position: fixed; top: var(--alto-barra); bottom: 0; left: 0; z-index: 70;
-    width: 264px; flex-basis: 264px; max-width: 82vw;
-    transform: translateX(-102%); transition: transform .18s ease;
-    /* El borde importa tanto como la sombra: los dos fondos se parecen
-       demasiado —#11161c el cajón, #0e1116 la página— y sin una línea el cajón
-       no se leía como una capa aparte, sino como parte de la misma pantalla. */
-    border-right: 1px solid var(--borde);
-    box-shadow: 6px 0 26px rgba(0, 0, 0, .55);
+    flex: 0 0 auto; width: auto; max-width: none; transition: none;
+    flex-direction: row; align-items: center;
+    border-right: none; border-bottom: 1px solid var(--borde);
+    /* Trece módulos no caben en 375 px y no se van a esconder: la tira se
+       desliza. Es exactamente lo que hace la de ellos. */
+    overflow-x: auto; overflow-y: hidden; scrollbar-width: thin;
+    -webkit-overflow-scrolling: touch;
   }
-  body.nav-abierta .sidebar { transform: translateX(0); }
-  /* Plegar y arrastrar son gestos de escritorio: en un cajón no significan
-     nada y el tirador de 6 px es imposible de agarrar con el dedo. */
-  .sidebar .plegar, .sidebar .tirador { display: none; }
-  /* El cajón ignora el ancho guardado y el modo iconos del escritorio. */
-  body.lateral-plegado .sidebar .tit,
-  body.lateral-plegado .nav .grupo,
+  /* Plegar y arrastrar son gestos de escritorio: acostada no hay ancho que
+     quitarle, y el título «Módulos» sobre una fila de iconos no dice nada. */
+  .sidebar .tit, .sidebar .plegar, .sidebar .tirador { display: none; }
+  /* El degradado del borde derecho: lo pone `avisarQueHayMasModulos()` sólo
+     cuando de verdad queda tira a la derecha. Va como máscara del elemento y
+     no como una capa encima, porque una capa dentro de algo que se desliza se
+     desliza con él y se va de la pantalla en el primer arrastre. */
+  .sidebar.hay-mas-modulos {
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 34px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 34px), transparent);
+  }
+
+  .nav {
+    display: flex; flex-direction: row; align-items: center; gap: 4px;
+    flex: 0 0 auto; overflow: visible; padding: 7px 8px;
+  }
+  /* Los tres grupos —Operación diaria, Seguimiento, Administración— ordenan
+     una columna; en una fila serían tres rótulos de canto partiendo la tira.
+     El orden de los módulos no cambia, así que la agrupación se sigue
+     leyendo aunque el rótulo no esté. */
+  .nav .grupo { display: none; }
+  .nav a {
+    flex: 0 0 auto; gap: 8px; padding: 5px 13px 5px 5px; min-height: 44px;
+    border-left: none; border-radius: 22px; white-space: nowrap;
+  }
+  /* El icono en su círculo, como en el sistema de ellos: es lo que se reconoce
+     de reojo cuando el rótulo se sale de la pantalla al deslizar. */
+  .nav a .ico {
+    width: 32px; height: 32px; padding: 8px; box-sizing: border-box;
+    border-radius: 50%; background: var(--acento); color: #fff; flex: 0 0 auto;
+  }
+  .nav a:hover { background: var(--superficie-2); }
+  /* El módulo abierto se marca con la píldora, no con la línea de la
+     izquierda: acostada, esa línea queda debajo del círculo y no se ve. */
+  .nav a.activo { background: var(--seleccion); box-shadow: none; }
+  .nav a.activo .ico { color: #fff; }
+  .nav a .cuenta { margin-left: 0; }
+
+  /* Si el escritorio quedó plegado a iconos, acá no manda: la tira es otra
+     cosa y el ancho guardado no significa nada acostada. */
   body.lateral-plegado .nav a .rot,
   body.lateral-plegado .nav a .cuenta { display: revert; }
-  /* 🔴 EL ALTO DE LOS MÓDULOS VA ACÁ Y NO SÓLO EN `pointer: coarse`. Con la
-     regla del puntero grueso los enlaces del cajón quedaban en 28 px cada vez
-     que el navegador se declaraba de puntero fino — una tablet con teclado, un
-     navegador que responde mal a la consulta, el escritorio angostado para
-     probar—. Veintiocho píxeles es media yema de dedo: se toca el módulo de
-     al lado. Si el cajón existe es porque la pantalla es chica, y en una
-     pantalla chica el destinatario es el dedo. */
-  .nav a { padding-top: 10px; padding-bottom: 10px; min-height: 40px; }
-  body.lateral-plegado .nav a { justify-content: flex-start; padding: 10px 12px; min-height: 40px; }
+  body.lateral-plegado .nav a {
+    justify-content: flex-start; padding: 5px 13px 5px 5px; min-height: 44px;
+  }
+  body.lateral-plegado .nav a.activo { box-shadow: none; }
 
   .contenido { padding-left: 10px; padding-right: 10px; }
   /* Los paneles de dos columnas pasan a una: 430 px de mínimo no caben. */
@@ -1443,15 +1429,30 @@ body.sin-desplazar { overflow: hidden; }
 
 /* ───────── Celular ───────── */
 @media (max-width: 560px) {
-  /* La barra de arriba se queda con lo imprescindible: el botón de módulos,
-     el logo y quién está adentro. Los botones de sesión bajan al pie del
-     cajón, donde hay sitio para tocarlos. */
-  /* Cambia la variable, no el alto: así el cajón y su velo bajan con ella. */
+  /* La barra de arriba se queda con lo imprescindible: el logo, quién está
+     adentro y los tres botones de sesión con el rótulo corto. Ninguno se
+     apaga: la regla de la casa es que un botón no desaparece por ser chica la
+     pantalla. Los módulos ya no están acá —están en la tira de abajo—. */
+  /* Cambia la variable, no el alto: así todo lo que va debajo de la barra baja
+     con ella. */
   :root { --alto-barra: 52px; }
   .barra-menu { padding: 0 6px; gap: 0; }
-  /* Un poco más ancho: deja la franja de atrás en 90 px en vez de 126, que es
-     donde las tarjetas se cortaban a media palabra y ensuciaban la pantalla. */
-  .sidebar { width: 288px; flex-basis: 288px; max-width: 86vw; }
+  /* 🔴 ACÁ DECÍA `.sidebar { width: 288px; flex-basis: 288px }` (27-08-2026).
+
+     Era el ancho del cajón, y al acostar la barra pasó a ser su ALTURA: en un
+     flex en columna, `flex-basis` mide el eje principal, que ahora es el
+     vertical. La tira quedaba de 288 px de alto —media pantalla de teléfono
+     en negro con los iconos flotando al medio— y la tabla empezaba abajo.
+
+     Este es el precio de girar un eje: TODA medida escrita para el eje viejo
+     cambia de significado sin avisar y sin romper nada, que es la clase de
+     error que no aparece en una prueba. */
+  .sidebar { flex-basis: auto; }
+  /* La tira se junta: en 375 px cada píldora que se ahorra es un módulo más
+     a la vista antes de tener que deslizar. */
+  .nav { padding: 6px; gap: 3px; }
+  .nav a { padding: 4px 11px 4px 4px; font-size: 12px; }
+  .nav a .ico { width: 30px; height: 30px; padding: 7px; }
   .barra-menu .prod { padding-right: 8px; margin-right: 4px; border-right: none; font-size: 0; }
   .barra-menu .prod img.logo { height: 30px; padding: 2px 5px; }
   .barra-menu .der { gap: 6px; }

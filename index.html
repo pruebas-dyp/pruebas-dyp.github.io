@@ -10,7 +10,7 @@
      para que aparezca en buscadores. Se comparte por link, no se indexa. -->
 <meta name="robots" content="noindex, nofollow">
 <title>Automotora DyP · Control de Taller</title>
-<link rel="stylesheet" href="css/estilos.css?v=202608270026">
+<link rel="stylesheet" href="css/estilos.css?v=202608270044">
 <script>
   // Se aplica antes de pintar para que no haya un destello del tema anterior.
   try {
@@ -25,13 +25,10 @@
 
   <!-- Barra de menú -->
   <div class="barra-menu">
-    <!-- El botón de módulos. Sólo se ve bajo los 860 px, que es donde la barra
-         lateral no cabe y pasa a ser un cajón. Sin él, en un celular no había
-         NINGUNA forma de cambiar de módulo: la barra simplemente desaparecía. -->
-    <button class="btn-nav" id="btn-nav" type="button" aria-controls="sidebar"
-      aria-expanded="false" aria-label="Abrir el menú de módulos">
-      <span class="rayas" aria-hidden="true"></span>
-    </button>
+    <!-- 🔴 ACÁ HABÍA UN BOTÓN DE TRES RAYAS (27-08-2026). Abría el cajón de
+         módulos del celular. Ya no hay cajón: bajo los 860 px los módulos son
+         una tira arriba, siempre a la vista, como en el sistema que usan. Un
+         botón que abre algo que ya no existe es un botón muerto. -->
     <span class="prod" id="prod"></span>
     <span class="mnu">Archivo</span>
     <span class="mnu">Edición</span>
@@ -45,7 +42,10 @@
 
   <div class="marco">
 
-    <!-- Navegador de módulos -->
+    <!-- Navegador de módulos. Es UNO SOLO: a la izquierda en el escritorio,
+         en una tira arriba en celular y tablet. El mismo HTML y el mismo
+         `pintarMenu()` —un segundo menú sólo para el teléfono se habría
+         desincronizado del de escritorio en la primera semana. -->
     <!-- El tirador del borde derecho angosta la barra; el botón de abajo la
          deja en iconos. Las dos cosas son para lo mismo: que la tabla de la
          torre —17 columnas— entre completa, como entra en el sistema actual,
@@ -58,11 +58,6 @@
       <div class="tirador" id="tirador-lateral" role="separator" aria-orientation="vertical"
         title="Arrastrar para angostar la barra"></div>
     </aside>
-
-    <!-- El velo del cajón. Oscurece lo de atrás y, sobre todo, da dónde tocar
-         para cerrar: en un celular el gesto natural es tocar al lado, no buscar
-         una cruz. -->
-    <div class="velo-nav" id="velo-nav" hidden></div>
 
     <main class="principal">
 
@@ -89,41 +84,41 @@
      las reglas (arma los números de OR), el repositorio depende de las dos, y
      las vistas dependen del repositorio. `app.js` va último porque al cargar
      ya pinta, y para eso necesita que las vistas estén definidas. -->
-<script src="js/iconos.js?v=202608270026"></script>
-<script src="js/reglas.js?v=202608270026"></script>
-<script src="js/semilla.js?v=202608270026"></script>
-<script src="js/modelo.js?v=202608270026"></script>
-<script src="js/media.js?v=202608270026"></script>
-<script src="js/vistas/silueta.js?v=202608270026"></script>
-<script src="js/vistas/fotos.js?v=202608270026"></script>
-<script src="js/vistas/recepcion.js?v=202608270026"></script>
-<script src="js/vistas/recepcion-pasos.js?v=202608270026"></script>
-<script src="js/vistas/recepcion-cableado.js?v=202608270026"></script>
-<script src="js/vistas/recepcion-editar.js?v=202608270026"></script>
-<script src="js/vistas/torre.js?v=202608270026"></script>
-<script src="js/vistas/taller.js?v=202608270026"></script>
-<script src="js/vistas/mitrabajo.js?v=202608270026"></script>
-<script src="js/vistas/ingreso.js?v=202608270026"></script>
-<script src="js/vistas/etapas.js?v=202608270026"></script>
-<script src="js/vistas/impresos.js?v=202608270026"></script>
-<script src="js/vistas/ficha.js?v=202608270026"></script>
-<script src="js/vistas/presupuesto.js?v=202608270026"></script>
-<script src="js/vistas/bodega.js?v=202608270026"></script>
-<script src="js/vistas/entrega.js?v=202608270026"></script>
-<script src="js/vistas/historico.js?v=202608270026"></script>
-<script src="js/vistas/reporteria.js?v=202608270026"></script>
-<script src="js/vistas/reporteria-panel.js?v=202608270026"></script>
-<script src="js/vistas/expediente.js?v=202608270026"></script>
-<script src="js/vistas/personal.js?v=202608270026"></script>
-<script src="js/vistas/documentos.js?v=202608270026"></script>
-<script src="js/vistas/configuracion.js?v=202608270026"></script>
-<script src="js/acceso.js?v=202608270026"></script>
-<script src="js/sala.js?v=202608270026"></script>
-<script src="js/app/formato.js?v=202608270026"></script>
-<script src="js/app/menu.js?v=202608270026"></script>
-<script src="js/app/acciones.js?v=202608270026"></script>
-<script src="js/app/render.js?v=202608270026"></script>
-<script src="js/app/tabla.js?v=202608270026"></script>
-<script src="js/app.js?v=202608270026"></script>
+<script src="js/iconos.js?v=202608270044"></script>
+<script src="js/reglas.js?v=202608270044"></script>
+<script src="js/semilla.js?v=202608270044"></script>
+<script src="js/modelo.js?v=202608270044"></script>
+<script src="js/media.js?v=202608270044"></script>
+<script src="js/vistas/silueta.js?v=202608270044"></script>
+<script src="js/vistas/fotos.js?v=202608270044"></script>
+<script src="js/vistas/recepcion.js?v=202608270044"></script>
+<script src="js/vistas/recepcion-pasos.js?v=202608270044"></script>
+<script src="js/vistas/recepcion-cableado.js?v=202608270044"></script>
+<script src="js/vistas/recepcion-editar.js?v=202608270044"></script>
+<script src="js/vistas/torre.js?v=202608270044"></script>
+<script src="js/vistas/taller.js?v=202608270044"></script>
+<script src="js/vistas/mitrabajo.js?v=202608270044"></script>
+<script src="js/vistas/ingreso.js?v=202608270044"></script>
+<script src="js/vistas/etapas.js?v=202608270044"></script>
+<script src="js/vistas/impresos.js?v=202608270044"></script>
+<script src="js/vistas/ficha.js?v=202608270044"></script>
+<script src="js/vistas/presupuesto.js?v=202608270044"></script>
+<script src="js/vistas/bodega.js?v=202608270044"></script>
+<script src="js/vistas/entrega.js?v=202608270044"></script>
+<script src="js/vistas/historico.js?v=202608270044"></script>
+<script src="js/vistas/reporteria.js?v=202608270044"></script>
+<script src="js/vistas/reporteria-panel.js?v=202608270044"></script>
+<script src="js/vistas/expediente.js?v=202608270044"></script>
+<script src="js/vistas/personal.js?v=202608270044"></script>
+<script src="js/vistas/documentos.js?v=202608270044"></script>
+<script src="js/vistas/configuracion.js?v=202608270044"></script>
+<script src="js/acceso.js?v=202608270044"></script>
+<script src="js/sala.js?v=202608270044"></script>
+<script src="js/app/formato.js?v=202608270044"></script>
+<script src="js/app/menu.js?v=202608270044"></script>
+<script src="js/app/acciones.js?v=202608270044"></script>
+<script src="js/app/render.js?v=202608270044"></script>
+<script src="js/app/tabla.js?v=202608270044"></script>
+<script src="js/app.js?v=202608270044"></script>
 </body>
 </html>

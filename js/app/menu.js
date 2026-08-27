@@ -263,6 +263,7 @@ function pintarMenu() {
     a.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); ir(a.dataset.vista); } });
   });
 
+  avisarQueHayMasModulos();
   pintarLogo();
   /* La esquina del usuario la dibuja `montarRol()`, y SOLO ella. Acá había un
      `innerHTML` que escribía el nombre a secas, y como `pintarMenu()` corre
@@ -280,8 +281,8 @@ function pintarMenu() {
    que miente al lado de la lista que lo desmiente es peor que no ponerlo.
 
    Se actualiza el TEXTO del contador, no se redibuja el menú: rehacer el
-   `innerHTML` en cada render tira los listeners, parpadea y rompe el cajón
-   del celular a media apertura. Qué módulos se ven no cambia dentro de una
+   `innerHTML` en cada render tira los listeners, parpadea y manda la tira del
+   celular de vuelta al principio. Qué módulos se ven no cambia dentro de una
    sesión —depende del permiso y de las etapas de la ficha—; lo que cambia son
    los números. */
 function refrescarContadoresDelMenu() {
@@ -449,3 +450,42 @@ function dialogoDemostracion() {
       ejecutarAccion(a);
     }));
 }
+
+/* ── LA TIRA DE MÓDULOS DEL CELULAR AVISA QUE SIGUE ─────────────────────
+   Trece módulos no caben en 375 px, así que la tira se desliza. El problema de
+   una fila que se desliza es que no parece una fila que se desliza: se ve como
+   si el sistema tuviera cinco módulos y punto, y nadie va a arrastrar para
+   buscar lo que no sabe que existe.
+
+   Se MIDE, no se adivina —igual que el aviso de las columnas de la tabla, que
+   es el mismo problema y ya estaba resuelto así—: el degradado del borde sólo
+   aparece si de verdad queda algo a la derecha, y desaparece al llegar al
+   final. En el escritorio, donde la barra es vertical, no aparece nunca. */
+function avisarQueHayMasModulos() {
+  const s = document.getElementById('sidebar');
+  if (!s) return;
+  // 4 px de margen: un par de píxeles son redondeo del navegador, no un módulo.
+  s.classList.toggle('hay-mas-modulos', s.scrollLeft + s.clientWidth < s.scrollWidth - 4);
+}
+
+/* El módulo abierto tiene que estar A LA VISTA. Sin esto, entrar a
+   Configuración —que es el último— dejaba la píldora marcada fuera de la
+   pantalla: la tira se veía entera sin nada iluminado, o sea mintiendo sobre
+   dónde estamos parados. */
+function traerModuloALaVista() {
+  const a = document.querySelector('#nav a.activo');
+  const s = document.getElementById('sidebar');
+  if (!a || !s || s.scrollWidth <= s.clientWidth + 4) return;
+  /* `nearest` y no `center`: centrar mueve la tira incluso cuando el modulo
+     ya se veia, y entrar a la Torre —que es el segundo— escondia el primero
+     sin motivo. Con `nearest` solo se mueve lo justo para que aparezca. */
+  if (a.scrollIntoView) a.scrollIntoView({ inline: 'nearest', block: 'nearest' });
+  avisarQueHayMasModulos();
+}
+
+(function () {
+  const s = document.getElementById('sidebar');
+  if (!s) return;
+  s.addEventListener('scroll', avisarQueHayMasModulos, { passive: true });
+  window.addEventListener('resize', avisarQueHayMasModulos);
+})();

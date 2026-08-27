@@ -164,6 +164,8 @@ function ir(vista) {
      nada marcado y uno no sabe en qué parte del sistema está. */
   const marcado = vista === 'entrega' ? 'recepcion' : vista;
   document.querySelectorAll('#nav a').forEach((a) => a.classList.toggle('activo', a.dataset.vista === marcado));
+  // En la tira del celular el módulo abierto puede estar fuera de la pantalla.
+  if (typeof traerModuloALaVista === 'function') traerModuloALaVista();
   const c = document.getElementById('contenido');
   if (c) c.scrollTop = 0;
   render();
