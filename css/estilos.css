@@ -226,12 +226,16 @@ div.desplegable button:hover .ico { color: var(--acento); }
    La cuadrícula se acomoda sola: cuatro por fila en el escritorio, dos en una
    tablet y una en el celular, sin un solo punto de quiebre escrito. */
 .acciones-ficha {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 10px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  gap: 12px;
 }
 .acciones-ficha .acceso {
+  /* 🔴 MÁS GRANDES (26-08-2026, Marco: «esto un poco más grande, así como lo
+     tienen ellos»). En su sistema estos accesos ocupan media pantalla: el
+     círculo es de 64 px y el rótulo se lee de lejos. Acá estaban en 46 y 104
+     de alto, que era una versión educada de lo mismo. Se sube a su tamaño. */
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 9px; min-height: 104px; padding: 16px 12px;
+  gap: 12px; min-height: 148px; padding: 22px 14px;
   background: var(--superficie); border: 1px solid var(--borde); border-radius: 4px;
   color: var(--texto); font: inherit; font-size: 13.5px; cursor: pointer;
   text-align: center; transition: border-color .12s ease, background .12s ease;
@@ -242,11 +246,20 @@ div.desplegable button:hover .ico { color: var(--acento); }
 .acciones-ficha .acceso:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
 .acciones-ficha .acceso .ico-redondo {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 46px; height: 46px; border-radius: 50%;
+  width: 64px; height: 64px; border-radius: 50%;
   background: var(--superficie-2); border: 1px solid var(--borde); color: var(--gris);
 }
 .acciones-ficha .acceso:hover .ico-redondo { color: var(--acento); border-color: var(--acento); }
-.acciones-ficha .acceso .rot-acceso { line-height: 1.3; }
+.acciones-ficha .acceso .rot-acceso { line-height: 1.3; font-size: 14.5px; }
+.acciones-ficha .acceso .ico-redondo .ico { width: 26px; height: 26px; }
+
+/* La vuelta desde un panel a la ficha. Ocupa el lugar que tenían las pestañas. */
+.volver-ficha {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 10px;
+}
+.volver-ficha .titulo-panel {
+  font-weight: 700; font-size: 15px; color: var(--tinta);
+}
 .acciones-ficha .acceso.pendiente { opacity: .6; }
 
 /* La fila de botones del desplegable de la torre NO es esta cuadrícula: son

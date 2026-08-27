@@ -172,8 +172,14 @@ const FICHA_ENLACES = [
   { rot: 'Ver repuestos',                   tab: 'repuestos', permiso: 'repuesto.ver', ico: 'repuesto' },
   { rot: 'Ver/Subir Documentos o imágenes', vista: 'documentos', permiso: 'documento.ver', ico: 'documento' },
   { rot: 'Ver Fotografías',                 tab: 'fotos', permiso: 'foto.ver', ico: 'camara' },
-  { rot: 'Editar Recepción',                tab: null, tanda: 8, permiso: 'ot.editar', ico: 'editar',
-    nota: 'la recepción se edita desde su propia pantalla; editar una ya guardada exige política de versiones' },
+  /* 🔴 YA NO ESTÁ PENDIENTE (26-08-2026, Marco: «agrega editar recepción»).
+
+     Salía apagado y con el rótulo «pendiente», y la nota decía que «la
+     recepción se edita desde su propia pantalla». Era cierto y era inútil: la
+     pantalla existe hace rato —se llega desde Recepción— y desde acá había que
+     salir, buscar la orden de nuevo y recién ahí entrar. Ahora este acceso
+     abre esa misma pantalla, ya parada en esta orden. */
+  { rot: 'Editar Recepción',                editarRecepcion: true, permiso: 'ot.editar', ico: 'editar' },
   { rot: 'Agregar OR',                      vista: 'presupuesto', permiso: 'presupuesto.crear', ico: 'nuevo' },
   { rot: 'Bodega de esta orden',            vista: 'bodega', permiso: 'repuesto.cargar', ico: 'bodega' },
   { rot: 'Bitácora',                        tab: 'bitacora', permiso: 'ficha.completa', ico: 'info' }
@@ -184,12 +190,66 @@ function vFichaOT(o) {
   const completa = Modelo.puede('ficha.completa');
   const campoCab = (k, v) => '<div class="dato"><span class="k">' + esc(k) + '</span><span class="v">' + v + '</span></div>';
 
-  const cuerpo = {
-    ficha: fichaResumen, etapas: vEtapas, historial: fichaHistorial,
+  /* 🔴 SIN PESTAÑAS (26-08-2026, Marco: «debes sacar esos paneles de ahí; el
+     único que me debes dejar es Ficha, que quiero que quede arriba y ojalá con
+     un poco más de detalle»).
+
+     La ficha tenía seis pestañas —Ficha, Etapas, Historial, Bitácora,
+     Repuestos, Fotografías— y en el sistema que usan no hay ninguna: hay una
+     pantalla con los datos, los accesos grandes, y abajo la bitácora y el
+     historial, todo a la vista.
+
+     Ahora el orden es el de ellos:
+
+        1 · los datos de la orden, arriba y completos
+        2 · los accesos, grandes
+        3 · la bitácora de observaciones
+        4 · el historial
+
+     Los otros paneles no se borraron: se llega a ellos por su acceso, y desde
+     ahí se vuelve. Es la misma navegación de su sistema —el icono te lleva a
+     una pantalla y vuelves— y por eso los `data-fichatab` siguen intactos. */
+  const enFicha = f.tab === 'ficha';
+  const cuerpo = enFicha ? '' : {
+    etapas: vEtapas, historial: fichaHistorial,
     bitacora: fichaBitacora, repuestos: fichaRepuestos, fotos: fichaFotos
   }[f.tab](o);
 
   const enlaces = FICHA_ENLACES.filter((l) => !l.permiso || Modelo.puede(l.permiso));
+
+  /* 🔴 LOS ACCESOS VAN ABAJO, DESPUES DE LA FICHA (26-08-2026, Marco: «el
+     unico que me debes dejar es Ficha, que quiero que quede ARRIBA... y abajo
+     esto un poco mas grande»). Estaban dentro del panel de la cabecera, o sea
+     entre los datos de la orden y su detalle. Ahora el orden es el de su
+     sistema: primero se lee la orden entera, despues se decide a donde ir. */
+  const accesos = enlaces.length ? `<div class="acciones-ficha" style="margin-top:10px">
+        ${/* 🔴 TARJETAS CON ICONO, COMO EN SU SISTEMA (26-08-2026, Marco:
+             «quiero hacerlo más intuitivo y quiero la visual que tienen
+             actualmente en el sistema, ya que esto nos permitirá que a ellos
+             también les sea más fácil ocuparlo»).
+
+             Eran nueve botones chicos en una fila, todos del mismo color y del
+             mismo tamaño: para encontrar «Ver Fotografías» había que leerlos
+             uno por uno. En el sistema que usan hoy son tarjetas grandes con un
+             icono redondo, y eso se reconoce sin leer.
+
+             El CONTENIDO no cambia: los mismos accesos, los mismos permisos y
+             los mismos manejadores —`data-fichatab`, `data-imprimir`,
+             `data-irvista`, `data-pendiente`—. Es la forma, no la función. */''}
+        ${enlaces.map((l) => {
+          const cara = '<span class="ico-redondo">' + ico(l.ico || 'documento') + '</span>' +
+            '<span class="rot-acceso">' + esc(l.rot) + '</span>';
+          if (l.tab) return '<button class="acceso" type="button" data-fichatab="' + l.tab + '">' + cara + '</button>';
+          if (l.imprimir) return '<button class="acceso" type="button" data-imprimir="' + l.imprimir + '">' + cara + '</button>';
+          if (l.vista) return '<button class="acceso" type="button" data-irvista="' + l.vista +
+            '" data-irot="' + esc(o.numeroOT) + '">' + cara + '</button>';
+          if (l.editarRecepcion) return '<button class="acceso" type="button" data-editar-recepcion="' +
+            esc(o.numeroOT) + '">' + cara + '</button>';
+          return '<button class="acceso pendiente" type="button" data-pendiente="' + esc(l.rot) + '|' + l.tanda +
+            (l.nota ? '|' + esc(l.nota) : '') + '">' + cara +
+            '<span class="et gris">pendiente</span></button>';
+        }).join('')}
+    </div>` : '';
 
   return `
   <div class="panel">
@@ -224,41 +284,18 @@ function vFichaOT(o) {
         </fieldset>
       </div>
 
-      ${enlaces.length ? `<div class="acciones-ficha" style="margin-top:10px">
-        ${/* 🔴 TARJETAS CON ICONO, COMO EN SU SISTEMA (26-08-2026, Marco:
-             «quiero hacerlo más intuitivo y quiero la visual que tienen
-             actualmente en el sistema, ya que esto nos permitirá que a ellos
-             también les sea más fácil ocuparlo»).
-
-             Eran nueve botones chicos en una fila, todos del mismo color y del
-             mismo tamaño: para encontrar «Ver Fotografías» había que leerlos
-             uno por uno. En el sistema que usan hoy son tarjetas grandes con un
-             icono redondo, y eso se reconoce sin leer.
-
-             El CONTENIDO no cambia: los mismos accesos, los mismos permisos y
-             los mismos manejadores —`data-fichatab`, `data-imprimir`,
-             `data-irvista`, `data-pendiente`—. Es la forma, no la función. */''}
-        ${enlaces.map((l) => {
-          const cara = '<span class="ico-redondo">' + ico(l.ico || 'documento') + '</span>' +
-            '<span class="rot-acceso">' + esc(l.rot) + '</span>';
-          if (l.tab) return '<button class="acceso" type="button" data-fichatab="' + l.tab + '">' + cara + '</button>';
-          if (l.imprimir) return '<button class="acceso" type="button" data-imprimir="' + l.imprimir + '">' + cara + '</button>';
-          if (l.vista) return '<button class="acceso" type="button" data-irvista="' + l.vista +
-            '" data-irot="' + esc(o.numeroOT) + '">' + cara + '</button>';
-          return '<button class="acceso pendiente" type="button" data-pendiente="' + esc(l.rot) + '|' + l.tanda +
-            (l.nota ? '|' + esc(l.nota) : '') + '">' + cara +
-            '<span class="et gris">pendiente</span></button>';
-        }).join('')}
-      </div>` : ''}
     </div>
   </div>
 
-  <div class="tabs" style="margin-bottom:10px">
-    ${tabsVisibles().map((t) => '<button type="button" class="' + (t.id === f.tab ? 'activo' : '') +
-      '" data-fichatab="' + t.id + '">' + esc(t.n) + '</button>').join('')}
-  </div>
-
-  ${cuerpo}
+  ${enFicha
+    ? /* La ficha completa arriba, la bitácora y el historial abajo — el mismo
+         orden que tiene su sistema. */
+      fichaResumen(o) + accesos + fichaBitacora(o) + fichaHistorial(o)
+    : /* Cualquier otro panel se abre solo, con la vuelta a la vista. */
+      '<div class="volver-ficha"><button class="btn secundario" type="button" data-fichatab="ficha">' +
+      ico('chevron') + 'Volver a la ficha</button>' +
+      '<span class="titulo-panel">' + esc((FICHA_TABS.find((t) => t.id === f.tab) || {}).n || '') + '</span>' +
+      '</div>' + cuerpo}
 `;
 }
 
@@ -696,6 +733,23 @@ function fichaFotos(o) {
 /* ── Cableado de la ficha ──────────────────────────────────────────────── */
 
 function pFichaOT(o) {
+  /* 🔴 EDITAR RECEPCIÓN, DESDE ACÁ (26-08-2026). Deja la pantalla de Recepción
+     ya cargada con ESTA orden. `editRecCargar` se llama una sola vez, al
+     entrar: si se recargara en cada pintado, cada tecla que el usuario escribe
+     se perdería con el render siguiente —está dicho en `recepcion-cableado.js`
+     y vale igual acá. */
+  document.querySelectorAll('[data-editar-recepcion]').forEach((b) => b.addEventListener('click', () => {
+    const orden = Modelo.otPorNumero(b.dataset.editarRecepcion);
+    if (!orden) return avisar({ ok: false, motivo: 'Esa orden ya no está abierta: la recepción de una orden cerrada no se corrige.' });
+    if (typeof editRecCargar !== 'function' || typeof rec !== 'function')
+      return avisar({ ok: false, motivo: 'La pantalla de recepción no está cargada.' });
+    editRecCargar(orden);
+    rec().pantalla = 'editar-ficha';
+    /* Sale de la ventana de la orden al módulo: la edición de la recepción vive
+       en Recepción y tiene su propio flujo de versiones. */
+    ir('recepcion');
+  }));
+
   const btnOR = document.getElementById('or-editar');
   if (btnOR) btnOR.addEventListener('click', () => dialogoEditarOR(o));
 
