@@ -16,7 +16,7 @@
    encabezado no se vuelve clicable. */
 /* Cuántas columnas tiene la tabla, contando la de la flecha. Es el número que
    necesita el `colspan` del desplegable y el de la fila «Sin resultados». */
-const COLUMNAS_TORRE = 20;
+const COLUMNAS_TORRE = 21;   // 20 del listado + la lupa de «Datos»
 
 const ORDEN_TORRE = {
   ot:         (o) => Number(o.numeroOT) || 0,
@@ -183,6 +183,7 @@ function vTorre() {
           ${thOrden('estado', 'Estado')}${thOrden('etapa', 'Etapa')}${thOrden('encargado', 'Encargado')}
           ${thOrden('entrega', 'Fecha de Entrega')}
           <th title="La inicial del asunto de cada mensaje de bitácora">Alerta</th>
+          ${TH_LUPA}
         </tr></thead>
         <tbody>${pagina.length ? pagina.map(filaTorre).join('') :
           '<tr><td colspan="' + COLUMNAS_TORRE + '"><div class="vacio"><div class="titulo">Sin resultados</div>' +
@@ -276,7 +277,8 @@ function filaTorre(o) {
     '<td>' + (o.asignado ? esc(o.asignado) : '<span class="et gris">Sin Asignar</span>') + '</td>' +
     '<td class="num">' + (o.fechaCompromiso ? fFechaHora(o.fechaCompromiso) : '—') + '</td>' +
     '<td>' + chipsAlerta(o) + (pend ? ' <span class="et roja" title="' + pend +
-      ' repuestos por llegar">' + pend + '</span>' : '') + '</td></tr>';
+      ' repuestos por llegar">' + pend + '</span>' : '') + '</td>' +
+    CELDA_LUPA(o.numeroOT) + '</tr>';
 
   /* 🔴 EL `colspan` SE CUENTA, NO SE ESCRIBE (26-08-2026). Estaba en 19 a mano,
      y al agregar la columna «Rep. pend.» la tabla pasó a 20: el detalle quedaba

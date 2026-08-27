@@ -99,9 +99,11 @@ function vTallerListado() {
         : '<span style="color:var(--gris-2)">—</span>') + '</td>' +
       '<td><button class="btn secundario chico" data-etapasde="' + esc(o.numeroOT) + '">' +
         ico('check') + esc(TALLER_ACCION.rot) + '</button></td>' +
-      '<td style="text-align:center"><button class="btn secundario chico" data-datosde="' + esc(o.numeroOT) + '" ' +
-        'title="Abrir la orden ' + o.numeroOT + '" aria-label="Abrir la orden ' + o.numeroOT + '">' +
-        ico('buscar') + '</button></td></tr>';
+      /* 🔴 ERA UN BOTÓN CON BORDE Y ACÁ DENTRO (27-08-2026). La lupa es la
+         misma de la Torre y del Consolidado: una sola forma de dibujarla, en
+         `CELDA_LUPA`. Tres lupas distintas en tres pantallas se despegan sola
+         la primera vez que alguien toca una. */
+      CELDA_LUPA(o.numeroOT) + '</tr>';
 
   return `
   <div class="filtros" style="margin-bottom:10px">
@@ -204,6 +206,9 @@ function pTaller() {
     abrirFicha(b.dataset.etapasde, 'etapas', 'asignar');
   }));
 
+  /* ⚠️ `data-datosde` ya no lo escribe nadie: la lupa usa `data-verot` y la
+     cablea `cablearLupas()` en el render. Esto se queda por si queda alguna en
+     otra pantalla, y no estorba. */
   document.querySelectorAll('[data-datosde]').forEach((b) => b.addEventListener('click', (ev) => {
     ev.stopPropagation();
     abrirFicha(b.dataset.datosde);

@@ -231,7 +231,13 @@ div.desplegable button:hover .ico { color: var(--acento); }
      actual»). A 215 px entraban siete en una fila y quedaban como una barra de
      botones. A 260 entran cinco y cuatro: dos filas de tarjetas grandes, que
      es la pantalla que ellos conocen. */
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  /* 🔴 CUATRO Y CUATRO, FIJO (27-08-2026, Marco: «alinea que queden 4 y 4»).
+
+     Con `auto-fit` entraban las que cupieran: en un monitor ancho salían cinco
+     arriba y tres abajo, y la segunda fila quedaba coja. Ocho accesos en dos
+     filas parejas se leen como un teclado —siempre en el mismo sitio—, que es
+     justamente lo que hace que uno deje de leerlos y solo apunte. */
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px; margin-top: 12px;
 }
 .acciones-ficha .acceso {
@@ -258,6 +264,54 @@ div.desplegable button:hover .ico { color: var(--acento); }
 .acciones-ficha .acceso .rot-acceso { line-height: 1.3; font-size: 15.5px; font-weight: 600; }
 .acciones-ficha .acceso .ico-redondo .ico { width: 34px; height: 34px; }
 
+/* ── LA PILA DE LA FICHA ────────────────────────────────────────
+
+   Detalle · accesos · bitácora · historial. En el escritorio ese es el orden y
+   no hace falta nada; el `flex` existe para poder CAMBIARLO en el teléfono. */
+.pila-ficha { display: flex; flex-direction: column; }
+
+/* En el escritorio la cabecera y los datos son un panel solo: van pegados y se
+   reparten los bordes. Es una pieza en el HTML porque en el teléfono se separan;
+   acá no se tiene por qué notar. */
+.pila-ficha .p-cabecera .panel {
+  margin-bottom: 0; border-bottom: 0; border-radius: 3px 3px 0 0;
+}
+.pila-ficha .p-detalle .panel { border-radius: 0 0 3px 3px; }
+
+/* 🔴 EN EL CELULAR LOS ACCESOS VAN PRIMERO (27-08-2026, Marco: «en el celular,
+   al abrir la Ficha, no aparece esto y es sumamente importante que sí
+   aparezca»). Estaban a 1.213 píxeles de scroll: los cuatro bloques de la ficha,
+   que en el escritorio van en fila, en un teléfono se apilan. */
+@media (max-width: 860px) {
+  .pila-ficha .p-cabecera { order: 1; }
+  .pila-ficha .p-accesos  { order: 2; }
+  .pila-ficha .p-detalle  { order: 3; }
+  .pila-ficha .p-bitacora { order: 4; }
+  .pila-ficha .p-historial{ order: 5; }
+  /* Separadas, cada una vuelve a ser un panel entero. */
+  .pila-ficha .p-cabecera .panel {
+    margin-bottom: 10px; border-bottom: 1px solid var(--borde); border-radius: 3px;
+  }
+  .pila-ficha .p-detalle .panel { border-radius: 3px; }
+}
+
+/* Las tres acciones de la orden —Etapas y los dos impresos—, dentro del panel
+   y encima de los datos: es lo que se HACE con la orden, no lo que dice. */
+.acciones-orden {
+  display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 11px;
+  padding-bottom: 10px; border-bottom: 1px solid var(--borde);
+}
+
+/* La salida de la pestaña de una orden, en la línea de la ruta. Va primero y
+   con el chevron mirando a la izquierda: es «volver», no «entrar». */
+.cab-modulo .ruta .volver-sistema {
+  display: inline-flex; align-items: center; gap: 3px;
+  color: var(--acento); font-weight: 600; text-decoration: none;
+  padding: 2px 8px 2px 4px; margin-right: 4px; border-radius: 3px;
+}
+.cab-modulo .ruta .volver-sistema:hover { background: var(--acento-bg); }
+.cab-modulo .ruta .volver-sistema .ico { transform: rotate(180deg); }
+
 /* La vuelta desde un panel a la ficha. Ocupa el lugar que tenían las pestañas. */
 .volver-ficha {
   display: flex; align-items: center; gap: 12px; margin-bottom: 10px;
@@ -273,6 +327,10 @@ div.desplegable button:hover .ico { color: var(--acento); }
    `auto-fit`, que en 500 px de ancho nunca va a dar dos— y se achica el
    círculo. Siguen siendo tarjetas grandes: el dedo tiene 132 px de alto donde
    apretar, más del doble del mínimo. */
+/* La tablet no da para cuatro de 260: tres, y la última fila queda de dos. */
+@media (max-width: 1000px) {
+  .acciones-ficha { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 @media (max-width: 620px) {
   .acciones-ficha { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
   .acciones-ficha .acceso { min-height: 132px; padding: 16px 8px; gap: 10px; }
@@ -831,6 +889,33 @@ fieldset.bloque legend {
      a presupuestar— que esta pantalla existe para mostrar. */
   opacity: 1; color: var(--tinta); background: var(--superficie-2);
 }
+
+/* ── La lupa de la columna «Datos» ────────────────────────────────────────
+   Una sola forma para las cuatro tablas. Es un icono, no un botón con borde:
+   en el sistema que usan es exactamente eso, y una columna de botones grises
+   compite con la data que la tabla vino a mostrar. 34 px de alto para el dedo. */
+.lupa-col { width: 54px; text-align: center; }
+.lupa {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; padding: 0; border: 0; border-radius: 4px;
+  background: transparent; color: var(--acento); cursor: pointer;
+}
+.lupa:hover { background: var(--acento-bg); }
+.lupa:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
+.lupa .ico { width: 17px; height: 17px; }
+
+/* La historia de la fecha de entrega, debajo de las dos fechas. Chica y en
+   gris: es traza, no dato de operación — se mira cuando alguien pregunta por
+   qué el auto salió tarde. */
+.historia-entrega { margin: 3px 0 2px; padding-left: 2px; }
+.historia-entrega > div {
+  display: flex; align-items: baseline; gap: 6px;
+  font-size: 10.5px; color: var(--gris); padding: 1px 0;
+}
+.historia-entrega .n {
+  flex: 0 0 auto; min-width: 16px; font-weight: 700; color: var(--gris-2);
+}
+.historia-entrega .quien { margin-left: auto; text-align: right; color: var(--gris-2); }
 
 /* Progreso de etapas */
 .linea-tiempo { display: flex; gap: 2px; margin-top: 5px; }
@@ -1515,7 +1600,14 @@ svg.chispa.verde .chispa-punto { fill: var(--verde); }
 
   .contenido { padding: 8px 8px 16px; }
   .cab-modulo h1 { font-size: 17px; }
-  .cab-modulo .ruta { display: none; }
+  /* 🔴 LA RUTA SE ESCONDE, LA SALIDA NO (27-08-2026). «Operación diaria ›
+     Torre de control › OT 23368» no cabe y no hace falta. Pero desde que
+     «Volver al sistema» vive en esta línea, esconderla entera dejaba la pestaña
+     de una orden SIN salida en el teléfono: la única forma de volver era el
+     botón del navegador. */
+  .cab-modulo .ruta > span, .cab-modulo .ruta > .ico { display: none; }
+  .cab-modulo .ruta .volver-sistema { display: inline-flex; margin: 0 0 2px; }
+  .cab-modulo .ruta .volver-sistema .ico { display: inline-block; }
 
   /* Todo formulario a una columna. Con dos, cada casilla queda de 150 px y no
      se puede escribir una patente sin equivocarse. */

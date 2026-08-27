@@ -303,6 +303,7 @@ function render() {
   // que vengan, en vez de tener que acordarse de llamarlo en cada vista.
   marcarEtiquetas();
   mejorarTablas();
+  cablearLupas();
   /* Y por la misma razón otra vez: amarrar cada `<label>` con su campo vale
      para las quince pantallas y para las que vengan. Se pasa `document` y no
      `c` porque los campos de la barra y de los diálogos viven fuera del
@@ -706,6 +707,37 @@ function sesionDeEstaPestana() {
   } catch (e) { delQueAbrio = null; }   // otro origen: no es asunto nuestro
 
   return Modelo.adoptar_sesion(delQueAbrio) || Modelo.adoptar_sesion(tomarPase());
+}
+
+/* 🔴 LA LUPA DE LA COLUMNA «DATOS» (27-08-2026, Marco: «en la torre de
+   control, taller, consolidado, etc. las lupas no aparecen y eso debería estar;
+   deja las lupas como en los paneles que tienen ellos en su sistema»).
+
+   En su sistema la última columna de cada listado se llama «Datos» y trae una
+   lupa que abre el vehículo. Acá abrir la orden estaba en el DOBLE CLIC —que
+   funciona y se queda—, pero un doble clic no se ve: quien no lo sabe, no lo
+   descubre. Y en un teléfono directamente no existe.
+
+   Es la misma puerta, con picaporte: llama a `abrirFicha`, igual que el doble
+   clic, así que no hay dos caminos que mantener de acuerdo. */
+const CELDA_LUPA = (numero) => '<td class="lupa-col">' +
+  '<button class="lupa" type="button" data-verot="' + esc(numero) + '" ' +
+  'title="Ver los datos de la orden ' + esc(numero) + '" ' +
+  'aria-label="Ver los datos de la orden ' + esc(numero) + '">' + ico('buscar') + '</button></td>';
+
+const TH_LUPA = '<th class="lupa-col" title="Abre la ficha de la orden">Datos</th>';
+
+/* Las lupas de TODAS las tablas, cableadas de una vez después de cada render:
+   igual que `Media.pintar` o `mejorarTablas`, vale para las que hay y para las
+   que vengan, en vez de tener que acordarse en cada pantalla. */
+function cablearLupas() {
+  document.querySelectorAll('#contenido [data-verot]').forEach((b) =>
+    b.addEventListener('click', (ev) => {
+      /* La lupa vive DENTRO de una fila que se despliega al hacerle clic. Sin
+         esto, apretar la lupa también desplegaría la fila de atrás. */
+      ev.stopPropagation();
+      abrirFicha(b.dataset.verot);
+    }));
 }
 
 function abrirFicha(numero, tab, modo) {

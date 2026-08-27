@@ -215,13 +215,14 @@ function modoRegistro(numero) {
        cómodo y dejaría al pintor pensando que el sistema se rompió. */
     const ajena = Modelo.otFueraDeAlcance(numero);
     document.title = (ajena ? 'OT fuera de tu alcance' : 'OT no encontrada') + ' · Automotora DyP';
-    document.getElementById('ruta').innerHTML = '<span>Torre de control</span>';
+    document.getElementById('ruta').innerHTML =
+      '<a class="volver-sistema" href="index.html">' + ico('chevron') + 'Volver al sistema</a>' +
+      '<span>Torre de control</span>';
     document.getElementById('titulo').innerHTML = ico(ajena ? 'candado' : 'alerta', 'g') +
       (ajena ? 'Esta orden no está asignada a ti' : 'Orden de trabajo no encontrada');
     document.getElementById('bajada').textContent = '';
     document.getElementById('tabs').innerHTML = '';
-    document.getElementById('herramientas').innerHTML =
-      '<a class="hbtn primario" href="index.html">' + ico('torre') + 'Volver al sistema</a>';
+    document.getElementById('herramientas').innerHTML = '';
     document.getElementById('contenido').innerHTML =
       '<div class="panel"><div class="cuerpo"><div class="vacio">' + ico(ajena ? 'candado' : 'buscar') +
       (ajena
@@ -238,46 +239,43 @@ function modoRegistro(numero) {
   }
 
   document.title = 'OT ' + o.numeroOT + ' · ' + o.patente + ' · Automotora DyP';
-  document.getElementById('ruta').innerHTML =
-    '<span>Operación diaria</span>' + ico('chevron') + '<span>Torre de control</span>' +
-    ico('chevron') + '<span>OT ' + o.numeroOT + '</span>';
   document.getElementById('titulo').innerHTML = ico('torre', 'g') + 'Ficha de la orden de trabajo';
   document.getElementById('bajada').textContent =
     'Toda la información de esta orden en una sola pantalla. Esta pestaña tiene su propia dirección: se puede compartir.';
   // Las pestañas las pinta la ficha, que es la que sabe en cuál está.
   document.getElementById('tabs').innerHTML = '';
 
-  // Nada de botones inertes: o llevan a alguna parte, o dicen en qué tanda se
-  // construyen. Un botón que no hace nada y no lo dice es peor que no tenerlo.
-  /* La barra se arma con lo que la cuenta puede hacer. Antes salían los diez
-     botones siempre, y el pintor apretaba "Acta de entrega" para descubrir que
-     no era para él. */
-  const puede = (c) => Modelo.puede(c);
-  const barra = ['<a class="hbtn primario" href="index.html">' + ico('torre') + 'Volver al sistema</a>',
-    '<span class="sep"></span>',
-    '<button class="hbtn" type="button" data-fichatab="etapas">' + ico('taller') + 'Etapas</button>'];
-  if (puede('ficha.completa')) barra.push('<button class="hbtn" type="button" data-fichatab="bitacora">' + ico('info') + 'Bitácora</button>');
-  if (puede('foto.ver')) barra.push('<button class="hbtn" type="button" data-fichatab="fotos">' + ico('camara') + 'Fotos</button>');
-  const impresos = [];
-  if (puede('ficha.completa')) impresos.push(['recepcion', 'Comprobante']);
-  // El impreso del presupuesto lleva cliente, RUT y valores: pide `montos`,
-  // no `ver`. Con `ver` se leen las líneas sin precio, en la ficha.
-  if (puede('presupuesto.montos')) impresos.push(['presupuesto', 'Presupuesto']);
-  if (puede('ficha.completa')) impresos.push(['ficha', 'Ficha completa'], ['entrega', 'Acta de entrega']);
-  if (impresos.length) {
-    barra.push('<span class="sep"></span>');
-    impresos.forEach(([k, rot]) => barra.push('<button class="hbtn" type="button" data-imprimir="' + k + '">' +
-      ico('imprimir') + rot + '</button>'));
-  }
-  // La ficha arma su propia barra: el rótulo va igual que en los paneles, y
-  // desde el 16-08-2026 también abre las herramientas de la demostración.
-  barra.push('<button class="hbtn der" type="button" data-demo-abrir="1" ' +
-    'title="Las herramientas de la demostración: la guía, las pruebas y el calendario">' +
-    ico('base') + 'Datos de demostración</button>');
-  document.getElementById('herramientas').innerHTML = barra.join('');
+  /* 🔴 ACÁ SE ARMABA UNA BARRA DE OCHO BOTONES (27-08-2026, Marco:
+     «sacame eso, y ordena lo de volver al sistema para que quede mejor
+     visualmente tanto en el PC como en el celular»).
 
-  document.querySelectorAll('#herramientas [data-imprimir]').forEach((b) =>
-    b.addEventListener('click', () => abrirImpreso(b.dataset.imprimir, o.id)));
+     Tenía: Volver al sistema · Etapas · Bitácora · Fotos · Comprobante ·
+     Presupuesto · Ficha completa · Acta de entrega. Y SEIS de esos ocho
+     repiten algo que está más abajo en la misma pantalla: Fotos es la tarjeta
+     «Ver Fotografías», Presupuesto es «Ver Presupuesto», Comprobante es «Ver
+     recepción» y Bitácora es el panel completo del pie. Dos filas de lo mismo,
+     con nombres distintos, es peor que una: obliga a comparar antes de elegir.
+
+     Las tres que NO repetían nada —Etapas, Ficha completa y Acta de entrega—
+     se fueron adentro del panel de la orden, que es donde está lo que se hace
+     con esta orden.
+
+     Y «Volver al sistema» sube a la línea de la ruta: es el único camino de
+     salida de esta pestaña y en un teléfono estaba al final de una fila que se
+     desliza —o sea, escondido detrás de siete botones que ya no están—. */
+  document.getElementById('ruta').innerHTML =
+    '<a class="volver-sistema" href="index.html">' + ico('chevron') + 'Volver al sistema</a>' +
+    '<span>Operación diaria</span>' + ico('chevron') + '<span>Torre de control</span>' +
+    ico('chevron') + '<span>OT ' + o.numeroOT + '</span>';
+
+  /* La única herramienta que se queda es la de la demostración, que no es del
+     sistema sino del modelo borrador, y va a la derecha como en los demás
+     módulos. */
+  document.getElementById('herramientas').innerHTML =
+    '<button class="hbtn der" type="button" data-demo-abrir="1" ' +
+    'title="Las herramientas de la demostración: la guía, las pruebas y el calendario">' +
+    ico('base') + 'Datos de demostración</button>';
+
   document.querySelectorAll('#herramientas [data-demo-abrir]').forEach((b) =>
     b.addEventListener('click', dialogoDemostracion));
 

@@ -27,7 +27,7 @@ function documentosListado() {
       <div class="filtros"><input type="search" id="doc-q" placeholder="OT, patente o cliente" value="${esc(d.busqueda)}"></div></div>
     <div class="grid-envoltorio"><table class="grid">
       <thead><tr><th>OT</th><th>Patente</th><th>Marca</th><th>Modelo</th><th>Fecha de Ingreso</th>
-        <th>Estado</th><th>Etapa</th><th>Adjuntos</th><th></th></tr></thead>
+        <th>Estado</th><th>Etapa</th><th>Adjuntos</th><th></th>${TH_LUPA}</tr></thead>
       ${/* Sin el `slice(0, 60)` que había: cortaba en sesenta y el pie decía
             «Mostrando 60 de 102» sin dar forma de llegar a las demás. */''}
       <tbody>${filas.map((o) => {
@@ -39,7 +39,8 @@ function documentosListado() {
           '<td><span class="et ' + esc(o.estadoClase) + '">' + esc(o.estadoNombre) + '</span></td>' +
           '<td>' + esc(o.etapaNombre) + '</td>' +
           '<td class="num">' + (n || '<span style="color:var(--gris-2)">—</span>') + '</td>' +
-          '<td><button class="btn secundario" data-doc-ot="' + esc(o.id) + '">Ver / subir</button></td></tr>';
+          '<td><button class="btn secundario" data-doc-ot="' + esc(o.id) + '">Ver / subir</button></td>' +
+          CELDA_LUPA(o.numeroOT) + '</tr>';
       }).join('')}</tbody>
     </table></div>
   </div>`;

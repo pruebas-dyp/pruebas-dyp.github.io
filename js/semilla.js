@@ -150,7 +150,10 @@ const Semilla = (function () {
     'Daños en costado izquierdo y espejo'
   ];
 
-  const FORMA_DATOS = 15;
+  /* 15 → 16 el 27-08-2026: la semilla trae una tabla nueva, `compromiso`. Una
+     base guardada de ayer no la tiene, y sin resembrar la ficha mostraría todas
+     las órdenes «sin fecha comprometida». */
+  const FORMA_DATOS = 16;
   // TEMPARIO_HORA ($10.000, reglas §C.15) se eliminó el 13-08-2026 junto con
   // el tempario entero. La cifra queda medida en `reglas`, no en el sistema.
 
@@ -1085,6 +1088,9 @@ const Semilla = (function () {
     const vehiculo = [], recepcion = [], orden_trabajo = [], ot_etapa = [], ot_estadia = [];
     const repuesto = [], presupuesto = [], presupuesto_linea = [], bitacora = [], media = [];
     const evento = [], dano = [], recepcion_inventario = [], ot_detencion = [], costo_adicional = [];
+    /* Las fechas comprometidas de entrega, con su número. Ver `anotarCompromiso`
+       en el modelo: la 1ª es la que se le prometió al cliente. */
+    const compromiso = [];
     // La cola de avisos por correo nace vacía: se llena al operar. Es la
     // parte MODELADA del punto 4 — el envío real lo hace el servidor.
     const aviso = [];
@@ -1297,6 +1303,20 @@ const Semilla = (function () {
          presupuesto lo resta del neto, y así los dos leen el mismo número. */
       const deducibleOT = comp ? entre(0, 8) * 25000 : 0;
 
+      /* 🔴 LA FECHA COMPROMETIDA, Y SU HISTORIA (27-08-2026).
+
+         Una de cada cinco órdenes vivas se sembró con la fecha ya corrida: son
+         las que en el taller se atrasaron y a las que alguien les movió la
+         entrega. Sin ellas la pantalla mostraría siempre «1ª fecha» y no habría
+         cómo ver para qué sirve guardar las demás —que es exactamente lo que
+         Marco pidió poder mostrar—. Reparte por índice, no al azar: la base
+         sembrada tiene que ser la misma en todos los navegadores. */
+      const compromisoBase = diasHora(diasIngreso - entre(15, 25));
+      const vecesMovida = viva && idx % 5 === 0 ? (idx % 10 === 0 ? 2 : 1) : 0;
+      const compromisoOT = vecesMovida
+        ? new Date(compromisoBase.getTime() + vecesMovida * 6 * 86400000)
+        : compromisoBase;
+
       orden_trabajo.push({
         id: ot_id, numero_ot, numero_or: PRIMERA_OR + idx, recepcion_id: rec_id,
         vehiculo_id: veh_id, cliente_id: cli_id,
@@ -1309,7 +1329,7 @@ const Semilla = (function () {
            Entrega la muestra, y sin hora quedaba en 00:00 — una hora que nadie
            comprometió y que además hace inútil ordenar por esa columna cuando
            hay varios autos citados el mismo día. */
-        fecha_ingreso, fecha_compromiso: diasHora(diasIngreso - entre(15, 25)),
+        fecha_ingreso, fecha_compromiso: compromisoOT,
         fecha_entrega_real, estado: estadoCod,
         /* Quién responde por el vehículo completo: recepción o jefe de taller,
            que son los dos que pueden presupuestarlo y hacerlo avanzar. Antes
@@ -1332,6 +1352,18 @@ const Semilla = (function () {
         descripcion_danos: DANOS[idx % DANOS.length],
         observaciones_ingreso: '', demo: true
       });
+
+      /* La 1ª es la del cliente y va con el ingreso; las que la movieron van
+         después, seis días más allá cada una. */
+      for (let k = 0; k <= vecesMovida; k++) {
+        compromiso.push({
+          id: 'cmp-' + numero_ot + '-' + (k + 1), ot_id, n: k + 1,
+          fecha: new Date(compromisoBase.getTime() + k * 6 * 86400000),
+          anotada: diasHora(diasIngreso - k * 5),
+          por: k === 0 ? MESON : JEFA_TALLER,
+          de: k === 0 ? 'Recepción del vehículo' : 'Se corrió la entrega'
+        });
+      }
 
       /* ── Las estadías. Es la tabla que arregla el contador de días ──────
          Una de cada cinco órdenes vivas ya salió y volvió: eso es lo que en
@@ -1829,7 +1861,7 @@ const Semilla = (function () {
       // no inventa correcciones, y una recepción sin correcciones es la
       // versión 1. Ver `corregir_recepcion` en el modelo.
       recepcion_correccion: [],
-      ot_etapa, ot_estadia, ot_detencion, costo_adicional,
+      ot_etapa, ot_estadia, ot_detencion, costo_adicional, compromiso,
       presupuesto, presupuesto_linea, repuesto, bitacora, media, evento, aviso,
       // idempotencia
       operacion: []

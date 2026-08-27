@@ -405,6 +405,13 @@ const Modelo = (function () {
       orExterna: o.or_externa || null,
       prioridad: (ix.prioridad.get(o.prioridad_id) || {}).codigo,
       fechaIngreso: o.fecha_ingreso, fechaCompromiso: o.fecha_compromiso,
+      /* Las fechas comprometidas, con su número. La 1ª es la del cliente: es
+         contra ésa —y no contra la última— que se mide si se entregó a tiempo. */
+      compromisos: (db.compromiso || []).filter((x) => x.ot_id === o.id)
+        .sort((a, b) => a.n - b.n).map((x) => ({
+          n: x.n, fecha: x.fecha, anotada: x.anotada, de: x.de,
+          por: (() => { const p = x.por ? ix.persona.get(x.por) : null; return p ? nombreDe(p) : null; })()
+        })),
       fechaEntrega: o.fecha_entrega_real,
       // 🔴 `Fecha de salida` existe en la ficha del sistema actual y está
       // VACÍA incluso en órdenes ya entregadas. Acá sale de `ot_estadia`, que
@@ -1748,6 +1755,44 @@ const Modelo = (function () {
     .map((p) => ({ id: p.id, nombre: nombreDe(p) }))
     .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 
+  /* 🔴 CADA FECHA COMPROMETIDA SE GUARDA (27-08-2026, Marco: «quiero que quede
+     la trazabilidad de que se cambia la fecha de entrega al cliente, porque si
+     no, el cálculo de fecha comprometida vs fecha real pierde trazabilidad. Se
+     debería ir guardando la fecha de entrega 1, fecha de entrega 2, y así
+     sucesivamente según las veces que lo cambien»).
+
+     Hasta hoy `fecha_compromiso` era UN campo que se pisaba. Cuando la orden se
+     atrasaba, alguien corría la fecha y la anterior desaparecía: al final, el
+     indicador «se entregó a tiempo» comparaba contra la última fecha —la que
+     ya se había movido para que calzara— y siempre daba bien. Un KPI que no
+     puede dar mal no mide nada.
+
+     Ahora cada fecha queda como una fila con su número, quien la puso y
+     cuándo. La 1ª es la que se le prometió al cliente y es contra la que hay
+     que medir; las demás son la historia de los atrasos, que es justamente lo
+     que el taller necesita poder mostrar.
+
+     ⚠️ UN SOLO ESCRITOR. `fecha_compromiso` se escribía desde DOS lugares
+     —etapas y programar entrega— y cada uno dejaba su propio evento. Dos
+     lugares guardando lo mismo por caminos distintos es como se desincronizan
+     las cosas; los dos pasan por acá. */
+  function anotarCompromiso(o, fecha, de) {
+    if (!db.compromiso) db.compromiso = [];
+    const mios = db.compromiso.filter((x) => x.ot_id === o.id);
+    const n = mios.length + 1;
+    db.compromiso.push({
+      id: nuevoId('cmp'), ot_id: o.id, n, fecha,
+      anotada: ahora(), por: persona_actual || null, de: de || ''
+    });
+    o.fecha_compromiso = fecha;
+    return n;
+  }
+
+  /* Las fechas comprometidas de una orden, en orden. La 1ª es la del cliente. */
+  function compromisosDe(ot_id) {
+    return (db.compromiso || []).filter((x) => x.ot_id === ot_id).sort((a, b) => a.n - b.n);
+  }
+
   /* La fecha probable de entrega se fija en la pantalla de finalizar etapas,
      igual que en el original, y queda como evento de Modificación. */
   function fijar_fecha_compromiso(ot_id, fecha) {
@@ -1756,9 +1801,9 @@ const Modelo = (function () {
     if (Reglas.esTerminal(db, o.estado))
       return { ok: false, motivo: 'La orden ' + o.numero_ot + ' está cerrada y no admite cambios.' };
     if (!fecha) return { ok: false, motivo: 'Hay que indicar una fecha.' };
-    o.fecha_compromiso = fecha;
+    const n = anotarCompromiso(o, fecha, 'Finalizar etapas');
     registrarEvento(ot_id, 'modificacion', 'Fecha Probable De Entrega ' +
-      fecha.toLocaleDateString('es-CL'));
+      fecha.toLocaleDateString('es-CL') + (n > 1 ? ' (' + n + 'ª fecha)' : ''));
     tocado();
     return { ok: true, motivo: '' };
   }
@@ -2010,9 +2055,9 @@ const Modelo = (function () {
     if (Reglas.esTerminal(db, o.estado))
       return { ok: false, motivo: 'La orden ' + o.numero_ot + ' ya está cerrada: se entregó, no se programa.' };
     if (!fecha) return { ok: false, motivo: 'Hay que indicar la fecha comprometida.' };
-    o.fecha_compromiso = fecha;
+    const n = anotarCompromiso(o, fecha, String(observacion || '').trim() || 'Programar entrega');
     registrarEvento(ot_id, 'modificacion', 'Entrega programada para el ' +
-      fecha.toLocaleDateString('es-CL') +
+      fecha.toLocaleDateString('es-CL') + (n > 1 ? ' (' + n + 'ª fecha)' : '') +
       (String(observacion || '').trim() ? ' — ' + String(observacion).trim() : ''));
     tocado();
     return { ok: true, motivo: '' };
@@ -4302,7 +4347,7 @@ const Modelo = (function () {
     crear_ot_desde_recepcion, asignar_etapas, finalizar_etapa, finalizar_etapas, quitar_etapa,
     tomar_etapa, soltar_etapa, miTrabajo, asignar_responsable_ot,
     validar_etapa, devolver_etapa, porValidar, cargaDelEquipo, tieneEtapas,
-    personasParaEtapa, destinatarios, fijar_fecha_compromiso,
+    personasParaEtapa, destinatarios, fijar_fecha_compromiso, compromisosDe,
     registrar_salida, registrar_reingreso, cambiar_estado_ot, registrar_entrega,
     programar_entrega, corregir_recepcion, correccionesDeRecepcion,
     cargar_repuesto, recibir_repuesto, entregar_repuesto_area, fijar_responsable_pago,

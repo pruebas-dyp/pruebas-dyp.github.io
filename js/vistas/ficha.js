@@ -187,8 +187,14 @@ const FICHA_ENLACES = [
      permiso: abrir la OR es `presupuesto.abrir` —del recepcionista—, no
      `presupuesto.crear`, que es valorizarla y es del evaluador. */
   { rot: 'Agregar OR',                      agregarOR: true, permiso: 'presupuesto.abrir', ico: 'nuevo' },
-  { rot: 'Bodega de esta orden',            vista: 'bodega', permiso: 'repuesto.cargar', ico: 'bodega' },
-  { rot: 'Bitácora',                        tab: 'bitacora', permiso: 'ficha.completa', ico: 'info' }
+  { rot: 'Bodega de esta orden',            vista: 'bodega', permiso: 'repuesto.cargar', ico: 'bodega' }
+  /* 🔴 ACÁ HABÍA UNA NOVENA TARJETA, «BITÁCORA» (27-08-2026, Marco:
+     «elimíname lo que es el círculo de Bitácora para que queden 4 y 4»).
+
+     Y además no llevaba a ninguna parte nueva: la bitácora de observaciones se
+     pinta ENTERA más abajo, en la misma pantalla. Era una tarjeta para bajar
+     dos dedos. Ocho tarjetas caben en dos filas de cuatro, que es como se ven
+     los accesos en el sistema que usan. */
 ];
 
 /* 🔴 LA CABECERA DE LA ORDEN, UNA SOLA VEZ (27-08-2026, Marco: «el resumen
@@ -268,12 +274,34 @@ function vFichaOT(o) {
   }[f.tab](o);
 
   const enlaces = FICHA_ENLACES.filter((l) => !l.permiso || Modelo.puede(l.permiso));
+  fichaAcciones = '';
 
   /* 🔴 LOS ACCESOS VAN ABAJO, DESPUES DE LA FICHA (26-08-2026, Marco: «el
      unico que me debes dejar es Ficha, que quiero que quede ARRIBA... y abajo
      esto un poco mas grande»). Estaban dentro del panel de la cabecera, o sea
      entre los datos de la orden y su detalle. Ahora el orden es el de su
      sistema: primero se lee la orden entera, despues se decide a donde ir. */
+  /* 🔴 LAS TRES QUE SE QUEDABAN SIN PUERTA (27-08-2026, Marco: «sacame eso
+     de la FOTO 4»).
+
+     Esa barra tenía ocho botones y seis repetían una tarjeta de más abajo:
+     Fotos = Ver Fotografías, Presupuesto = Ver Presupuesto, Comprobante = Ver
+     recepción, Bitácora = el panel de abajo. Sacarla entera, sin embargo,
+     dejaba tres cosas sin ninguna puerta: ETAPAS, FICHA COMPLETA y ACTA DE
+     ENTREGA.
+
+     Quedan acá, en una fila de tres dentro del panel de la orden. Tres botones
+     que no repiten nada no son la barra que sobraba: son lo que faltaba. */
+  const sueltas = [];
+  sueltas.push('<button class="btn secundario" type="button" data-fichatab="etapas">' +
+    ico('taller') + 'Etapas</button>');
+  if (Modelo.puede('ficha.completa')) sueltas.push(
+    '<button class="btn secundario" type="button" data-imprimir="ficha">' +
+      ico('imprimir') + 'Ficha completa</button>',
+    '<button class="btn secundario" type="button" data-imprimir="entrega">' +
+      ico('imprimir') + 'Acta de entrega</button>');
+  fichaAcciones = '<div class="acciones-orden">' + sueltas.join('') + '</div>';
+
   const accesos = enlaces.length ? `<div class="acciones-ficha" style="margin-top:10px">
         ${/* 🔴 TARJETAS CON ICONO, COMO EN SU SISTEMA (26-08-2026, Marco:
              «quiero hacerlo más intuitivo y quiero la visual que tienen
@@ -307,9 +335,31 @@ function vFichaOT(o) {
 
   return `
   ${enFicha
-    ? /* La ficha completa arriba —con la cabecera adentro, no encima—, los
-         accesos al medio, y la bitácora y el historial abajo. */
-      fichaResumen(o) + accesos + fichaBitacora(o) + fichaHistorial(o)
+    ? /* 🔴 UNA PILA, PARA PODER REORDENARLA (27-08-2026, Marco: «en el
+           celular, al abrir la Ficha, no aparece esto —los accesos— y es
+           sumamente importante que sí aparezca»).
+
+           Aparecían: estaban a 1.213 píxeles de scroll. En el escritorio los
+           cuatro bloques de la ficha van en fila y los accesos quedan justo
+           debajo; en un teléfono esos cuatro bloques se apilan y son metro y
+           medio de pantalla antes de llegar al primer botón. Nadie baja tanto
+           para ver si hay algo.
+
+           Mismo contenido, otro orden: bajo los 860 px los accesos van PRIMERO.
+           Se abre la ficha para ir a alguna parte, no para leer cuarenta
+           campos; los cuarenta campos siguen ahí, dos dedos más abajo. */
+      '<div class="pila-ficha">' +
+        /* 🔴 LA CABECERA SALE DEL PANEL DE DATOS (27-08-2026). Estaba adentro,
+           y al poner los accesos primero en el teléfono el resultado era ocho
+           botones antes de decir de qué orden son. Saber en qué auto estás
+           parado va SIEMPRE primero. En el escritorio las dos piezas se pegan
+           con el CSS y se siguen viendo como un panel solo. */
+        '<div class="p-cabecera"><div class="panel">' + cabFicha(o) + '</div></div>' +
+        '<div class="p-detalle">' + fichaResumen(o) + '</div>' +
+        '<div class="p-accesos">' + accesos + '</div>' +
+        '<div class="p-bitacora">' + fichaBitacora(o) + '</div>' +
+        '<div class="p-historial">' + fichaHistorial(o) + '</div>' +
+      '</div>'
     : /* Cualquier otro panel se abre solo. Se queda con la cabecera sola, que
          es lo único que dice de qué orden estamos hablando, y con la vuelta. */
       '<div class="panel">' + cabFicha(o) + '</div>' +
@@ -373,8 +423,44 @@ function fichaInventario(inv) {
   return partes.join(' ') + ' <span class="et gris">de ' + inv.length + '</span>';
 }
 
+/* La fila de acciones de la orden. La arma `vFichaOT` —que es quien sabe los
+   permisos de esta pantalla— y la pinta `fichaResumen`, que es quien tiene el
+   panel. Se pasa por acá y no por parámetro porque `fichaResumen` se llama
+   también desde la vista recortada del taller, que no lleva acciones. */
+let fichaAcciones = '';
+
+/* Las fechas comprometidas de la orden. Una línea si nunca se movió; la
+   promesa, la vigente y el detalle de los cambios si se movió. */
+function compromisosFicha(o, dato) {
+  const h = o.compromisos || [];
+  const vigente = o.fechaCompromiso;
+  if (!vigente) return dato('Fecha de Entrega', '<span style="color:var(--gris-2)">Sin comprometer</span>',
+    'Todavía no se le ha dado fecha al cliente');
+  if (h.length < 2) {
+    return dato('Fecha de Entrega comprometida', fFechaHora(vigente),
+      'La que se le dio al cliente. No se ha movido.');
+  }
+  const primera = h[0];
+  const dias = Math.round((new Date(vigente) - new Date(primera.fecha)) / 86400000);
+  return dato('Comprometida al cliente', fFechaHora(primera.fecha),
+      'La primera fecha que se le dio al cliente. Contra ésta se mide si se entregó a tiempo.') +
+    dato('Estimada hoy', '<strong>' + fFechaHora(vigente) + '</strong>' +
+      (dias > 0 ? ' <span class="et ambar" title="' + dias + ' días después de lo comprometido">+' +
+        dias + ' d</span>' : ''),
+      'La fecha vigente. Se movió ' + (h.length - 1) +
+      (h.length === 2 ? ' vez' : ' veces') + '.') +
+    '<div class="historia-entrega">' + h.map((x) =>
+      '<div><span class="n">' + x.n + 'ª</span>' + esc(fFechaHora(x.fecha)) +
+      '<span class="quien">' + esc(x.por || 'sin autor') +
+      (x.de ? ' · ' + esc(x.de) : '') + '</span></div>').join('') + '</div>';
+}
+
 function fichaResumen(o) {
-  const dato = (k, v) => '<div class="dato"><span class="k">' + esc(k) + '</span><span class="v">' + v + '</span></div>';
+  /* La ayuda es el TERCER argumento y va como globo del rótulo, no dentro del
+     texto: el rótulo se escapa con `esc()` y ahí no entra HTML. */
+  const dato = (k, v, ayuda) => '<div class="dato"><span class="k"' +
+    (ayuda ? ' title="' + esc(ayuda) + '"' : '') + '>' + esc(k) + '</span>' +
+    '<span class="v">' + v + '</span></div>';
   const pend = o.repuestos.filter((r) => !r.fechaBodega);
   const fuera = o.fueraDeTaller;
   const completa = Modelo.puede('ficha.completa');
@@ -386,7 +472,7 @@ function fichaResumen(o) {
      justamente lo que se pidió corregir. */
   if (!completa) {
     return `
-    <div class="panel">${cabFicha(o)}<div class="cuerpo"><div class="ficha-rejilla">
+    <div class="panel"><div class="cuerpo"><div class="ficha-rejilla">
       <fieldset class="bloque"><legend>Vehículo</legend>
         ${dato('Patente', '<span class="patente">' + esc(o.patente) + '</span>')}
         ${dato('Marca y modelo', esc([o.marca, o.modelo].filter(Boolean).join(' ') || '—'))}
@@ -403,7 +489,7 @@ function fichaResumen(o) {
           : '<span class="et gris">Pendiente</span>')}
         ${dato('Encargado', o.asignado ? esc(o.asignado) : '<span class="et gris">Sin asignar</span>')}
         ${dato('Días en reparación', o.diasKpi + ' de ' + META_DIAS_REPARACION +
-          (o.sobreMeta ? ' <span class="et roja">sobre la meta</span>' : ''))}
+          (o.sobreMeta ? ' <span class="et roja" title="Sobre la meta">!</span>' : ''))}
         ${dato('Dónde está', fuera
           ? '<span class="et ambar">fuera de taller</span>'
           : '<span class="et verde">en taller</span>')}
@@ -426,7 +512,7 @@ function fichaResumen(o) {
   }).join('');
 
   return `
-  <div class="panel">${cabFicha(o)}<div class="cuerpo"><div class="ficha-rejilla">
+  <div class="panel"><div class="cuerpo">${fichaAcciones || ''}<div class="ficha-rejilla">
     <fieldset class="bloque"><legend>Vehículo</legend>
       ${dato('Patente', '<span class="patente">' + esc(o.patente) + '</span>')}
       ${dato('Marca y modelo', esc([o.marca, o.modelo].filter(Boolean).join(' ') || '—'))}
@@ -438,7 +524,8 @@ function fichaResumen(o) {
       ${dato('VIN', esc(o.vin || '—'))}
       ${dato('Kilometraje', fKm(o.recepcion && o.recepcion.km))}
       ${dato('Combustible', fComb(o.recepcion && o.recepcion.combustible))}
-      ${dato('Daños marcados', o.danos.length + (o.danos.length ? ' <span class="et gris">del vehículo, no de la orden</span>' : ''))}
+      ${dato('Daños marcados', o.danos.length,
+        'Las piezas marcadas en la silueta al recibir el vehículo. Son del vehículo, no de esta orden')}
       ${/* 🔶 EL INVENTARIO, DESGLOSADO (15-08-2026). Decía "24 de 28 ítems", que
            con cuatro estados no dice nada: mezclaba en un solo número lo que
            está, lo que no está, lo que llegó roto y lo que nadie alcanzó a
@@ -478,15 +565,26 @@ function fichaResumen(o) {
     </fieldset>
 
     <fieldset class="bloque"><legend>Los tres relojes</legend>
-      ${dato('Días desde el ingreso', '<strong>' + o.diasTotales + '</strong> · nunca se reinicia')}
-      ${dato('Reparación acumulada', o.diasReparacion + ' · se reanuda al reingresar')}
-      ${dato('Estadía actual', fuera
-        ? '<span style="color:var(--gris)">0 · detenido</span>'
-        : o.diasEstadiaActual + ' · vuelve a cero al reingresar')}
+      ${/* 🔴 EL NÚMERO Y NADA MÁS (27-08-2026, Marco: «eliminar esos textos de
+           nunca se reinicia, se reanuda al reingresar, vuelve a cero al
+           reingresar... colocar la cantidad de días nomás. La idea es que no se
+           sienta que el sistema te habla»).
+
+           Cada número traía su explicación al lado, y la explicación se lee
+           igual todos los días aunque ya se sepa. Lo que decían sigue siendo
+           verdad y sigue estando: pasó al globo del rótulo, que se lee una vez
+           —cuando uno se pregunta por qué tres relojes dan tres números— y
+           después no molesta más. */''}
+      ${dato('Días desde el ingreso', '<strong>' + o.diasTotales + '</strong>',
+        'Desde que entró el vehículo. Nunca se reinicia')}
+      ${dato('Reparación acumulada', o.diasReparacion,
+        'Los días que el vehículo estuvo en reparación. Se reanuda al reingresar')}
+      ${dato('Estadía actual', fuera ? '<span style="color:var(--gris)">0</span>' : o.diasEstadiaActual,
+        'Los días de esta estadía. Vuelve a cero cada vez que el vehículo sale y entra')}
       ${dato('Contra la meta', o.sobreMeta
-        ? '<span style="color:var(--ambar)">' + o.diasKpi + ' de ' + META_DIAS_REPARACION + ' · sobre la meta</span>'
+        ? '<span style="color:var(--ambar)" title="Sobre la meta">' + o.diasKpi + ' de ' + META_DIAS_REPARACION + '</span>'
         : o.diasKpi + ' de ' + META_DIAS_REPARACION)}
-      ${fuera ? dato('Fuera de taller hace', '<span style="color:var(--ambar)">' + o.diasFuera + ' días</span>') : ''}
+      ${fuera ? dato('Fuera de taller hace', '<span style="color:var(--ambar)">' + o.diasFuera + '</span>') : ''}
       ${dato('Fecha de Ingreso', fFechaHora(o.fechaIngreso))}
       ${/* Bajó de la cabecera, que se fue. Sale de `ot_estadia`, o sea de un
            hecho con fecha: es la última vez que el auto salió del taller, no la
@@ -495,7 +593,21 @@ function fichaResumen(o) {
       ${dato('Fecha de salida', o.fechaSalida ? fFechaHora(o.fechaSalida)
         : (o.enTaller ? '<span style="color:var(--gris-2)">el vehículo está adentro</span>'
                       : '<span style="color:var(--gris-2)">—</span>'))}
-      ${dato('Fecha de Entrega probable', fFechaHora(o.fechaCompromiso))}
+      ${/* 🔴 LA FECHA DE ENTREGA, CON SU HISTORIA (27-08-2026, Marco: «deja mejor
+           explicado el tema de la Fecha Probable de entrega, que no se
+           entiende... quiero que quede la trazabilidad de que se cambia la
+           fecha de entrega al cliente»).
+
+           Decía «Fecha de Entrega probable» y un día, sin más. Dos personas
+           distintas la leían de dos formas: para el mesón era lo que se le
+           prometió al cliente; para el taller, para cuándo cree que va a estar.
+           Y cuando el auto se atrasaba alguien corría la fecha y la promesa
+           original desaparecía.
+
+           Ahora se dicen las dos, con su rótulo: la COMPROMETIDA AL CLIENTE es
+           la primera y no se mueve; la ESTIMADA es la vigente. Cuando son la
+           misma sale una sola línea, que es el caso normal. */''}
+      ${compromisosFicha(o, dato)}
       ${o.fechaEntrega ? dato('Fecha de Entrega real', fFechaHora(o.fechaEntrega)) : ''}
       <div class="linea-tiempo">${hitos}</div>
     </fieldset>

@@ -563,7 +563,8 @@ function vConsolidado() {
               la tabla la dejaba en 90px, el texto se partía cada dos palabras y
               cada fila crecía a seis líneas. La tabla ya tiene su barra
               horizontal, y el ancho igual se puede arrastrar. */''}
-        <th>Venta</th><th style="min-width:250px">Rep Pend.</th><th>Rep OK.</th></tr></thead>
+        <th>Venta</th><th style="min-width:250px">Rep Pend.</th><th>Rep OK.</th>
+        ${TH_LUPA}</tr></thead>
       ${/* Sin el `slice(0, 60)`: el pie de abajo decía «Mostrando 60 de 102»
             mientras el total del pie de tabla sumaba las 102. Dos números
             distintos de la misma cosa en la misma pantalla. */''}
@@ -611,10 +612,12 @@ function vConsolidado() {
                   ? ' <span class="prov">(' + esc(String(r.responsablePago).toLowerCase()) + ')</span>'
                   : '')).join(', ') + '</div>'
             : '<span style="color:var(--gris-2)">—</span>') + '</td>' +
-          '<td class="num">' + llegados.length + '</td></tr>';
+          '<td class="num">' + llegados.length + '</td>' +
+          CELDA_LUPA(o.numeroOT) + '</tr>';
       }).join('')}</tbody>
+      ${/* El pie cierra 17 columnas: 13 + venta + las dos de repuestos + la lupa. */''}
       <tfoot><tr><td colspan="13" style="text-align:right">Venta parada en las ${filas.length} órdenes vivas</td>
-        <td class="num"><strong>${fMonto(suma.venta)}</strong></td><td colspan="2"></td></tr></tfoot>
+        <td class="num"><strong>${fMonto(suma.venta)}</strong></td><td colspan="3"></td></tr></tfoot>
     </table></div>
   </div>`;
 }

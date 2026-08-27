@@ -1115,6 +1115,55 @@ const Pruebas = (function () {
         });
       })();
 
+      /* 🔴 CORRER LA FECHA DE ENTREGA NO BORRA LA ANTERIOR (27-08-2026, Marco:
+         «quiero que quede la trazabilidad de que se cambia la fecha de entrega
+         al cliente, porque si no el cálculo de comprometida vs real pierde
+         trazabilidad»).
+
+         Es la prueba que hace que el KPI pueda dar MAL. Con un solo campo que
+         se pisa, «se entregó a tiempo» compara contra la última fecha —la que
+         ya se movió para que calzara— y da bien siempre. Acá se ata que la 1ª
+         sobreviva a las que vengan después. */
+      (function () {
+        restaurarSesion();
+        const admin = db.persona.find((x) => x.correo === 'gabriel.diaz@dyp.cl');
+        Modelo.fijar_persona_actual(admin ? admin.id : null);
+        const o = db.orden_trabajo.find((x) => Reglas.estaAbierta(db, x.estado));
+        const antes = Modelo.compromisosDe(o.id);
+        const primera = antes.length ? antes[0].fecha : null;
+
+        const d1 = new Date(2027, 0, 15, 10, 30);
+        const d2 = new Date(2027, 0, 28, 16, 0);
+        const r1 = Modelo.fijar_fecha_compromiso(o.id, d1);
+        const r2 = Modelo.programar_entrega(o.id, d2, 'El repuesto no llegó');
+        const h = Modelo.compromisosDe(o.id);
+        // `vistaOT` recibe la ORDEN, no su id; el que recibe el id es `otPorId`.
+        const vista = Modelo.otPorId(o.id);
+
+        const numerosSeguidos = h.every((x, i) => x.n === i + 1);
+        const primeraIntacta = !primera ||
+          new Date(h[0].fecha).getTime() === new Date(primera).getTime();
+        const ultima = h[h.length - 1];
+
+        push({
+          nombre: '🔴 Correr la fecha de entrega no borra la que se prometió',
+          intento: 'Mover dos veces la fecha comprometida, desde etapas y desde programar entrega',
+          esperado: 'Quedan todas, numeradas 1..n; la 1ª intacta y la vigente es la última',
+          paso: r1.ok && r2.ok && h.length === antes.length + 2 &&
+                numerosSeguidos && primeraIntacta &&
+                new Date(ultima.fecha).getTime() === d2.getTime() &&
+                new Date(vista.fechaCompromiso).getTime() === d2.getTime() &&
+                (vista.compromisos || []).length === h.length,
+          detalle: h.length !== antes.length + 2
+            ? 'Se guardaron ' + (h.length - antes.length) + ' de 2: la historia se está pisando'
+            : (!primeraIntacta ? 'La 1ª fecha cambió: el KPI ya no puede dar mal'
+              : (!numerosSeguidos ? 'Los números no van 1, 2, 3'
+                : h.length + ' fechas, la 1ª del ' +
+                  new Date(h[0].fecha).toLocaleDateString("es-CL") + ' y la vigente del ' +
+                  new Date(ultima.fecha).toLocaleDateString("es-CL")))
+        });
+      })();
+
       /* 🔴 «CAMBIO» BAJA LA DESCRIPCIÓN A REPUESTOS, EN BLANCO (26-08-2026).
 
          Marco, después de ver presupuestar en terreno: «cuando ponen Cambio,
