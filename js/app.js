@@ -238,23 +238,6 @@ function modoRegistro(numero) {
   }
 
   document.title = 'OT ' + o.numeroOT + ' · ' + o.patente + ' · Automotora DyP';
-
-  /* 🔶 ASIGNAR ETAPAS NO LLEVA NADA ALREDEDOR (26-08-2026, pedido del cliente
-     sobre la captura del sistema real): *«que lo único que se vea sean las
-     etapas y encargados, nada más»*.
-
-     La ruta, el título «Ficha de la orden de trabajo», su bajada y la barra de
-     ocho botones se siguen pintando —son de la ventana de la orden, no de esta
-     pantalla— pero quedan ocultos por CSS mientras la dirección pida el modo.
-     Se marca acá porque `modoRegistro` es quien los escribe; el módulo normal
-     lo quita en `pintarShell`, así que salir al Taller los devuelve.
-
-     La salida no se pierde: `Cancelar` está al pie de la tabla y arriba queda
-     el enlace a la ficha completa. */
-  const soloEtapas = (typeof PARAM_MODO === 'function') &&
-    ['asignar', 'finalizar'].indexOf(PARAM_MODO()) >= 0;
-  document.body.classList.toggle('solo-etapas', soloEtapas);
-
   document.getElementById('ruta').innerHTML =
     '<span>Operación diaria</span>' + ico('chevron') + '<span>Torre de control</span>' +
     ico('chevron') + '<span>OT ' + o.numeroOT + '</span>';
@@ -560,20 +543,6 @@ function pararEnLaOrden(numeroOT) {
     }
     case 'documentos':
       documentosEstado().otId = o.id; break;
-    /* Recepción parada en una orden significa CORREGIRLA: es lo único que se
-       puede hacer sobre una recepción que ya existe. Llegar al menú de los
-       cuatro botones obligaría a buscar la patente de nuevo teniendo el número
-       de la orden en la mano.
-
-       Sin `ot.editar` se queda en el menú en vez de rebotar: el motor rechaza
-       igual al guardar, y dejar a alguien mirando un formulario que no va a
-       poder guardar es peor que no abrírselo. */
-    case 'recepcion': {
-      if (!Modelo.puede('ot.editar')) return;
-      editRecCargar(o);
-      rec().pantalla = 'editar-ficha';
-      break;
-    }
     case 'entrega':
       ui.entrega = ui.entrega || {}; ui.entrega.patente = o.patente; ui.entrega.otId = o.id; break;
     default: return;

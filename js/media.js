@@ -168,6 +168,23 @@ const Media = (function () {
     });
   }
 
+  /* Guarda un blob ya listo (la firma del cliente, que sale de un canvas y
+     pesa unos pocos KB: no se comprime). */
+  function guardarBlob(blob, ficha) {
+    const id = 'me-' + Date.now().toString(36) + '-' + Math.round(performance.now() * 1000).toString(36);
+    return conAlmacen('readwrite', (st) => st.put(blob, id)).then(() => ({
+      id,
+      ot_id: (ficha && ficha.ot_id) || null,
+      recepcion_id: (ficha && ficha.recepcion_id) || null,
+      etapa_id: null,
+      momento: (ficha && ficha.momento) || 'firma',
+      nombre: (ficha && ficha.nombre) || 'firma.png',
+      mime: blob.type, bytes_original: blob.size, bytes: blob.size,
+      ancho: (ficha && ficha.ancho) || null, alto: (ficha && ficha.alto) || null,
+      creado_at: cuando()
+    }));
+  }
+
   const obtener = (id) => conAlmacen('readonly', (st) => st.get(id));
 
   /* Devuelve una URL utilizable en un <img>. Quien la pide se hace cargo de
@@ -340,14 +357,7 @@ const Media = (function () {
     return conAlmacen('readwrite', (st) => st.clear());
   }
 
-  /* ⛔ `guardarBlob` salió el 26-08-2026 con la captura de firma: era su
-     único llamador. Guardaba un Blob ya armado, sin comprimir. Si vuelve a
-     hacer falta, está en el historial.
-
-     ⚠️ Volvió a aparecer al fusionar la línea de Marco del 26-08 —su rama no
-     tenía la eliminación— y se vuelve a sacar: nadie lo llama. `empaquetar`
-     y `bajarCarpeta`, que sí son suyas y sí se usan, se quedan. */
-  return { guardar, subir, obtener, url, eliminar, pintar, resumen, fPeso, vaciar,
+  return { guardar, guardarBlob, subir, obtener, url, eliminar, pintar, resumen, fPeso, vaciar,
     empaquetar, bajarCarpeta,
            ladoMax, objetivoBytes, comprimeSiempre };
 })();

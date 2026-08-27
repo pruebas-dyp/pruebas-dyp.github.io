@@ -26,11 +26,7 @@ const tabsVisibles = () => FICHA_TABS.filter((t) => !t.permiso || Modelo.puede(t
 function fichaEstado() {
   if (!ui.ficha) {
     ui.ficha = {
-      /* `soloEtapas` lo enciende SOLO la dirección con `modo=` —o sea llegar
-         desde Taller—, nunca el conmutador Asignar/Finalizar de adentro de la
-         ficha: si colgara de `modoEtapas`, tocar ese botón dentro de la ficha
-         le desarmaría la pantalla al que está mirando la orden completa. */
-      tab: 'ficha', modoEtapas: null, soloEtapas: false,
+      tab: 'ficha', modoEtapas: null,
       // Los dos arrancan sin elegir, como el original: `Seleccionar`.
       bitacora: { asunto: null, destinatario: null, mensaje: '' }
     };
@@ -53,17 +49,7 @@ function fichaAplicarDireccion() {
   const tab = typeof PARAM_TAB === 'function' ? PARAM_TAB() : null;
   const modo = typeof PARAM_MODO === 'function' ? PARAM_MODO() : null;
   if (tab && FICHA_TABS.some((t) => t.id === tab)) f.tab = tab;
-  /* 🔴 SIN `modo` EN LA DIRECCIÓN, LA PANTALLA RECORTADA SE APAGA. No basta
-     con encenderla cuando el parámetro está: pegar el enlace de una orden
-     —`#ot=23344`, sin modo— en una pestaña que venía de asignar etapas dejaba
-     la pantalla recortada, o sea que el que recibía el enlace veía las etapas
-     en vez de la orden que le mandaron y sin forma de saber por qué.
-
-     Es la misma trampa que ya había pasado con `tab`: un parámetro que falta
-     tiene que APAGAR lo que enciende, no dejarlo como estaba. */
-  const pideEtapas = modo === 'asignar' || modo === 'finalizar';
-  if (pideEtapas) f.modoEtapas = modo;
-  f.soloEtapas = pideEtapas;
+  if (modo === 'asignar' || modo === 'finalizar') f.modoEtapas = modo;
   return f;
 }
 
@@ -111,9 +97,21 @@ function dialogoEditarOR(o) {
         <div class="campo"><label for="or-danos">Descripción de daños</label>
           <textarea id="or-danos" rows="3">${esc(o.descripcionDanos || '')}</textarea></div>
       </div>
-      <div class="modal-pie" style="padding:12px 18px;display:flex;gap:8px;justify-content:flex-end">
-        <button class="btn secundario" type="button" data-cerrar="1">Cancelar</button>
-        <button class="btn" type="button" id="or-guardar">Guardar</button>
+      <div class="modal-pie" style="padding:12px 18px;display:flex;gap:8px;
+        justify-content:space-between;flex-wrap:wrap">
+        ${/* 🔴 «En editar OR debemos poder crear una nueva» (26-08-2026, Marco).
+             Va acá y no en otro botón del menú porque es donde se está mirando
+             la OR: se abre para corregir el siniestro, se descubre que en
+             realidad son dos siniestros, y se abre la segunda sin salir. */''}
+        ${Modelo.puede('ot.crear')
+          ? '<button class="btn secundario" type="button" id="or-nueva" ' +
+            'title="Abre otra orden de reparación sobre este mismo vehículo, con los datos ' +
+            'que estén escritos arriba. Comparten la recepción.">Crear OR nueva</button>'
+          : '<span></span>'}
+        <span style="display:flex;gap:8px">
+          <button class="btn secundario" type="button" data-cerrar="1">Cancelar</button>
+          <button class="btn" type="button" id="or-guardar">Guardar</button>
+        </span>
       </div>
     </div>`;
   document.body.appendChild(velo);
@@ -123,6 +121,21 @@ function dialogoEditarOR(o) {
   velo.addEventListener('click', (ev) => { if (ev.target === velo) cerrar(); });
   const primero = document.getElementById('or-siniestro');
   if (primero) primero.focus();
+
+  const nueva = document.getElementById('or-nueva');
+  if (nueva) nueva.addEventListener('click', () => {
+    const v = (id) => (document.getElementById(id) || {}).value || '';
+    const r = ejecutar(() => Modelo.abrir_or_nueva(o.id, {
+      siniestro: v('or-siniestro'), compania_id: v('or-compania'),
+      tipo_ingreso_id: v('or-tipo'), deducible: v('or-deducible'),
+      liquidador: v('or-liquidador'), descripcion_danos: v('or-danos')
+    }), 'OR nueva abierta.');
+    if (!r || r.ok === false) return;
+    cerrar();
+    /* Se abre en su propia pestaña, que es donde se va a trabajar. La de acá
+       queda con la OR original, que es lo que el usuario estaba mirando. */
+    abrirFicha(r.numero_ot);
+  });
 
   document.getElementById('or-guardar').addEventListener('click', () => {
     const v = (id) => (document.getElementById(id) || {}).value || '';
@@ -144,42 +157,39 @@ function refrescarFicha() {
   render();
 }
 
-/* Las OCHO pantallas que cuelgan de la ficha viven en `js/vistas/pantallas-ot.js`
-   desde el 16-08-2026, porque el expandible de la Torre ofrece las mismas y dos
-   copias de la misma lista terminan ofreciendo cosas distintas. Acá se leen; no
-   se redefinen. */
+/* Las OCHO pantallas que cuelgan de la ficha en el sistema actual, con su
+   rótulo literal. Las que todavía no se construyen se rotulan como tales:
+   un botón que no hace nada y no lo dice es peor que no tenerlo. */
+/* 🔴 CADA UNO CON SU ICONO (26-08-2026). En el sistema que usan, estos accesos
+   son botones grandes con un icono redondo, y es lo que la gente reconoce de un
+   vistazo sin leer. Se copia esa forma. */
+const FICHA_ENLACES = [
+  { rot: 'Ver recepción',                   imprimir: 'recepcion', permiso: 'ficha.completa', ico: 'recepcion' },
+  // El impreso del presupuesto es el documento comercial —cliente, RUT y
+  // valores—, así que pide `presupuesto.montos`. Quien solo tiene
+  // `presupuesto.ver` lee las líneas sin precio en la ficha.
+  { rot: 'Ver Presupuesto',                 imprimir: 'presupuesto', permiso: 'presupuesto.montos', ico: 'presupuesto' },
+  { rot: 'Ver repuestos',                   tab: 'repuestos', permiso: 'repuesto.ver', ico: 'repuesto' },
+  { rot: 'Ver/Subir Documentos o imágenes', vista: 'documentos', permiso: 'documento.ver', ico: 'documento' },
+  { rot: 'Ver Fotografías',                 tab: 'fotos', permiso: 'foto.ver', ico: 'camara' },
+  { rot: 'Editar Recepción',                tab: null, tanda: 8, permiso: 'ot.editar', ico: 'editar',
+    nota: 'la recepción se edita desde su propia pantalla; editar una ya guardada exige política de versiones' },
+  { rot: 'Agregar OR',                      vista: 'presupuesto', permiso: 'presupuesto.crear', ico: 'nuevo' },
+  { rot: 'Bodega de esta orden',            vista: 'bodega', permiso: 'repuesto.cargar', ico: 'bodega' },
+  { rot: 'Bitácora',                        tab: 'bitacora', permiso: 'ficha.completa', ico: 'info' }
+];
 
 function vFichaOT(o) {
   const f = fichaEstado();
   const completa = Modelo.puede('ficha.completa');
   const campoCab = (k, v) => '<div class="dato"><span class="k">' + esc(k) + '</span><span class="v">' + v + '</span></div>';
 
-  /* 🔶 ASIGNAR ETAPAS ES UNA PANTALLA PROPIA (26-08-2026, pedido del cliente).
-
-     Llegando desde Taller, todo lo que rodea a las etapas sobra: el encabezado
-     de la orden, los dos paneles, la fila de nueve enlaces y la barra de
-     pestañas. La pantalla del sistema real tiene tres cosas —la tabla, el
-     historial y la bitácora— y nada más.
-
-     No se duplica nada: es el MISMO `vEtapas` de la pestaña, pintado sin la
-     ficha alrededor. La pestaña Etapas de la ficha completa sigue igual.
-
-     🔴 Y queda una salida a la vista. Nadie puede quedar encerrado: está el
-     enlace a la ficha completa acá arriba y el botón `Cancelar` al pie de la
-     tabla, que devuelve al Taller. */
-  /* ⛔ Sin barra propia arriba: la orden ya se nombra en el título del panel
-     —«Asignar etapas OR 19910»— y la patente en el del historial. Poner otro
-     encabezado encima era repetir la identidad por tercera vez, y el cliente
-     pidió que no se vea nada más que las etapas. La salida a la ficha completa
-     bajó a un enlace de texto, junto al de finalizar. */
-  if (f.soloEtapas && f.tab === 'etapas') return vEtapas(o);
-
   const cuerpo = {
     ficha: fichaResumen, etapas: vEtapas, historial: fichaHistorial,
     bitacora: fichaBitacora, repuestos: fichaRepuestos, fotos: fichaFotos
   }[f.tab](o);
 
-  const enlaces = pantallasOtDe('ficha');
+  const enlaces = FICHA_ENLACES.filter((l) => !l.permiso || Modelo.puede(l.permiso));
 
   return `
   <div class="panel">
@@ -215,15 +225,29 @@ function vFichaOT(o) {
       </div>
 
       ${enlaces.length ? `<div class="acciones-ficha" style="margin-top:10px">
+        ${/* 🔴 TARJETAS CON ICONO, COMO EN SU SISTEMA (26-08-2026, Marco:
+             «quiero hacerlo más intuitivo y quiero la visual que tienen
+             actualmente en el sistema, ya que esto nos permitirá que a ellos
+             también les sea más fácil ocuparlo»).
+
+             Eran nueve botones chicos en una fila, todos del mismo color y del
+             mismo tamaño: para encontrar «Ver Fotografías» había que leerlos
+             uno por uno. En el sistema que usan hoy son tarjetas grandes con un
+             icono redondo, y eso se reconoce sin leer.
+
+             El CONTENIDO no cambia: los mismos accesos, los mismos permisos y
+             los mismos manejadores —`data-fichatab`, `data-imprimir`,
+             `data-irvista`, `data-pendiente`—. Es la forma, no la función. */''}
         ${enlaces.map((l) => {
-          if (l.tab) return '<button class="btn secundario" data-fichatab="' + l.tab + '">' + esc(l.rot) + '</button>';
-          if (l.imprimir) return '<button class="btn secundario" data-imprimir="' + l.imprimir +
-            '">' + ico('imprimir') + esc(l.rot) + '</button>';
-          if (l.vista) return '<button class="btn secundario" data-irvista="' + l.vista +
-            '" data-irot="' + esc(o.numeroOT) + '">' + esc(l.rot) + '</button>';
-          return '<button class="btn secundario" data-pendiente="' + esc(l.rot) + '|' + l.tanda +
-            (l.nota ? '|' + esc(l.nota) : '') + '" style="opacity:.65">' + esc(l.rot) +
-            ' <span class="et gris">pendiente</span></button>';
+          const cara = '<span class="ico-redondo">' + ico(l.ico || 'documento') + '</span>' +
+            '<span class="rot-acceso">' + esc(l.rot) + '</span>';
+          if (l.tab) return '<button class="acceso" type="button" data-fichatab="' + l.tab + '">' + cara + '</button>';
+          if (l.imprimir) return '<button class="acceso" type="button" data-imprimir="' + l.imprimir + '">' + cara + '</button>';
+          if (l.vista) return '<button class="acceso" type="button" data-irvista="' + l.vista +
+            '" data-irot="' + esc(o.numeroOT) + '">' + cara + '</button>';
+          return '<button class="acceso pendiente" type="button" data-pendiente="' + esc(l.rot) + '|' + l.tanda +
+            (l.nota ? '|' + esc(l.nota) : '') + '">' + cara +
+            '<span class="et gris">pendiente</span></button>';
         }).join('')}
       </div>` : ''}
     </div>
@@ -592,18 +616,13 @@ function fichaRepuestos(o) {
 /* ── Pestaña · Fotografías ─────────────────────────────────────────────── */
 
 function fichaFotos(o) {
-  /* ⛔ Las capturas de firma se descartan enteras desde el 26-08-2026, no solo
-     del resumen de tamaño como antes. La captura en pantalla se eliminó (C-47),
-     pero un navegador que la usó ayer todavía tiene esos PNG en IndexedDB: sin
-     esto le aparecían como un grupo de fotos rotulado «firma» —el rótulo se fue
-     con la función—, o sea una firma digital que el sistema ya no reconoce. */
-  const todas = Modelo.mediaDe(o.id).filter((m) => m.momento !== 'firma');
+  const todas = Modelo.mediaDe(o.id);
   const porMomento = {};
   todas.forEach((m) => { (porMomento[m.momento] = porMomento[m.momento] || []).push(m); });
-  const res = Media.resumen(todas);
+  const res = Media.resumen(todas.filter((m) => m.momento !== 'firma'));
 
   const ROTULOS = { ingreso: 'Imágenes de ingreso', proceso: 'Imágenes por etapa',
-                    entrega: 'Imágenes de entrega' };
+                    entrega: 'Imágenes de entrega', firma: 'Firma del cliente' };
 
   return `
   <div class="panel">
@@ -677,24 +696,6 @@ function fichaFotos(o) {
 /* ── Cableado de la ficha ──────────────────────────────────────────────── */
 
 function pFichaOT(o) {
-  /* 🔴 EL MARCO SIGUE AL ESTADO, NO A LA DIRECCIÓN. `modoRegistro` esconde la
-     ruta y la barra leyendo el `modo=` del ancla, y eso alcanza para entrar —
-     pero al apretar «Ver la ficha completa» el ancla SIGUE diciendo
-     `modo=asignar`, así que volvían los paneles y las pestañas y el encabezado
-     se quedaba escondido: media pantalla de una y media de la otra.
-     Acá se vuelve a sincronizar con lo que la ficha realmente está mostrando. */
-  document.body.classList.toggle('solo-etapas',
-    !!(fichaEstado().soloEtapas && fichaEstado().tab === 'etapas'));
-
-  /* La salida de la pantalla de etapas: devuelve la ficha entera sin cambiar
-     de orden ni de pestaña. El que llegó a asignar y quiere ver el resto la
-     tiene a un clic, y no hay que explicarle que cierre y vuelva a entrar. */
-  const verFicha = document.getElementById('ir-ficha-completa');
-  if (verFicha) verFicha.addEventListener('click', () => {
-    fichaEstado().soloEtapas = false;
-    refrescarFicha();
-  });
-
   const btnOR = document.getElementById('or-editar');
   if (btnOR) btnOR.addEventListener('click', () => dialogoEditarOR(o));
 
@@ -741,8 +742,29 @@ function pFichaOT(o) {
      Abría el ÚLTIMO sin decirlo, que es la peor de las respuestas: el que
      imprime cree que tiene el documento que pidió. Con una sola OR se abre
      directo, que es el caso de todos los días. */
-  document.querySelectorAll('#contenido [data-imprimir]').forEach((b) => b.addEventListener('click', () =>
-    abrirImpresoDeOT(b.dataset.imprimir, o)));
+  document.querySelectorAll('#contenido [data-imprimir]').forEach((b) => b.addEventListener('click', () => {
+    if (b.dataset.imprimir !== 'presupuesto' || o.presupuestos.length <= 1)
+      return abrirImpreso(b.dataset.imprimir, o.id);
+
+    dialogo('¿Qué presupuesto quieres abrir?',
+      '<p class="pie-nota" style="margin:0 0 10px">Esta orden tiene ' +
+      o.presupuestos.length + ' documentos. Se abren en otra pestaña.</p>' +
+      '<div class="grid-envoltorio"><table class="grid"><tbody>' +
+      o.presupuestos.map((pr) => {
+        const e = ESTADO_PRESUPUESTO[pr.estado] || { txt: pr.estado, clase: 'gris' };
+        return '<tr><td><span class="cod">OR ' + esc(pr.numeroOR) + '</span></td>' +
+          '<td><span class="et ' + esc(e.clase) + '">' + esc(e.txt) + '</span></td>' +
+          '<td class="num">' + fMonto(pr.total) + '</td>' +
+          '<td><button class="btn secundario chico" data-elegir-pr="' + esc(pr.id) + '">' +
+          'Abrir</button></td></tr>';
+      }).join('') + '</tbody></table></div>');
+
+    (dialogo.ultimo || document).querySelectorAll('[data-elegir-pr]').forEach((x) =>
+      x.addEventListener('click', () => {
+        if (dialogo.cerrar) dialogo.cerrar();
+        abrirImpreso('presupuesto', o.id, x.dataset.elegirPr);
+      }));
+  }));
 
   // Salir de la ficha hacia otro módulo: la ficha vive en su propia pestaña,
   // así que se abre el sistema completo en esa vista.

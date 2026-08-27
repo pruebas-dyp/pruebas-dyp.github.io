@@ -18,53 +18,20 @@ function vEtapas(o) {
   const modo = puedeAsignar ? (ui.ficha.modoEtapas || modoEtapasPorDefecto(o)) : 'finalizar';
   const cuerpo = modo === 'asignar' ? vAsignarEtapas(o) : vFinalizarEtapas(o);
 
-  /* 🔶 DOS COLUMNAS CUANDO ES PANTALLA PROPIA (26-08-2026): las etapas a la
-     izquierda y el historial de la orden a la derecha, como el original. Quien
-     reparte el trabajo mira las dos cosas a la vez — qué falta y qué ya pasó—
-     sin cambiar de pestaña.
-
-     Dentro de la ficha NO se pone: ahí el historial ya tiene su propia
-     pestaña, y repetirlo al lado sería el mismo dato dos veces en la misma
-     pantalla. */
-  const solo = ui.ficha && ui.ficha.soloEtapas;
-  const conHistorial = solo && Modelo.puede('ficha.completa');
-
-  /* 🔶 EN LA PANTALLA PROPIA, EL ENCABEZADO ES EL DEL ORIGINAL: el título y
-     debajo un enlace de texto —«Ir a finalizar etapas»—, sin bajada y sin los
-     dos botones de conmutar. Es lo que muestra la captura del sistema real y
-     responde la pregunta abierta 32.
-
-     Dentro de la FICHA se quedan los chips y la bajada: ahí la pantalla es una
-     pestaña más entre otras cinco y el conmutador tiene que verse como lo que
-     es. */
-  const enlaces = solo
-    ? `<div class="enlaces-etapas">
-        ${puedeAsignar ? '<button type="button" class="enlace" data-modoetapa="' +
-          (modo === 'asignar' ? 'finalizar' : 'asignar') + '">Ir a ' +
-          (modo === 'asignar' ? 'finalizar' : 'asignar') + ' etapas</button>' : ''}
-        <button type="button" class="enlace" id="ir-ficha-completa">Ver la ficha completa</button>
-      </div>`
-    : '';
-
   return `
-  <div class="${conHistorial ? 'pantalla-etapas' : ''}">
   <div class="panel">
     <div class="cab">
       <div><h2>${ico('taller', 'g')}${modo === 'asignar' ? 'Asignar etapas' : 'Finalizar etapas'}
         OR ${esc(o.presupuestos.length ? o.presupuestos[0].numeroOR : o.numeroOT)}</h2>
-        ${solo ? enlaces : `<div class="desc">${modo === 'asignar'
+        <div class="desc">${modo === 'asignar'
           ? 'Qué etapas aplican a este vehículo. No todas aplican a todos.'
-          : 'Cerrar etapas y fijar la entrega probable. Se pueden cerrar varias de una vez.'}</div>`}</div>
-      ${!solo && puedeAsignar ? `<div class="chips">
+          : 'Cerrar etapas y fijar la entrega probable. Se pueden cerrar varias de una vez.'}</div></div>
+      ${puedeAsignar ? `<div class="chips">
         <button class="chip${modo === 'asignar' ? ' activo' : ''}" data-modoetapa="asignar">Asignar</button>
         <button class="chip${modo === 'finalizar' ? ' activo' : ''}" data-modoetapa="finalizar">Finalizar</button>
       </div>` : ''}
     </div>
     <div class="cuerpo">${cuerpo}</div>
-  </div>
-  ${/* El historial, tal cual lo pinta su pestaña. Es la MISMA función, no una
-       copia: dos marcados del mismo dato se despegan sin que nadie lo note. */''}
-  ${conHistorial ? fichaHistorial(o) : ''}
   </div>
   ${/* 🔶 LA BITÁCORA VA DEBAJO, como en el sistema actual (15-08-2026).
 
@@ -86,104 +53,92 @@ function vAsignarEtapas(o) {
   const asignadas = o.etapasAsignadas;
   const enc = (c) => asignadas.find((x) => x.codigo === c);
 
-  /* 🔶 UNA TABLA, COMO EL ORIGINAL (26-08-2026, pedido del cliente).
+  /* 🔴 LA TABLA DEL SISTEMA ACTUAL (26-08-2026, Marco, con la captura al lado).
 
-     Antes eran dos grupos de tarjetas: «Ya asignadas» arriba y «Agregar
-     etapas» abajo. Mostraban lo mismo, pero repartido en dos listas y con dos
-     formas distintas — había que leer las dos para saber cómo estaba la orden.
-     Ahora son las nueve etapas en una sola tabla, en su orden, con su estado en
-     una columna. Es el formato del sistema real.
+     Esto eran tarjetas: un bloque «Ya asignadas» arriba y otro «Agregar etapas»
+     abajo, cada etapa en su propia caja de color. Se veía bien y no se parecía
+     en nada a lo que ellos usan todos los días — y esta pantalla la abre el
+     jefe de taller veinte veces al día.
 
-     🔴 SE COPIA EL FORMATO, NO EL DEFECTO. El original muestra las nueve
-     casillas EN BLANCO aunque la orden ya tenga etapas cerradas —es el hallazgo
-     C-9 / C-15 / FUN-6 de la auditoría y una de las correcciones que se le
-     vendieron al cliente—. Acá las asignadas llegan marcadas, las cerradas se
-     ven cerradas con su fecha, y solo se puede desmarcar lo que sigue abierto.
+     En su sistema es UNA tabla: N° · Etapa · Responsable, las nueve etapas
+     siempre a la vista y en su orden, una casilla por fila, y Guardar y
+     Cancelar abajo. Las que ya están asignadas salen marcadas; no hay dos
+     listas que cruzar con la vista.
 
-     El desplegable de responsable aparece SOLO en la fila marcada, como allá.
-     Y ofrece solo a quien tiene esa etapa habilitada en su ficha de Personal,
-     que es el único modelo de permisos real que tiene el sistema actual. */
+     ⚠️ LOS GANCHOS NO CAMBIAN: `data-asignar` en la casilla, `data-respasignar`
+     en el desplegable, `#btn-asignar` para guardar y `data-quitaretapa` para
+     sacar una. `pEtapas` sigue igual, sin tocar una línea. Es la forma, no la
+     función.
+
+     ENTREGA queda como en su sistema: en la lista, sin casilla y sin
+     desplegable. No se asigna a nadie — es el cierre, no un trabajo. */
   const gentePara = (codigo) => {
     const etapa = Modelo.base().etapa.find((x) => x.codigo === codigo) || {};
     return Modelo.personasParaEtapa(etapa.id);
   };
-
-  /* La carga de cada persona AHORA, para que el que reparte no reparta a
-     ciegas. No es un tope —Marco fue explícito en que no hay límite de autos
-     por persona—: es información para decidir. */
   const carga = Modelo.cargaDelEquipo();
   const cuantoTiene = (id) => (carga.get(id) || { abiertas: 0 }).abiertas;
 
+  const SIN_ASIGNAR = ['entrega'];
+  const huerfanas = ETAPAS.filter((e) => SIN_ASIGNAR.indexOf(e.codigo) < 0 &&
+    !enc(e.codigo) && !gentePara(e.codigo).length);
+
   const fila = (e, i) => {
     const a = enc(e.codigo);
+    const noSeAsigna = SIN_ASIGNAR.indexOf(e.codigo) >= 0;
     const gente = gentePara(e.codigo);
-    const cerrada = !!(a && a.finalizada);
 
-    const estado = cerrada
-      ? '<span class="et verde">Cerrada</span> <span class="pie-nota" style="margin:0">' +
-        esc(a.finalizadaAt ? fFecha(a.finalizadaAt) : '') + '</span>'
-      : a
-        ? (a.esperandoValidacion
-            ? '<span class="et ambar">Esperando visto bueno</span>'
-            : '<span class="et azul">En curso</span>')
-        : '<span style="color:var(--gris-2)">Sin asignar</span>';
+    const casilla = noSeAsigna ? ''
+      : '<input type="checkbox" data-asignar="' + esc(e.codigo) + '"' +
+        (a ? ' checked' : '') + (a ? ' disabled title="Ya asignada"' : '') + '>';
 
-    /* En una etapa cerrada el encargado es un HECHO, no una elección: se
-       muestra como texto. Cambiarlo sería reescribir quién hizo el trabajo. */
-    const responsable = cerrada
-      ? '<span>' + esc(a.responsable || a.terminadaPor || '—') + '</span>'
-      : gente.length
-        ? '<span class="resp-etapa"' + (a ? '' : ' hidden') + '>' +
-          '<select data-respasignar="' + esc(e.codigo) + '">' +
-          '<option value="">Seleccionar encargado</option>' +
-          gente.map((per) => '<option value="' + esc(per.id) + '"' +
-            (a && a.responsableId === per.id ? ' selected' : '') + '>' +
-            esc(per.nombre) + ' (' + cuantoTiene(per.id) + ')</option>').join('') +
-          '</select></span>'
-        : '<span class="et ambar" title="Se habilita en la ficha de cada persona">' +
-          'Nadie habilitado</span>';
+    let responsable;
+    if (noSeAsigna) {
+      responsable = '<span style="color:var(--gris-2)">—</span>';
+    } else if (a) {
+      responsable = (a.responsable ? '<strong>' + esc(a.responsable) + '</strong>'
+        : '<em style="color:var(--gris)">sin encargado</em>') +
+        ' <span class="et ' + (a.finalizada ? 'verde' : (a.esperandoValidacion ? 'ambar' : 'gris')) + '">' +
+        (a.finalizada ? 'cerrada' : (a.esperandoValidacion ? 'esperando visto bueno' : 'en curso')) + '</span>' +
+        (!a.finalizada ? ' <button class="btn secundario" data-quitaretapa="' + esc(e.codigo) +
+          '" title="Sacar esta etapa de la orden">Quitar</button>' : '');
+    } else if (gente.length) {
+      responsable = '<select data-respasignar="' + esc(e.codigo) + '">' +
+        '<option value="">Seleccionar encargado</option>' +
+        gente.map((per) => '<option value="' + esc(per.id) + '">' + esc(per.nombre) +
+          ' (' + cuantoTiene(per.id) + ')</option>').join('') + '</select>';
+    } else {
+      responsable = '<span class="et ambar" title="Se habilita en Personal, en la ficha de cada persona">' +
+        'Nadie habilitado</span>';
+    }
 
-    return '<tr' + (cerrada ? ' class="etapa-cerrada"' : '') + '>' +
-      '<td class="num">' + (i + 1) + '</td>' +
-      '<td><label class="etapa-casilla">' +
-        '<input type="checkbox" data-asignar="' + esc(e.codigo) + '"' +
-        (a ? ' checked' : '') + (cerrada ? ' data-cerrada="1"' : '') + '>' +
-        '<i class="punto" style="background:' + esc(e.color) + '"></i>' + esc(e.nombre) +
-        (e.opcional ? ' <span class="pie-nota" style="margin:0" ' +
-          'title="Un tapabarro o un espejo no pasa por mecánica">no siempre</span>' : '') +
-      '</label></td>' +
-      '<td>' + estado + '</td>' +
+    return '<tr' + (a ? ' class="ya"' : '') + '>' +
+      '<td class="num">' + casilla + '</td>' +
+      '<td><i class="punto" style="background:' + esc(e.color) + '"></i>' + esc(e.nombre) +
+        (e.opcional ? ' <span class="et gris" title="Un tapabarro o un espejo no pasa por mecánica">no siempre</span>' : '') +
+      '</td>' +
       '<td>' + responsable + '</td></tr>';
   };
 
-  /* 🔴 LAS ETAPAS QUE NADIE PUEDE HACER, DICHAS DE UNA VEZ (22-08-2026).
-     Con la nómina que entregó Andrés —los usuarios de la web de hoy— cuatro de
-     las nueve etapas no las tiene habilitada ninguna cuenta: quien pinta y
-     quien desabolla no tiene cuenta en el sistema. Hoy da igual porque el
-     sistema actual no registra quién hizo qué; con el visto bueno del jefe deja
-     de dar igual, porque estaría asignando a nadie. */
-  const huerfanas = ETAPAS.filter((e) => !enc(e.codigo) && !gentePara(e.codigo).length);
-
   return `
-  <div class="grid-envoltorio"><table class="grid tabla-etapas">
-    <thead><tr><th style="width:38px">N°</th><th>Etapa</th><th>Estado</th><th>Responsable</th></tr></thead>
-    <tbody>${ETAPAS.map(fila).join('')}</tbody>
-  </table></div>
+  <div class="asignar-tabla">
+    ${huerfanas.length ? '<div class="aviso-etapas">' + ico('alerta', 'g') +
+      '<div><strong>' + huerfanas.length + ' de estas etapas no las puede hacer ninguna cuenta: ' +
+      esc(huerfanas.map((e) => e.nombre).join(', ')) + '.</strong> ' +
+      'Se pueden marcar igual y quedan sin encargado, pero entonces el sistema no va a poder decir ' +
+      'quién las hizo. Se habilita en <em>Personal</em>, en la ficha de cada persona.</div></div>' : ''}
 
-  ${huerfanas.length ? '<div class="aviso-etapas">' + ico('alerta', 'g') +
-    '<div><strong>' + huerfanas.length + ' de estas etapas no las puede hacer ninguna cuenta: ' +
-    esc(huerfanas.map((e) => e.nombre).join(', ')) + '.</strong> ' +
-    'Se pueden asignar igual y quedan sin encargado, pero entonces el sistema no va a poder ' +
-    'decir quién las hizo. Se habilita en <em>Personal</em>, en la ficha de cada persona — ' +
-    'y si quien hace ese trabajo todavía no tiene cuenta, hay que creársela.</div></div>' : ''}
+    <div class="grid-envoltorio"><table class="grid">
+      <thead><tr><th style="width:52px">N°</th><th>Etapa</th><th>Responsable</th></tr></thead>
+      <tbody>${ETAPAS.map(fila).join('')}</tbody>
+    </table></div>
 
-  <div class="pie-asignar">
-    ${/* 🔴 `Guardar` se aprieta SIEMPRE. Si no hay nada que cambiar, se rechaza
-         y se dice — ninguna regla de este sistema se enseña apagando un botón. */''}
-    <button class="btn" id="btn-asignar">Guardar</button>
-    <button class="btn secundario" id="btn-etapas-cancelar">Cancelar</button>
-    <span class="pie-nota" style="margin:0">Queda registrado quién asignó y cuándo.
-      Una etapa ya cerrada no se puede desmarcar: el historial no se edita.</span>
+    <div class="pie-asignar">
+      <button class="btn" id="btn-asignar">Guardar</button>
+      <button class="btn secundario" id="btn-cancelar-etapas">Cancelar</button>
+      <span class="pie-nota" style="margin:0">Queda registrado quién asignó y cuándo.
+        Una etapa ya cerrada no se puede desmarcar: el historial no se edita.</span>
+    </div>
   </div>`;
 }
 
@@ -283,118 +238,54 @@ function pEtapas(o) {
     ui.ficha.modoEtapas = b.dataset.modoetapa; refrescarFicha();
   }));
 
-  /* 🔶 EL DESPLEGABLE APARECE AL MARCAR, como en el original (26-08-2026).
-     La fila sin marcar no ofrece encargado: todavía no hay etapa a la cual
-     asignarlo. Al marcarla aparece y se lleva el foco, porque lo siguiente que
-     hay que contestar es quién la hace. */
+  /* El desplegable del encargado ya NO se esconde: en la tarjeta vive siempre
+     a la vista, debajo del nombre de la etapa, con la carga de cada persona al
+     lado. Lo unico que queda es llevar el foco: al marcar la etapa, lo
+     siguiente que hay que contestar es quien la hace. */
   document.querySelectorAll('[data-asignar]').forEach((c) => {
-    const fila = c.closest('tr');
-    if (!fila) return;
+    const tarjeta = c.closest('.tarea');
+    if (!tarjeta) return;
     c.addEventListener('change', () => {
-      /* 🔴 UNA ETAPA CERRADA NO SE DESMARCA. No se apaga la casilla —ninguna
-         regla de este sistema se enseña con un control apagado—: se deja
-         apretar, se vuelve atrás y se explica por qué. El historial no se
-         edita. */
-      if (c.dataset.cerrada && !c.checked) {
-        c.checked = true;
-        return avisar({ ok: false, motivo: 'Esa etapa ya está cerrada y no se puede desmarcar: ' +
-          'el historial de la orden no se edita. Si se cerró por error, hay que dejarlo dicho en ' +
-          'la bitácora — que queda firmada— y no borrarlo.' });
-      }
-      const caja = fila.querySelector('.resp-etapa');
-      if (caja) caja.hidden = !c.checked;
-      const sel = fila.querySelector('select');
+      const sel = tarjeta.querySelector('select');
       if (c.checked && sel) sel.focus();
     });
   });
 
-  /* 🔶 `Guardar` GUARDA LA TABLA ENTERA, no solo lo que se agrega. Desde que
-     las nueve etapas viven en una sola tabla con su estado, desmarcar una es
-     una acción tan válida como marcarla — antes eso era un botón «Quitar» en
-     otra tarjeta, y había que entender que las dos listas eran la misma cosa.
-
-     Se comparan las casillas contra lo que hay guardado: lo que se marcó se
-     asigna, lo que se desmarcó se quita, y las que ya estaban se dejan como
-     están. Las cerradas no entran en la comparación: no se pueden desmarcar. */
   const asignar = document.getElementById('btn-asignar');
   if (asignar) asignar.addEventListener('click', () => {
-    const guardadas = o.etapasAsignadas;
-    const abierta = (c) => guardadas.find((x) => x.codigo === c && !x.finalizada);
-    const marcadas = Array.from(document.querySelectorAll('[data-asignar]:checked'))
-      .map((c) => c.dataset.asignar);
+    const yaAsignadas = o.etapasAsignadas.map((x) => x.codigo);
+    const codigos = Array.from(document.querySelectorAll('[data-asignar]:checked'))
+      .map((c) => c.dataset.asignar)
+      .filter((c) => yaAsignadas.indexOf(c) < 0);
+    if (!codigos.length)
+      return avisar({ ok: false, motivo: 'No hay ninguna etapa nueva marcada. Las que ya estaban asignadas no se vuelven a asignar.' });
+    const ids = codigos.map((c) => (Modelo.base().etapa.find((e) => e.codigo === c) || {}).id);
 
-    const nuevas = marcadas.filter((c) => !guardadas.some((x) => x.codigo === c));
-    const quitadas = guardadas.filter((x) => !x.finalizada && marcadas.indexOf(x.codigo) < 0)
-      .map((x) => x.codigo);
-
-    /* 🔴 Y EL ENCARGADO DE LAS QUE YA ESTABAN. Sin esto el desplegable de una
-       etapa ya asignada era un adorno: se elegía a alguien, se guardaba, y no
-       pasaba nada — el peor resultado posible, porque el que reparte se queda
-       creyendo que la asignó. Va por `tomar_etapa`, que es el procedimiento que
-       existe para eso y el que revisa las reglas: si la etapa ya la tomó otro,
-       rechaza y dice quién. */
-    const tomas = [];
-    guardadas.filter((x) => !x.finalizada).forEach((x) => {
-      if (marcadas.indexOf(x.codigo) < 0) return;         // se está quitando
-      const sel = document.querySelector('[data-respasignar="' + x.codigo + '"]');
-      if (!sel || !sel.value) return;
-      if (sel.value === x.responsableId) return;          // no cambió
-      tomas.push({ codigo: x.codigo, persona_id: sel.value });
-    });
-
-    if (!nuevas.length && !quitadas.length && !tomas.length)
-      return avisar({ ok: false, motivo: 'No cambiaste ninguna etapa. Marca las que aplican a este ' +
-        'vehículo, desmarca las que no o elige un encargado, y vuelve a guardar.' });
-
-    /* El encargado que se eligió en cada fila, por id de etapa. Va junto con la
-       asignación y no en un segundo paso: es un solo gesto en el original —se
-       marca la casilla, se elige la persona, se guarda— y partirlo en dos
+    /* El encargado que se eligió en cada fila, por id de etapa. Va junto con
+       la asignación y no en un segundo paso: es un solo gesto en el original
+       —se marca la casilla, se elige la persona, se guarda— y partirlo en dos
        dejaría etapas asignadas sin dueño esperando que alguien vuelva. */
-    const idDe = (c) => (Modelo.base().etapa.find((e) => e.codigo === c) || {}).id;
-    const ids = nuevas.map(idDe);
     const responsables = {};
-    nuevas.forEach((c, i) => {
+    codigos.forEach((c, i) => {
       const sel = document.querySelector('[data-respasignar="' + c + '"]');
       if (sel && sel.value) responsables[ids[i]] = sel.value;
     });
 
-    /* Se quita primero y se asigna después, y cada paso se cuenta aparte: si
-       uno de los dos rebota, el aviso tiene que decir cuál. */
-    const fallos = [];
-    let quitas = 0;
-    quitadas.forEach((c) => {
-      const r = Modelo.quitar_etapa(o.id, c);
-      if (r.ok) quitas++; else fallos.push(r.motivo);
-    });
-    let puestas = 0;
-    if (ids.length) {
-      const r = Modelo.asignar_etapas(o.id, ids, responsables);
-      if (r.ok) puestas = ids.length; else fallos.push(r.motivo);
-      (r.avisos || []).forEach((a) => avisar({ ok: false, motivo: a }));
-    }
-
-    let tomadas = 0;
-    tomas.forEach((t) => {
-      const r = Modelo.tomar_etapa(o.id, t.codigo, t.persona_id);
-      if (r.ok) tomadas++; else fallos.push(r.motivo);
-    });
-
-    if (fallos.length) avisar({ ok: false, motivo: fallos.join(' · ') });
-    if (puestas || quitas || tomadas) {
-      const dicho = [];
-      if (puestas) dicho.push(plural(puestas, 'etapa asignada', 'etapas asignadas'));
-      if (quitas) dicho.push(plural(quitas, 'etapa quitada', 'etapas quitadas'));
-      if (tomadas) dicho.push(plural(tomadas, 'encargado puesto', 'encargados puestos'));
-      avisar({ ok: true, motivo: '' }, dicho.join(' y ') + '.');
-      refrescarFicha();
-    }
+    ejecutar(() => Modelo.asignar_etapas(o.id, ids, responsables),
+      plural(codigos.length, 'etapa asignada', 'etapas asignadas') + '.');
   });
 
-  /* 🔶 `Cancelar` devuelve al Taller, que es de donde se llega. `ir()` deshace
-     además la ventana de la orden —le devuelve el menú lateral y el título—,
-     así que nadie queda encerrado en una pantalla sin salida. */
-  const cancelar = document.getElementById('btn-etapas-cancelar');
-  if (cancelar) cancelar.addEventListener('click', () => ir('taller'));
+  document.querySelectorAll('[data-quitaretapa]').forEach((b) => b.addEventListener('click', () =>
+    ejecutar(() => Modelo.quitar_etapa(o.id, b.dataset.quitaretapa), 'Etapa quitada.')));
+
+  /* «Cancelar» está en su sistema al lado de «Guardar». Acá no borra nada —no
+     hay nada guardado todavía— : deshace lo marcado y devuelve la pantalla a
+     Finalizar, que es de donde se entra a repartir. */
+  const cancelar = document.getElementById('btn-cancelar-etapas');
+  if (cancelar) cancelar.addEventListener('click', () => {
+    ui.ficha.modoEtapas = 'finalizar';
+    refrescarFicha();
+  });
 
   const finalizar = document.getElementById('btn-finalizar');
   if (finalizar) finalizar.addEventListener('click', () => {

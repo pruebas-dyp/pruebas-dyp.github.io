@@ -95,43 +95,21 @@ const MODULOS = {
   /* `Ingresar recepción` se llama igual que el botón del paso Verificar: es la
      misma operación y no puede tener dos nombres. Desde cualquier otro paso
      lleva a Verificar si está todo completo, y si no, dice qué falta.
-
-     🔶 SE QUEDÓ CON UNA SOLA ACCIÓN (16-08-2026, pedido del cliente). Se
-     fueron `Agregar fotos` y `Descartar borrador` de la barra de arriba.
-
-     Las dos seguían existiendo abajo, dentro del formulario, donde están en su
-     contexto: las fotos en el paso que las pide y el descarte al pie. Tenerlas
-     además arriba repetía la misma acción en dos lugares de la pantalla, y la
-     de arriba era la que no decía sobre qué actuaba.
-
-     ⚠️ `Descartar borrador` del PIE se queda. Son dos botones distintos y solo
-     se sacó el de la barra.
-
-     Y la ruta va vacía: el título de la pantalla ya dice `Nuevo ingreso`, así
-     que «Operación diaria › Recepción» encima repetía dónde estás con otras
-     palabras. */
-  recepcion:   { ruta: [],
-                 acciones: [['guardar', 'Ingresar recepción', 'guardar', 'F2']] },
-  /* ⛔ SIN RUTA Y SIN BARRA (26-08-2026, pedido del cliente). Los tres módulos
-     de tabla larga —Torre, Taller y Presupuesto— pierden las dos líneas de
-     encabezado, y con ellas dos pantallas de alto en un monitor de taller.
-
-     · La RUTA decía con otras palabras lo que ya dicen el título del módulo y
-       el renglón marcado en la barra lateral. Tres veces lo mismo.
-     · `Actualizar` era F5, que el navegador ya hace y que el sistema NO
-       intercepta a propósito, así que la tecla sigue funcionando igual.
-     · `Nuevo ingreso` y `Abrir la orden` tienen su camino de siempre: el módulo
-       Recepción en la barra lateral, y el doble clic en la fila.
-
-     🔴 `Exportar` e `Imprimir` SÍ se van sin reemplazo: estos botones eran los
-     únicos que llamaban a esas acciones. El despachador sigue entero, así que
-     devolverlas es una línea — pero mientras tanto no hay cómo exportar la
-     Torre, el Taller ni el Presupuesto. Anotado en C-50 y como pregunta
-     abierta 27, para que sea una decisión y no un descuido.
-
-     La fila NO desaparece: `Datos de demostración` vive ahí y se queda. */
-  torre:       { ruta: [], acciones: [] },
-  taller:      { ruta: [], acciones: [] },
+     `Agregar fotos` lleva al paso Estado descriptivo, que es donde viven las
+     fotos desde el 15-08-2026 — no abre una pantalla que ya no existe. */
+  recepcion:   { ruta: ['Operación diaria', 'Recepción'],
+                 acciones: [['guardar', 'Ingresar recepción', 'guardar', 'F2'],
+                            ['camara', 'Agregar fotos', 'fotos'],
+                            ['refrescar', 'Descartar borrador', 'limpiar']] },
+  torre:       { ruta: ['Operación diaria', 'Torre de control'],
+                 acciones: [['refrescar', 'Actualizar', 'refrescar', 'F5'],
+                            ['nuevo', 'Nuevo ingreso', 'nuevo'],
+                            ['editar', 'Abrir la orden', 'abrir'],
+                            ['exportar', 'Exportar', 'exportar'],
+                            ['imprimir', 'Imprimir', 'imprimir']] },
+  taller:      { ruta: ['Operación diaria', 'Taller'],
+                 acciones: [['refrescar', 'Actualizar', 'refrescar', 'F5'],
+                            ['exportar', 'Exportar', 'exportar']] },
   entrega:     { ruta: ['Recepción', 'Entregar Unidad'],
                  acciones: [['buscar', 'Buscar patente', 'buscar'],
                             ['refrescar', 'Actualizar', 'refrescar', 'F5']] },
@@ -143,8 +121,10 @@ const MODULOS = {
   detenidos:   { ruta: ['Seguimiento', 'Esperas'],
                  acciones: [['refrescar', 'Actualizar', 'refrescar', 'F5'],
                             ['exportar', 'Exportar', 'exportar']] },
-  // Sin ruta ni barra, igual que Torre y Taller — ver el bloque de arriba.
-  presupuesto: { ruta: [], acciones: [] },
+  presupuesto: { ruta: ['Seguimiento', 'Presupuesto'],
+                 acciones: [['refrescar', 'Actualizar', 'refrescar', 'F5'],
+                            ['exportar', 'Exportar', 'exportar'],
+                            ['imprimir', 'Imprimir', 'imprimir']] },
   bodega:      { ruta: ['Seguimiento', 'Bodega'],
                  acciones: [['buscar', 'Buscar patente', 'buscar'],
                             ['refrescar', 'Actualizar', 'refrescar', 'F5'],
@@ -362,17 +342,8 @@ function enReporteria() {
 }
 
 function pintarShell() {
-  /* Salir de la pantalla de etapas devuelve el encabezado y la barra: la marca
-     la pone la ventana de la orden y se quita acá, que es por donde pasa
-     cualquier módulo. Sin esto, `Cancelar` dejaba al Taller sin su cabecera. */
-  document.body.classList.remove('solo-etapas');
-
   const m = MODULOS[ui.vista] || { ruta: [], acciones: [] };
-  // `|| []` y no `m.ruta` a secas: desde que Recepción no lleva ruta, un módulo
-  // puede no traerla, y sin esto la shell entera se cae por un `.slice` de
-  // `undefined` — el menú, las herramientas y el contenido, todo junto.
-  const suya = m.ruta || [];
-  const ruta = enReporteria() ? suya.slice(0, -1).concat('Reportería') : suya;
+  const ruta = enReporteria() ? m.ruta.slice(0, -1).concat('Reportería') : m.ruta;
 
   document.getElementById('ruta').innerHTML =
     ruta.map((r, i) => (i ? ico('chevron') : '') + '<span>' + esc(r) + '</span>').join('');
