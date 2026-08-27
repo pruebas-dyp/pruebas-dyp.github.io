@@ -185,10 +185,56 @@ const FICHA_ENLACES = [
   { rot: 'Bitácora',                        tab: 'bitacora', permiso: 'ficha.completa', ico: 'info' }
 ];
 
+/* 🔴 LA CABECERA DE LA ORDEN, UNA SOLA VEZ (27-08-2026, Marco: «el resumen
+   ejecutivo de todo lo del auto debe estar arriba y ser reemplazado por lo que
+   está ahí de Recepción y de Situación, ya que se repite con lo de abajo»).
+
+   Arriba había dos recuadros —RECEPCIÓN y SITUACIÓN— y justo debajo los cuatro
+   bloques de la ficha. Siete de los once campos de arriba estaban repetidos
+   abajo, palabra por palabra:
+
+     Fecha de Ingreso    → Los tres relojes      Tipo de ingreso → Viene por
+     Patente             → Vehículo              N° de Siniestro → Siniestro
+     Marca/Modelo        → Vehículo              Nombre Cliente  → Cliente
+     Estado del vehículo → la etiqueta del título
+
+   Repetir un dato no es sólo ruido: son dos lugares que hay que mantener de
+   acuerdo, y el día que uno cambie va a haber una pantalla que diga dos cosas
+   distintas del mismo auto.
+
+   Los cuatro que NO estaban abajo —fecha de salida, etapa actual, encargado
+   actual y alerta— no se perdieron: los tres últimos son la tira que ahora va
+   al lado del título, y la fecha de salida bajó a Los tres relojes, que es
+   donde viven las fechas. */
+function cabFicha(o) {
+  const completa = Modelo.puede('ficha.completa');
+  const chip = '<span class="et ' + esc(o.estadoClase) + '">' + esc(o.estadoNombre) + '</span>';
+
+  /* En la vista recortada del taller la etapa y el encargado ya salen en
+     «Cómo va», dos centímetros más abajo. No se ponen dos veces. */
+  const situacion = completa
+    ? '<span class="ss"><span class="k">Etapa actual</span>' +
+      (o.etapa
+        ? '<i class="punto" style="background:' + etapaPorCodigo(o.etapa).color + '"></i>' + esc(o.etapaNombre)
+        : '<span class="et gris">Pendiente</span>') + '</span>' +
+      '<span class="ss"><span class="k">Encargado</span>' +
+      (o.asignado ? esc(o.asignado) : '<span class="et gris">Sin asignar</span>') + '</span>' +
+      (o.alertas.length
+        ? '<span class="ss"><span class="k">Alerta</span>' + o.alertas.map((a) =>
+            '<span class="et gris" title="' + esc(a.asunto) + '">' + esc(a.letra) + '</span>').join(' ') + '</span>'
+        : '')
+    : '';
+
+  return `
+    <div class="cab">
+      <div><h2>${ico('auto', 'g')}Orden N° ${o.numeroOT} · <span class="patente">${esc(o.patente)}</span></h2>
+        <div class="desc">${esc([o.marca, o.modelo].filter(Boolean).join(' '))}${o.anio ? ' · ' + o.anio : ''}</div></div>
+      <div class="tira-situacion">${situacion}${chip}</div>
+    </div>`;
+}
+
 function vFichaOT(o) {
   const f = fichaEstado();
-  const completa = Modelo.puede('ficha.completa');
-  const campoCab = (k, v) => '<div class="dato"><span class="k">' + esc(k) + '</span><span class="v">' + v + '</span></div>';
 
   /* 🔴 SIN PESTAÑAS (26-08-2026, Marco: «debes sacar esos paneles de ahí; el
      único que me debes dejar es Ficha, que quiero que quede arriba y ojalá con
@@ -252,46 +298,13 @@ function vFichaOT(o) {
     </div>` : '';
 
   return `
-  <div class="panel">
-    <div class="cab">
-      <div><h2>${ico('auto', 'g')}Orden N° ${o.numeroOT} · <span class="patente">${esc(o.patente)}</span></h2>
-        <div class="desc">${esc([o.marca, o.modelo].filter(Boolean).join(' '))}${o.anio ? ' · ' + o.anio : ''}</div></div>
-      <span class="et ${esc(o.estadoClase)}">${esc(o.estadoNombre)}</span>
-    </div>
-    <div class="cuerpo">
-      <div class="ficha-rejilla">
-        <fieldset class="bloque"><legend>${completa ? 'Recepción' : 'El vehículo'}</legend>
-          ${campoCab('Fecha de Ingreso', fFechaHora(o.fechaIngreso))}
-          ${campoCab('Fecha de Salida', o.fechaSalida
-            ? fFechaHora(o.fechaSalida) + ' <span class="et verde">registrada</span>'
-            : (o.enTaller ? '<span style="color:var(--gris-2)">el vehículo está adentro</span>'
-                          : '<span class="et roja">sin registrar</span>'))}
-          ${campoCab('Patente', '<span class="patente">' + esc(o.patente) + '</span>')}
-          ${completa ? campoCab('Tipo de ingreso', esc(o.origenIngresoNombre || '—')) : ''}
-          ${completa ? campoCab('N° de Siniestro', esc(o.siniestro || '—')) : ''}
-          ${completa ? campoCab('Nombre Cliente', esc(o.cliente)) : campoCab('Color', esc(o.color || '—'))}
-          ${campoCab('Marca/Modelo', esc([o.marca, o.modelo].filter(Boolean).join(' / ') || '—'))}
-        </fieldset>
-        <fieldset class="bloque"><legend>Situación</legend>
-          ${campoCab('Estado del vehículo', '<span class="et ' + esc(o.estadoClase) + '">' + esc(o.estadoNombre) + '</span>')}
-          ${campoCab('Etapa actual', o.etapa
-            ? '<i class="punto" style="background:' + etapaPorCodigo(o.etapa).color + '"></i>' + esc(o.etapaNombre)
-            : '<span class="et gris">Pendiente</span>')}
-          ${campoCab('Encargado actual', o.asignado ? esc(o.asignado) : '<span class="et gris">Sin Asignar</span>')}
-          ${completa ? campoCab('Alerta', o.alertas.length
-            ? o.alertas.map((a) => '<span class="et gris" title="' + esc(a.asunto) + '">' + esc(a.letra) + '</span>').join(' ')
-            : '<span style="color:var(--gris-2)">—</span>') : ''}
-        </fieldset>
-      </div>
-
-    </div>
-  </div>
-
   ${enFicha
-    ? /* La ficha completa arriba, la bitácora y el historial abajo — el mismo
-         orden que tiene su sistema. */
+    ? /* La ficha completa arriba —con la cabecera adentro, no encima—, los
+         accesos al medio, y la bitácora y el historial abajo. */
       fichaResumen(o) + accesos + fichaBitacora(o) + fichaHistorial(o)
-    : /* Cualquier otro panel se abre solo, con la vuelta a la vista. */
+    : /* Cualquier otro panel se abre solo. Se queda con la cabecera sola, que
+         es lo único que dice de qué orden estamos hablando, y con la vuelta. */
+      '<div class="panel">' + cabFicha(o) + '</div>' +
       '<div class="volver-ficha"><button class="btn secundario" type="button" data-fichatab="ficha">' +
       ico('chevron') + 'Volver a la ficha</button>' +
       '<span class="titulo-panel">' + esc((FICHA_TABS.find((t) => t.id === f.tab) || {}).n || '') + '</span>' +
@@ -365,7 +378,7 @@ function fichaResumen(o) {
      justamente lo que se pidió corregir. */
   if (!completa) {
     return `
-    <div class="panel"><div class="cuerpo"><div class="ficha-rejilla">
+    <div class="panel">${cabFicha(o)}<div class="cuerpo"><div class="ficha-rejilla">
       <fieldset class="bloque"><legend>Vehículo</legend>
         ${dato('Patente', '<span class="patente">' + esc(o.patente) + '</span>')}
         ${dato('Marca y modelo', esc([o.marca, o.modelo].filter(Boolean).join(' ') || '—'))}
@@ -386,6 +399,8 @@ function fichaResumen(o) {
         ${dato('Dónde está', fuera
           ? '<span class="et ambar">fuera de taller</span>'
           : '<span class="et verde">en taller</span>')}
+        ${dato('Fecha de salida', o.fechaSalida ? fFechaHora(o.fechaSalida)
+          : '<span style="color:var(--gris-2)">—</span>')}
         ${dato('Repuestos', pend.length
           ? '<span class="et ambar">faltan ' + pend.length + ' de ' + o.repuestos.length + '</span>'
           : (o.repuestos.length ? '<span class="et verde">todos llegaron</span>' : 'no requiere'))}
@@ -403,7 +418,7 @@ function fichaResumen(o) {
   }).join('');
 
   return `
-  <div class="panel"><div class="cuerpo"><div class="ficha-rejilla">
+  <div class="panel">${cabFicha(o)}<div class="cuerpo"><div class="ficha-rejilla">
     <fieldset class="bloque"><legend>Vehículo</legend>
       ${dato('Patente', '<span class="patente">' + esc(o.patente) + '</span>')}
       ${dato('Marca y modelo', esc([o.marca, o.modelo].filter(Boolean).join(' ') || '—'))}
@@ -465,6 +480,13 @@ function fichaResumen(o) {
         : o.diasKpi + ' de ' + META_DIAS_REPARACION)}
       ${fuera ? dato('Fuera de taller hace', '<span style="color:var(--ambar)">' + o.diasFuera + ' días</span>') : ''}
       ${dato('Fecha de Ingreso', fFechaHora(o.fechaIngreso))}
+      ${/* Bajó de la cabecera, que se fue. Sale de `ot_estadia`, o sea de un
+           hecho con fecha: es la última vez que el auto salió del taller, no la
+           entrega. En el sistema que usan hoy este campo está vacío hasta en
+           órdenes ya entregadas. */''}
+      ${dato('Fecha de salida', o.fechaSalida ? fFechaHora(o.fechaSalida)
+        : (o.enTaller ? '<span style="color:var(--gris-2)">el vehículo está adentro</span>'
+                      : '<span style="color:var(--gris-2)">—</span>'))}
       ${dato('Fecha de Entrega probable', fFechaHora(o.fechaCompromiso))}
       ${o.fechaEntrega ? dato('Fecha de Entrega real', fFechaHora(o.fechaEntrega)) : ''}
       <div class="linea-tiempo">${hitos}</div>

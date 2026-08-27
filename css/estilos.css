@@ -226,8 +226,13 @@ div.desplegable button:hover .ico { color: var(--acento); }
    La cuadrícula se acomoda sola: cuatro por fila en el escritorio, dos en una
    tablet y una en el celular, sin un solo punto de quiebre escrito. */
 .acciones-ficha {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
-  gap: 12px;
+  /* 🔴 MÁS GRANDES TODAVÍA (27-08-2026, Marco: «la idea es que estos paneles
+     se coman la hoja, ya que son como más predominantes en el sistema
+     actual»). A 215 px entraban siete en una fila y quedaban como una barra de
+     botones. A 260 entran cinco y cuatro: dos filas de tarjetas grandes, que
+     es la pantalla que ellos conocen. */
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px; margin-top: 12px;
 }
 .acciones-ficha .acceso {
   /* 🔴 MÁS GRANDES (26-08-2026, Marco: «esto un poco más grande, así como lo
@@ -235,7 +240,7 @@ div.desplegable button:hover .ico { color: var(--acento); }
      círculo es de 64 px y el rótulo se lee de lejos. Acá estaban en 46 y 104
      de alto, que era una versión educada de lo mismo. Se sube a su tamaño. */
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 12px; min-height: 148px; padding: 22px 14px;
+  gap: 14px; min-height: 186px; padding: 26px 16px;
   background: var(--superficie); border: 1px solid var(--borde); border-radius: 4px;
   color: var(--texto); font: inherit; font-size: 13.5px; cursor: pointer;
   text-align: center; transition: border-color .12s ease, background .12s ease;
@@ -246,12 +251,12 @@ div.desplegable button:hover .ico { color: var(--acento); }
 .acciones-ficha .acceso:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
 .acciones-ficha .acceso .ico-redondo {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 64px; height: 64px; border-radius: 50%;
+  width: 84px; height: 84px; border-radius: 50%;
   background: var(--superficie-2); border: 1px solid var(--borde); color: var(--gris);
 }
 .acciones-ficha .acceso:hover .ico-redondo { color: var(--acento); border-color: var(--acento); }
-.acciones-ficha .acceso .rot-acceso { line-height: 1.3; font-size: 14.5px; }
-.acciones-ficha .acceso .ico-redondo .ico { width: 26px; height: 26px; }
+.acciones-ficha .acceso .rot-acceso { line-height: 1.3; font-size: 15.5px; font-weight: 600; }
+.acciones-ficha .acceso .ico-redondo .ico { width: 34px; height: 34px; }
 
 /* La vuelta desde un panel a la ficha. Ocupa el lugar que tenían las pestañas. */
 .volver-ficha {
@@ -261,6 +266,23 @@ div.desplegable button:hover .ico { color: var(--acento); }
   font-weight: 700; font-size: 15px; color: var(--tinta);
 }
 .acciones-ficha .acceso.pendiente { opacity: .6; }
+
+/* 🔴 EN EL CELULAR, DE A DOS (27-08-2026). Con 260 px de mínimo cabía UNA
+   sola tarjeta por fila, y nueve tarjetas de 186 px de alto son metro y medio
+   de pantalla para llegar a la bitácora. Se fijan dos columnas a mano —no por
+   `auto-fit`, que en 500 px de ancho nunca va a dar dos— y se achica el
+   círculo. Siguen siendo tarjetas grandes: el dedo tiene 132 px de alto donde
+   apretar, más del doble del mínimo. */
+@media (max-width: 620px) {
+  .acciones-ficha { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .acciones-ficha .acceso { min-height: 132px; padding: 16px 8px; gap: 10px; }
+  .acciones-ficha .acceso .ico-redondo { width: 58px; height: 58px; }
+  .acciones-ficha .acceso .ico-redondo .ico { width: 24px; height: 24px; }
+  .acciones-ficha .acceso .rot-acceso { font-size: 13px; }
+  /* La tira de situación arranca a la izquierda cuando cae debajo del título:
+     alineada a la derecha quedaba colgando de un borde que ya no está. */
+  .tira-situacion { justify-content: flex-start; gap: 10px 14px; }
+}
 
 /* La fila de botones del desplegable de la torre NO es esta cuadrícula: son
    cuatro botones sueltos y se quedan como estaban. */
@@ -494,6 +516,24 @@ body.lateral-plegado .sidebar .tirador { display: none; }
 }
 .panel > .cab h2 .ico { color: var(--gris); }
 .panel > .cab .desc { font-size: 11px; color: var(--gris); font-weight: 400; text-transform: none; letter-spacing: 0; }
+
+/* 🔴 LA TIRA DE SITUACIÓN (27-08-2026). Lo único que se salvó del recuadro
+   SITUACIÓN que se borró: etapa actual, encargado y alerta. Tres datos no
+   necesitan un recuadro con leyenda —necesitan una línea al lado del título,
+   que es donde uno mira para saber cómo va el auto. */
+.tira-situacion {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap; justify-content: flex-end;
+  font-size: 11.5px; color: var(--tinta); font-weight: 600;
+}
+.tira-situacion .ss { display: inline-flex; align-items: center; gap: 6px; }
+.tira-situacion .ss .k {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .6px;
+  color: var(--gris); font-weight: 700;
+}
+
+/* Un panel que es sólo cabecera —la identidad de la orden encima de Etapas,
+   Fotos o Repuestos— no lleva la línea de abajo ni la esquina viva. */
+.panel > .cab:last-child { border-bottom: 0; border-radius: 3px; }
 .panel > .cuerpo { padding: 11px; }
 
 /* Filtros en línea */
@@ -738,7 +778,17 @@ fieldset.bloque legend {
 .dato { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; font-size: 11.5px; }
 .dato .k { color: var(--gris); }
 .dato .v { color: var(--tinta); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
-.acciones-ficha { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--borde); }
+/* 🔴 ACÁ HABÍA UNA SEGUNDA `.acciones-ficha` (27-08-2026).
+
+   Ayer se escribió la cuadrícula de tarjetas 500 líneas más arriba —y no se
+   aplicó nunca. Esta regla, con la MISMA especificidad y más abajo en el
+   archivo, la pisaba entera: las tarjetas seguían siendo `display:flex` con 5
+   px de separación. Por eso venían de anchos distintos, con «Ver/Subir
+   Documentos o imágenes» al triple que «Ver repuestos».
+
+   Es el patrón de siempre: dos lugares mandando sobre lo mismo. La cuadrícula
+   quedó arriba, sola, y la fila de la torre —que sí necesita flex— está
+   escrita aparte y con nombre propio en `.detalle .acciones-ficha`. */
 
 /* Progreso de etapas */
 .linea-tiempo { display: flex; gap: 2px; margin-top: 5px; }
