@@ -180,7 +180,13 @@ const FICHA_ENLACES = [
      salir, buscar la orden de nuevo y recién ahí entrar. Ahora este acceso
      abre esa misma pantalla, ya parada en esta orden. */
   { rot: 'Editar Recepción',                editarRecepcion: true, permiso: 'ot.editar', ico: 'editar' },
-  { rot: 'Agregar OR',                      vista: 'presupuesto', permiso: 'presupuesto.crear', ico: 'nuevo' },
+  /* 🔴 LLEVABA A PRESUPUESTO Y AHÍ YA NO SE ABREN OR (27-08-2026, Marco: «si
+     quieren agregar otra OR lo hacen de la misma OT, y es como que hacen una
+     nueva orden de reparación en editar ingreso»). Ahora lleva a la única puerta
+     que abre reparaciones: Recepción → Agregar OR. Y por eso también cambia el
+     permiso: abrir la OR es `presupuesto.abrir` —del recepcionista—, no
+     `presupuesto.crear`, que es valorizarla y es del evaluador. */
+  { rot: 'Agregar OR',                      agregarOR: true, permiso: 'presupuesto.abrir', ico: 'nuevo' },
   { rot: 'Bodega de esta orden',            vista: 'bodega', permiso: 'repuesto.cargar', ico: 'bodega' },
   { rot: 'Bitácora',                        tab: 'bitacora', permiso: 'ficha.completa', ico: 'info' }
 ];
@@ -291,6 +297,8 @@ function vFichaOT(o) {
             '" data-irot="' + esc(o.numeroOT) + '">' + cara + '</button>';
           if (l.editarRecepcion) return '<button class="acceso" type="button" data-editar-recepcion="' +
             esc(o.numeroOT) + '">' + cara + '</button>';
+          if (l.agregarOR) return '<button class="acceso" type="button" data-agregar-or="' +
+            esc(o.patente) + '">' + cara + '</button>';
           return '<button class="acceso pendiente" type="button" data-pendiente="' + esc(l.rot) + '|' + l.tanda +
             (l.nota ? '|' + esc(l.nota) : '') + '">' + cara +
             '<span class="et gris">pendiente</span></button>';
@@ -760,6 +768,17 @@ function pFichaOT(o) {
      entrar: si se recargara en cada pintado, cada tecla que el usuario escribe
      se perdería con el render siguiente —está dicho en `recepcion-cableado.js`
      y vale igual acá. */
+  /* Abrir otra reparación sobre este mismo vehículo. Deja el buscador de
+     Recepción con la patente ya escrita: desde acá ya sabemos de qué auto se
+     habla, y hacerla teclear de nuevo es la clase de trabajo que el sistema
+     está para ahorrar. */
+  document.querySelectorAll('[data-agregar-or]').forEach((b) => b.addEventListener('click', () => {
+    const r = rec();
+    r.pantalla = 'or';
+    r.buscaEditar = b.dataset.agregarOr;
+    ir('recepcion');
+  }));
+
   document.querySelectorAll('[data-editar-recepcion]').forEach((b) => b.addEventListener('click', () => {
     const orden = Modelo.otPorNumero(b.dataset.editarRecepcion);
     if (!orden) return avisar({ ok: false, motivo: 'Esa orden ya no está abierta: la recepción de una orden cerrada no se corrige.' });

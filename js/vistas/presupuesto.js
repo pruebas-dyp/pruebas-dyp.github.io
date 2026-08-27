@@ -223,8 +223,19 @@ function vPresupuestoOT(o) {
            no se repite la OR asociada a una OT»: la OR sola ya identifica el
            presupuesto, y agregarle un número atrás sugiere que hay más de uno
            con ese mismo número. */''}
+      ${/* 🔴 LA OR NUNCA VA SOLA (27-08-2026, Marco: «recuerda que OR es
+           OR-Descripción de daños y ahí generan el presupuesto»).
+
+           En el sistema de ellos la reparación se llama «18450 - DAÑOS SECTOR
+           DERECHO DEL VEHÍCULO»: el número identifica y la descripción es lo
+           que la persona reconoce. Acá decía sólo el número, y con dos
+           reparaciones del mismo vehículo —el auto al que le robaron las
+           ruedas Y le rompieron los biseles— dos números parecidos no se
+           distinguen. */''}
       <div><h2>${ico('presupuesto', 'g')}${actual
-        ? 'Editar presupuesto N° ' + esc(actual.numeroOR) + ' · ' + esc(o.patente)
+        ? 'Editar presupuesto OR ' + esc(actual.numeroOR) +
+          (o.descripcionDanos ? ' - ' + esc(o.descripcionDanos.toUpperCase()) : '') +
+          ' · ' + esc(o.patente)
         : 'Generar presupuesto · Orden N° ' + o.numeroOT}</h2>
         <div class="desc">${o.siniestro
           ? esc(o.siniestro) + ' · ' + esc(o.origenIngresoNombre || '') + ' · '
@@ -243,7 +254,18 @@ function vPresupuestoOT(o) {
           ? '<button class="btn secundario" id="presu-pt" ' +
             'title="Declarar el vehículo como pérdida total. Cierra la orden.">Pérdida total</button>'
           : ''}
-        <button class="btn" id="presu-nuevo" data-crea>Agregar OR</button>
+        ${/* 🔴 ACÁ HABÍA UN BOTÓN «AGREGAR OR» (27-08-2026, Marco: «no deben
+             poder agregar OR acá; como te dije, la OR se crea cuando generan
+             una OT en su primer momento»).
+
+             Estaba mal nombrado y mal ubicado. Lo que hacía era crear un
+             PRESUPUESTO, y desde el 26-08-2026 la OR ya no nace ahí: nace con
+             la orden, correlativa, en la recepción. O sea que el botón
+             prometia abrir una reparación nueva y lo que abría era la
+             valorización de una que ya existía.
+
+             Otra OR sobre el mismo vehículo se abre donde se abrió la primera:
+             en Recepción → Agregar OR. Presupuesto sólo VALORIZA. */''}
       </div>
     </div>
     <div class="cuerpo">
@@ -265,14 +287,68 @@ function vPresupuestoOT(o) {
               ? ' · v' + x.version : '') + '</button>' +
           (Modelo.puede('presupuesto.crear') && x.estado === 'borrador'
             ? '<button class="quitar-or" data-presu-borrar="' + esc(x.id) +
-              '" title="Eliminar la OR ' + esc(x.numeroOR) + '">&times;</button>' : '') +
+              '" title="Eliminar el presupuesto de la OR ' + esc(x.numeroOR) +
+              '. La OR no se borra.">&times;</button>' : '') +
           '</span>').join('')}
       </div>` : ''}
-      ${actual ? vPresupuestoDetalle(o, actual) : `
-      <div class="vacio"><div class="titulo">Esta orden no tiene presupuestos</div>
-      <div class="texto">Aprieta <strong>Agregar OR</strong>. Cada presupuesto genera su propia OR:
-      la OT es el nombre y el presupuesto el apellido.</div></div>`}
+      ${actual ? vPresupuestoDetalle(o, actual) : vElegirReparacion(o)}
     </div>
+  </div>`;
+}
+
+/* ── ELEGIR QUÉ REPARACIÓN SE PRESUPUESTA ─────────────────────────
+   🔴 REEMPLAZA A «ESTA ORDEN NO TIENE PRESUPUESTOS · APRIETA AGREGAR OR»
+   (27-08-2026, Marco, con la captura de su sistema al lado).
+
+   Ese cartel decía que faltaba crear algo. No faltaba: la OR ya existía —nace
+   con la orden— y lo único que faltaba era valorizarla. Un aviso que manda a
+   crear lo que ya está creado es peor que no decir nada: deja pensando que el
+   sistema perdió el dato.
+
+   En el sistema que usan, esta pantalla se llama «Generar presupuesto Orden
+   N° 23546» y es una línea: «Seleccione ID de reparación a presupuestar» con
+   un desplegable que dice «18450 - DAÑOS SECTOR DERECHO DEL VEHÍCULO». Se
+   elige y se genera. Eso es lo que hay acá ahora.
+
+   ⚠️ EL DESPLEGABLE TIENE UNA SOLA OPCIÓN HOY, y no es un descuido: en este
+   modelo cada orden lleva UNA reparación, y la segunda reparación del mismo
+   vehículo se abre como otra OR desde Recepción. Se deja igual desplegable y no
+   como texto fijo porque es la forma que ellos reconocen, y porque el día que
+   una orden lleve dos reparaciones la pantalla ya está escrita. */
+function vElegirReparacion(o) {
+  const puede = Modelo.puede('presupuesto.crear');
+  /* Las reparaciones de esta orden. Hoy es una: la OR con la que nació. */
+  const reparaciones = o.numeroOR ? [{
+    numero: o.numeroOR,
+    danos: o.descripcionDanos || 'Sin descripción de daños'
+  }] : [];
+
+  if (!reparaciones.length) return `
+    <div class="vacio"><div class="titulo">Esta orden no tiene OR</div>
+    <div class="texto">Viene de antes del 26-08-2026, cuando la OR se abría a mano.
+    Se le abre una desde <strong>Recepción → Agregar OR</strong>.</div></div>`;
+
+  return `
+  <div class="elegir-reparacion">
+    <div class="rot">Seleccione ID de reparación a presupuestar</div>
+    <select id="presu-reparacion" ${reparaciones.length === 1 ? 'disabled' : ''}
+      title="${reparaciones.length === 1
+        ? 'Esta orden tiene una sola reparación'
+        : 'Cuál de las reparaciones de esta orden se va a valorizar'}">
+      ${reparaciones.map((r) => '<option value="' + esc(r.numero) + '">' +
+        esc(r.numero) + ' - ' + esc(r.danos.toUpperCase()) + '</option>').join('')}
+    </select>
+    ${/* ⚠️ `data-crea` NO ES ADORNO: es el guardia del repique. Sin él, tres
+         clics seguidos generan tres presupuestos —se descubrió así, en el
+         navegador, con el botón que este reemplaza—. El botón cambió de nombre
+         y de sitio; lo que hace sigue siendo irreversible. */''}
+    ${puede
+      ? '<button class="btn" id="presu-generar" data-crea="generar-presupuesto">' +
+        'Guardar y Generar Presupuesto</button>'
+      : '<div class="pie-nota" style="margin:0">Este perfil no valoriza: abre el presupuesto ' +
+        'el evaluador. Se puede mirar, no generar.</div>'}
+    <div class="pie-nota" style="margin:0">La OR ya existe desde que se recibió el vehículo.
+      Acá no se crea: se le pone precio.</div>
   </div>`;
 }
 
@@ -864,9 +940,19 @@ function pPresupuesto() {
     const o = Modelo.otPorId(p.otId);
     const pr = o && o.presupuestos.find((x) => x.id === b.dataset.presuBorrar);
     if (!pr) return;
-    if (!confirm('¿Eliminar la OR ' + pr.numeroOR + ' con sus líneas? No se puede recuperar, ' +
-                 'pero sí se puede deshacer con Ctrl+Z.')) return;
-    ejecutar(() => Modelo.eliminar_presupuesto(pr.id), 'OR ' + pr.numeroOR + ' eliminada.',
+    /* 🔴 DECÍA «ELIMINAR LA OR» Y NO BORRA NINGUNA OR (27-08-2026). Borra el
+       PRESUPUESTO: la OR es de la orden y sigue ahí —de hecho, al borrar el
+       último presupuesto la pantalla vuelve a ofrecer generarlo para la misma
+       OR—. Con dos versiones de la misma OR los dos avisos decían exactamente
+       lo mismo y no había cómo saber cuál se fue; ahora lo dice la versión. */
+    const version = o.presupuestos.filter((x) => x.numeroOR === pr.numeroOR).length > 1
+      ? ' v' + pr.version : '';
+    if (!confirm('¿Eliminar el presupuesto de la OR ' + pr.numeroOR + version +
+                 ' con sus líneas?\n\nLa OR NO se borra: sigue siendo la reparación de ' +
+                 'esta orden y se le puede generar otro presupuesto.\n\n' +
+                 'Se puede deshacer con Ctrl+Z.')) return;
+    ejecutar(() => Modelo.eliminar_presupuesto(pr.id),
+      'Presupuesto de la OR ' + pr.numeroOR + version + ' eliminado.',
       () => { p.presupuestoId = null; });
   }));
 
@@ -877,10 +963,17 @@ function pPresupuesto() {
     p.presupuestoId = b.dataset.presuVer; render();
   }));
 
-  const nuevo = document.getElementById('presu-nuevo');
-  if (nuevo) nuevo.addEventListener('click', () =>
-    ejecutar(() => Modelo.crear_presupuesto(p.otId, { lineas: [] }), 'OR creada.',
-      (r) => { p.presupuestoId = r.presupuesto_id; render(); }));
+  /* «Guardar y Generar Presupuesto», el mismo rótulo de su sistema. Llama a lo
+     mismo que llamaba «Agregar OR» —no cambió el motor, cambió lo que la
+     pantalla dice que hace—, y el aviso ahora nombra la OR que se valorizó en
+     vez de anunciar una OR que nadie creó. */
+  const generar = document.getElementById('presu-generar');
+  if (generar) generar.addEventListener('click', () => {
+    const o = Modelo.otPorId(p.otId);
+    ejecutar(() => Modelo.crear_presupuesto(p.otId, { lineas: [] }),
+      'Presupuesto generado para la OR ' + ((o && o.numeroOR) || '') + '.',
+      (r) => { p.presupuestoId = r.presupuesto_id; render(); });
+  });
 
   /* Ver el documento sin salir de la pantalla. El botón decía "PDF · tanda 7"
      y solo avisaba que estaba pendiente: quien acaba de armar un presupuesto

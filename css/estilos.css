@@ -812,6 +812,26 @@ fieldset.bloque legend {
    quedó arriba, sola, y la fila de la torre —que sí necesita flex— está
    escrita aparte y con nombre propio en `.detalle .acciones-ficha`. */
 
+/* ── Elegir qué reparación se presupuesta ──────────────────────────
+   Una línea: rótulo, desplegable y botón, centrada y con aire. Así está en el
+   sistema que usan, y así se lee que es UN paso y no un formulario. */
+.elegir-reparacion {
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+  padding: 34px 16px; text-align: center;
+}
+.elegir-reparacion .rot {
+  font-size: 12.5px; color: var(--gris); font-weight: 600;
+}
+.elegir-reparacion select {
+  min-width: min(460px, 100%); max-width: 100%; font-size: 13px;
+}
+.elegir-reparacion select:disabled {
+  /* Una sola reparación: el desplegable no se puede cambiar, pero se LEE. Un
+     gris de deshabilitado que no se lee esconde justamente el dato —qué se va
+     a presupuestar— que esta pantalla existe para mostrar. */
+  opacity: 1; color: var(--tinta); background: var(--superficie-2);
+}
+
 /* Progreso de etapas */
 .linea-tiempo { display: flex; gap: 2px; margin-top: 5px; }
 .hito { flex: 1; min-width: 18px; height: 5px; border-radius: 1px; background: var(--neutro-bg); border: 1px solid var(--neutro-borde); }

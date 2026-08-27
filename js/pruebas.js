@@ -1161,6 +1161,81 @@ const Pruebas = (function () {
         });
       })();
 
+      /* 🔴 PRESUPUESTAR NO CREA UNA OR (27-08-2026, Marco: «no deben poder
+         agregar OR acá; la OR se crea cuando generan una OT en su primer
+         momento»).
+
+         La prueba no mira la pantalla: mira el CORRELATIVO. Si alguien vuelve
+         a poner `Reglas.siguienteNumeroOR(db)` dentro de `crear_presupuesto`
+         —que es como estaba antes del 26-08— el número de la orden y el del
+         presupuesto se separan y el contador salta. Eso es lo que se ata acá,
+         y por eso sobrevive a que la pantalla se redibuje entera. */
+      (function () {
+        restaurarSesion();
+        const admin = db.persona.find((x) => x.correo === 'gabriel.diaz@dyp.cl');
+        Modelo.fijar_persona_actual(admin ? admin.id : null);
+        const o = db.orden_trabajo.find((x) => Reglas.estaAbierta(db, x.estado));
+        const orAntes = o.numero_or;
+        const contadorAntes = Number(Reglas.parametro(db, 'correlativo_or', 0));
+
+        const r = Modelo.crear_presupuesto(o.id, { lineas: [] });
+        const pr = r.ok && db.presupuesto.find((x) => x.id === r.presupuesto_id);
+        const contadorDespues = Number(Reglas.parametro(db, 'correlativo_or', 0));
+
+        push({
+          nombre: '🔴 Generar un presupuesto no abre una OR nueva',
+          intento: 'Generar el presupuesto de una orden y mirar su OR y el correlativo',
+          esperado: 'El presupuesto lleva la MISMA OR de la orden y el correlativo no se mueve',
+          paso: !!pr && String(pr.numero_or) === String(orAntes) &&
+                String(o.numero_or) === String(orAntes) &&
+                contadorDespues === contadorAntes,
+          detalle: !pr ? 'No se pudo generar el presupuesto: ' + r.motivo
+            : (String(pr.numero_or) !== String(orAntes)
+              ? 'El presupuesto nació con la OR ' + pr.numero_or + ' y la orden tiene la ' + orAntes
+              : (contadorDespues !== contadorAntes
+                ? 'El correlativo saltó de ' + contadorAntes + ' a ' + contadorDespues +
+                  ': se consumió una OR que nadie va a usar'
+                : 'Misma OR ' + orAntes + ', correlativo quieto en ' + contadorAntes))
+        });
+      })();
+
+      /* Y la pantalla, que es donde Marco lo vio: el módulo Presupuesto no
+         puede ofrecer abrir una OR. Se mira el HTML de verdad, no una bandera:
+         una prueba que compruebe «existe la función» daría verde con el botón
+         puesto igual. */
+      (function () {
+        restaurarSesion();
+        const admin = db.persona.find((x) => x.correo === 'gabriel.diaz@dyp.cl');
+        Modelo.fijar_persona_actual(admin ? admin.id : null);
+        /* Una orden SIN presupuesto todavia: es el caso que Marco vio, la
+           recepcion recien hecha. Con uno ya generado la pantalla muestra la
+           grilla y no el desplegable, y la prueba estaria mirando otra cosa. */
+        const o = db.orden_trabajo.find((x) => Reglas.estaAbierta(db, x.estado) &&
+          !db.presupuesto.some((y) => y.ot_id === x.id));
+        let html = '';
+        try {
+          ui.presupuesto = { otId: o.id, presupuestoId: null, busqueda: '',
+                             linea: { proceso: '', descripcion: '' } };
+          html = typeof vPresupuesto === 'function' ? vPresupuesto() : '';
+        } catch (e) { html = 'REVENTÓ: ' + e.message; }
+
+        const ofreceCrear = html.indexOf('>Agregar OR<') >= 0;
+        const pideElegir = html.indexOf('Seleccione ID de reparación a presupuestar') >= 0;
+        const nombraLaOR = o.numero_or ? html.indexOf(String(o.numero_or)) >= 0 : false;
+
+        push({
+          nombre: '🔴 Presupuesto pide ELEGIR la reparación, no crearla',
+          intento: 'Pintar el módulo Presupuesto sobre una orden sin presupuesto todavía',
+          esperado: 'Ningún botón «Agregar OR»; sale el desplegable de reparación con la OR de la orden',
+          paso: !ofreceCrear && pideElegir && nombraLaOR,
+          detalle: ofreceCrear
+            ? 'Sigue el botón «Agregar OR»: la OR ya existe y ahí se abriría otra'
+            : (!pideElegir ? 'No sale el desplegable de «Seleccione ID de reparación»'
+              : (!nombraLaOR ? 'El desplegable no nombra la OR ' + o.numero_or + ' de esta orden'
+                : 'Se elige la OR ' + o.numero_or + ' y se le pone precio'))
+        });
+      })();
+
       /* 🔶 Y SI DESPUÉS LE CAMBIAN LA OP, LA LISTA DE COMPRAS SIGUE.
 
          En la pantalla la OP se elige después de escribir, y se cambia de

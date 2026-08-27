@@ -119,7 +119,38 @@ const Semilla = (function () {
      26-08-2026: «si cortamos en la OR 19810, la siguiente debe ser la 19811». */
   const PRIMERA_OR = 19810;
 
-  const FORMA_DATOS = 14;
+  /* 🔴 14 → 15 EL 27-08-2026, A PROPÓSITO Y POR PEDIDO (Marco: «borrar la
+     recepción de prueba que hice»).
+
+     Su recepción de prueba —OT 23489, MAPFRE, siniestro 3232— no vive en la
+     semilla: la creó él y quedó en la base guardada de su navegador y en la
+     sala compartida. Borrarla «a mano» no existe: no hay una base central que
+     tocar.
+
+     Lo que sí existe es el SELLO. Subir este número cambia la huella de la
+     semilla, y con eso toda base guardada que no coincida se descarta y se
+     vuelve a sembrar —en su navegador, en el mío y en la sala, que desde el
+     26-08-2026 también compara el sello antes de repartir un documento—.
+
+     ⚠️ SE LLEVA TODO LO ESCRITO A MANO, no sólo su prueba: es una demostración
+     y los datos son de demostración. Es el precio de no tener base todavía, y
+     es exactamente lo que hay que resolver en la migración. */
+  /* Las descripciones de daño de la base sembrada. En su sistema la OR se
+     nombra con esto: «18450 - DAÑOS SECTOR DERECHO DEL VEHÍCULO». */
+  const DANOS = [
+    'Daños sector derecho del vehículo',
+    'Daños sector izquierdo del vehículo',
+    'Daños parte frontal',
+    'Daños parte trasera',
+    'Daños sector delantero derecho',
+    'Daños sector trasero izquierdo',
+    'Daños en puerta delantera derecha',
+    'Daños en tapa de maletero y parachoque trasero',
+    'Daños en capó y parachoque delantero',
+    'Daños en costado izquierdo y espejo'
+  ];
+
+  const FORMA_DATOS = 15;
   // TEMPARIO_HORA ($10.000, reglas §C.15) se eliminó el 13-08-2026 junto con
   // el tempario entero. La cifra queda medida en `reglas`, no en el sistema.
 
@@ -1287,6 +1318,18 @@ const Semilla = (function () {
            responsable: son las que hay que asignar, y sin ellas la pantalla
            del jefe no tendría nada pendiente que mostrar. */
         responsable_id: idx % 4 === 0 ? null : [MESON, JEFA_TALLER][idx % 2],
+        /* 🔴 LA DESCRIPCIÓN DE DAÑOS, QUE FALTABA (27-08-2026). Las órdenes
+           sembradas nacían sin ella, y desde hoy la OR se nombra «OR -
+           descripción de daños» en el presupuesto: sin este campo las 102
+           órdenes de la demostración decían «SIN DESCRIPCIÓN DE DAÑOS» y la
+           pantalla que Marco pidió no mostraba nada.
+
+           Son de demostración como todo lo demás de esta base —el vehículo, el
+           cliente y el siniestro también lo son— y están escritas en la forma
+           del sistema que usan: «DAÑOS SECTOR DERECHO DEL VEHÍCULO». Reparten
+           por índice, no al azar, para que la base sembrada sea la misma en
+           todos los navegadores. */
+        descripcion_danos: DANOS[idx % DANOS.length],
         observaciones_ingreso: '', demo: true
       });
 
