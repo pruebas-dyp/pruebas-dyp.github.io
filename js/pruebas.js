@@ -189,7 +189,7 @@ const Pruebas = (function () {
           esperado: 'Un total mayor que cero y el conteo de las que no tienen presupuesto',
           paso: total > 0 && vivas.length > 0,
           detalle: 'Venta parada: $' + Math.round(total).toLocaleString('es-CL') +
-                   ' en ' + vivas.length + ' órdenes · ' + sinPresu + ' todavía sin OR.'
+                   ' en ' + vivas.length + ' órdenes · ' + sinPresu + ' todavía sin presupuesto.'
         });
       })();
 
@@ -1112,6 +1112,55 @@ const Pruebas = (function () {
             : (pedidos.length + ' repuesto(s), ' + ligado + ' ligado(s) a su línea' +
               (pedidos.length ? ' · ' + pedidos.map((r) => r.descripcion).join(', ')
                 : '  ·  NADIE los pidió: el bodeguero tendría que escribirlos de nuevo a mano.'))
+        });
+      })();
+
+      /* 🔴 NINGUNA PANTALLA PUEDE DECIR «SIN OR» (27-08-2026, Marco: «seguimos
+         teniendo el problema que el panel de presupuesto te dice sin OR; la OR,
+         como ya te lo comenté, te dije qué era y cómo se generaba»).
+
+         Desde el 26-08 la OR nace CON la orden y es correlativa: no existe una
+         orden sin OR. Lo que puede faltar es el presupuesto. El rótulo viejo
+         sobrevivió en tres pantallas y en un comentario que lo defendía, porque
+         cada uno se arregló por separado y por su nombre.
+
+         Esta prueba no mira un rótulo: mira que NINGUNA pantalla lo diga, y que
+         el listado de Presupuesto muestre la OR de cada orden aunque todavía no
+         tenga presupuesto. Es la forma de que no vuelva por una cuarta puerta. */
+      (function () {
+        restaurarSesion();
+        const admin = db.persona.find((x) => x.correo === 'gabriel.diaz@dyp.cl');
+        Modelo.fijar_persona_actual(admin ? admin.id : null);
+
+        const pantallas = [];
+        const pintar = (nombre, fn) => {
+          try { pantallas.push([nombre, fn() || '']); } catch (e) { pantallas.push([nombre, 'REVENTÓ ' + e.message]); }
+        };
+        ui.presupuesto = { otId: null, presupuestoId: null, busqueda: '', linea: { proceso: '', descripcion: '' } };
+        pintar('Presupuesto', () => (typeof vPresupuesto === 'function' ? vPresupuesto() : ''));
+        pintar('Reportería', () => (typeof vReporteria === 'function' ? vReporteria() : ''));
+        pintar('Consolidado', () => (typeof vConsolidado === 'function' ? vConsolidado() : ''));
+
+        const culpables = pantallas.filter(([, h]) => /sin OR/i.test(h)).map(([n]) => n);
+
+        // Y la OR de una orden sin presupuesto tiene que estar a la vista.
+        const sinPresu = db.orden_trabajo.find((o) => Reglas.estaAbierta(db, o.estado) &&
+          !db.presupuesto.some((p) => p.ot_id === o.id));
+        const listado = (pantallas[0] || [])[1] || '';
+        const muestraSuOR = !sinPresu || !sinPresu.numero_or ||
+          listado.indexOf(String(sinPresu.numero_or)) >= 0;
+
+        push({
+          nombre: '🔴 Ninguna pantalla dice «sin OR»: la OR nace con la orden',
+          intento: 'Pintar Presupuesto, Reportería y Consolidado y buscar el rótulo',
+          esperado: 'No aparece en ninguna, y el listado muestra la OR de una orden sin presupuesto',
+          paso: !culpables.length && muestraSuOR,
+          detalle: culpables.length
+            ? 'Todavía lo dice: ' + culpables.join(', ') + '. La OR existe desde la recepción'
+            : (!muestraSuOR
+              ? 'La orden ' + sinPresu.numero_ot + ' tiene la OR ' + sinPresu.numero_or +
+                ' y el listado no la muestra'
+              : 'Lo que falta se llama «sin presupuesto», que es lo que de verdad falta')
         });
       })();
 
@@ -3671,7 +3720,7 @@ const Pruebas = (function () {
          sembrar repuestos a mano se caiga acá y no en la reunión. */
       ['Repuestos sin la línea de presupuesto que los originó',
         db.repuesto.filter((r) => !r.presupuesto_linea_id).length, 0],
-      ['Órdenes con repuestos y sin OR',
+      ['Órdenes con repuestos y sin presupuesto',
         (function () {
           const conOR = new Set(db.presupuesto.map((p) => p.ot_id));
           return new Set(db.repuesto.map((r) => r.ot_id).filter((id) => !conOR.has(id))).size;

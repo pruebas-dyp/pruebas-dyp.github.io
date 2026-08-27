@@ -471,6 +471,9 @@ function compromisosFicha(o, dato) {
       (x.de ? ' · ' + esc(x.de) : '') + '</span></div>').join('') + '</div>';
 }
 
+/* Un número de días con su unidad, y en singular cuando es uno. */
+const dias = (n) => Number(n) + (Number(n) === 1 ? ' día' : ' días');
+
 function fichaResumen(o) {
   /* La ayuda es el TERCER argumento y va como globo del rótulo, no dentro del
      texto: el rótulo se escapa con `esc()` y ahí no entra HTML. */
@@ -504,7 +507,7 @@ function fichaResumen(o) {
           ? '<i class="punto" style="background:' + etapaPorCodigo(o.etapa).color + '"></i>' + esc(o.etapaNombre)
           : '<span class="et gris">Pendiente</span>')}
         ${dato('Encargado', o.asignado ? esc(o.asignado) : '<span class="et gris">Sin asignar</span>')}
-        ${dato('Días en reparación', o.diasKpi + ' de ' + META_DIAS_REPARACION +
+        ${dato('Días en reparación', o.diasKpi + ' de ' + META_DIAS_REPARACION + ' días' +
           (o.sobreMeta ? ' <span class="et roja" title="Sobre la meta">!</span>' : ''))}
         ${dato('Dónde está', fuera
           ? '<span class="et ambar">fuera de taller</span>'
@@ -584,16 +587,22 @@ function fichaResumen(o) {
            verdad y sigue estando: pasó al globo del rótulo, que se lee una vez
            —cuando uno se pregunta por qué tres relojes dan tres números— y
            después no molesta más. */''}
-      ${dato('Días desde el ingreso', '<strong>' + o.diasTotales + '</strong>',
+      ${/* 🔴 CON SU UNIDAD (27-08-2026, Marco: «a lo que te dije, ponle días»).
+           Un «30» solo al lado de «Reparación acumulada» no dice si son días,
+           horas o piezas. La unidad no es el sistema hablando: es parte del
+           número. Lo que se sacó fue la explicación —«nunca se reinicia»—, que
+           es otra cosa y sigue en el globo del rótulo. */''}
+      ${dato('Días desde el ingreso', '<strong>' + dias(o.diasTotales) + '</strong>',
         'Desde que entró el vehículo. Nunca se reinicia')}
-      ${dato('Reparación acumulada', o.diasReparacion,
+      ${dato('Reparación acumulada', dias(o.diasReparacion),
         'Los días que el vehículo estuvo en reparación. Se reanuda al reingresar')}
-      ${dato('Estadía actual', fuera ? '<span style="color:var(--gris)">0</span>' : o.diasEstadiaActual,
+      ${dato('Estadía actual', fuera ? '<span style="color:var(--gris)">0 días</span>' : dias(o.diasEstadiaActual),
         'Los días de esta estadía. Vuelve a cero cada vez que el vehículo sale y entra')}
       ${dato('Contra la meta', o.sobreMeta
-        ? '<span style="color:var(--ambar)" title="Sobre la meta">' + o.diasKpi + ' de ' + META_DIAS_REPARACION + '</span>'
-        : o.diasKpi + ' de ' + META_DIAS_REPARACION)}
-      ${fuera ? dato('Fuera de taller hace', '<span style="color:var(--ambar)">' + o.diasFuera + '</span>') : ''}
+        ? '<span style="color:var(--ambar)" title="Sobre la meta">' + o.diasKpi + ' de ' +
+          META_DIAS_REPARACION + ' días</span>'
+        : o.diasKpi + ' de ' + META_DIAS_REPARACION + ' días')}
+      ${fuera ? dato('Fuera de taller hace', '<span style="color:var(--ambar)">' + dias(o.diasFuera) + '</span>') : ''}
       ${dato('Fecha de Ingreso', fFechaHora(o.fechaIngreso))}
       ${/* Bajó de la cabecera, que se fue. Sale de `ot_estadia`, o sea de un
            hecho con fecha: es la última vez que el auto salió del taller, no la

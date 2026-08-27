@@ -302,15 +302,28 @@ div.desplegable button:hover .ico { color: var(--acento); }
   padding-bottom: 10px; border-bottom: 1px solid var(--borde);
 }
 
-/* La salida de la pestaña de una orden, en la línea de la ruta. Va primero y
-   con el chevron mirando a la izquierda: es «volver», no «entrar». */
+/* 🔴 LA SALIDA, DESTACADA (27-08-2026, Marco: «deja más grande y destacado el
+   emoticono de volver al sistema como lo teníamos antes»).
+
+   Antes era el botón azul de la barra de herramientas. Al subirlo a la línea de
+   la ruta quedó como un enlace de texto: correcto de sitio y perdido de peso,
+   porque compite con «Operación diaria › Torre de control», que es de adorno.
+   Vuelve el azul sólido y el icono grande. Es el único botón de esta línea. */
 .cab-modulo .ruta .volver-sistema {
-  display: inline-flex; align-items: center; gap: 3px;
-  color: var(--acento); font-weight: 600; text-decoration: none;
-  padding: 2px 8px 2px 4px; margin-right: 4px; border-radius: 3px;
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--acento-solido); border: 1px solid var(--acento-solido); color: #fff;
+  font-weight: 600; font-size: 11.5px; text-decoration: none;
+  padding: 4px 11px 4px 8px; margin-right: 9px; border-radius: 4px;
 }
-.cab-modulo .ruta .volver-sistema:hover { background: var(--acento-bg); }
-.cab-modulo .ruta .volver-sistema .ico { transform: rotate(180deg); }
+.cab-modulo .ruta .volver-sistema:hover {
+  background: var(--acento-solido-hover); border-color: var(--acento-solido-hover);
+}
+.cab-modulo .ruta .volver-sistema .ico { color: #fff; width: 15px; height: 15px; }
+/* El primero es el chevron de «volver»: mira a la izquierda y va más chico que
+   el escudo, que es el que dice ADÓNDE se vuelve. */
+.cab-modulo .ruta .volver-sistema .ico:first-child {
+  transform: rotate(180deg); width: 12px; height: 12px; margin-right: -1px;
+}
 
 /* La vuelta desde un panel a la ficha. Ocupa el lugar que tenían las pestañas. */
 .volver-ficha {
@@ -847,9 +860,9 @@ body.ventana-registro .sidebar { display: none; }
 /* Fila expandida como ficha */
 tr.detalle > td { background: var(--superficie-3); padding: 0; border-bottom: 2px solid var(--borde-fuerte); }
 .ficha-detalle { padding: 10px 12px 12px; }
-.ficha-rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
+.ficha-rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 7px; }
 fieldset.bloque {
-  border: 1px solid var(--borde); border-radius: 3px; padding: 5px 9px 6px; margin: 0; background: var(--superficie);
+  border: 1px solid var(--borde); border-radius: 3px; padding: 3px 9px 5px; margin: 0; background: var(--superficie);
 }
 fieldset.bloque legend {
   font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--gris);
@@ -864,7 +877,15 @@ fieldset.bloque legend {
    ⚠️ EL TAMAÑO DE LETRA NO BAJA. Comprimir apretando el aire es gratis;
    comprimir achicando la letra se lo cobra al que lee el RUT o la patente, que
    es exactamente para lo que se abre esta pantalla. */
-.dato { display: flex; justify-content: space-between; gap: 10px; padding: 1px 0; font-size: 11.5px; }
+.dato {
+  display: flex; justify-content: space-between; gap: 10px; padding: 0; font-size: 11.5px;
+  /* 🔴 SIN AIRE Y CON INTERLINEADO CORTO (27-08-2026, Marco: «contráelo un
+     poco más»). Sin `line-height` las filas quedaban en 1,45 × 11,5 = 17 px
+     aunque el `padding` fuera cero: el aire estaba en la línea, no alrededor.
+     A 1,55 de rótulo son 15 px por fila; por 26 filas, 50 píxeles menos. */
+  line-height: 1.3;
+  min-height: 17px; align-items: center;
+}
 .dato .k { color: var(--gris); }
 .dato .v { color: var(--tinta); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
 /* 🔴 ACÁ HABÍA UNA SEGUNDA `.acciones-ficha` (27-08-2026).

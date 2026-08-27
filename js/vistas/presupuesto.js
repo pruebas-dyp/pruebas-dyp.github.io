@@ -177,20 +177,37 @@ function vPresupuestoListado() {
           // El mouse sobre la OR abre la etiqueta con monto, estado y fechas de
           // ese presupuesto: "que el usuario tenga el detalle ahí mismo y no
           // tenga que estar abriendo la OT". Textual del cliente, 15-08-2026.
-          '<td class="num">' + (o.presupuestos.length
-            ? '<span data-or="' + esc(o.presupuestos[o.presupuestos.length - 1].numeroOR) + '">' +
-                esc(o.presupuestos[o.presupuestos.length - 1].numeroOR) + '</span>' +
+          /* 🔴 ACÁ DECÍA «SIN OR» Y NO PUEDE (27-08-2026, Marco: «seguimos
+             teniendo el problema que el panel de presupuesto te dice sin OR; la
+             OR, como ya te lo comenté, te dije qué era y cómo se generaba»).
+
+             ⚠️ Y EL COMENTARIO QUE LO JUSTIFICABA ERA DEL 16-08 Y HABÍA DEJADO DE
+             SER VERDAD. Decía, con todas las letras: «la OR es el trabajo
+             abierto sobre la orden, y lo que falta acá es justamente eso». Era
+             cierto ENTONCES —la OR nacía al abrir el presupuesto— y dejó de
+             serlo el 26-08, cuando la OR pasó a nacer con la orden. La regla
+             cambió, la pantalla no, y el comentario seguía defendiendo la
+             pantalla vieja. Un comentario que envejece mal es peor que ninguno:
+             hace que el siguiente que pase lo lea y no toque nada.
+
+             La columna lee `o.numeroOR` —la OR DE LA ORDEN—, que existe desde
+             que se recibió el vehículo. Lo que puede faltar es el presupuesto, y
+             eso se dice al lado. */
+          '<td class="num">' + (o.numeroOR
+            ? '<span' + (o.presupuestos.length
+                ? ' data-or="' + esc(o.presupuestos[o.presupuestos.length - 1].numeroOR) + '"' : '') +
+                '>' + esc(o.numeroOR) + '</span>' +
               /* Cuántos documentos hay bajo esa OR, no «v5»: la versión se
                  sacó de la vista y dejar la letra v acá la traía de vuelta
                  disfrazada. */
               (o.presupuestos.length > 1 ? ' <span class="et gris">' + o.presupuestos.length +
-                ' documentos</span>' : '')
-            /* «sin OR», no «sin presupuesto» (16-08-2026, Marco). Es la
-               palabra del taller: la OR es el trabajo abierto sobre la orden, y
-               lo que falta acá es justamente eso — todavía nadie abrió el
-               trabajo. «Sin presupuesto» suena a que la OR existe y está en
-               blanco, que es otra cosa. */
-            : '<span class="et ambar">sin OR</span>') + '</td>' +
+                ' documentos</span>' : '') +
+              (!o.presupuestos.length
+                ? ' <span class="et ambar" title="La OR existe; todavía no se le generó el ' +
+                  'presupuesto">sin presupuesto</span>' : '')
+            /* Sin OR sólo puede venir de antes del 26-08-2026, cuando la OR se
+               abría a mano. No se inventa una: se dice lo que hay. */
+            : '<span class="et gris" title="Orden anterior al correlativo de OR">—</span>') + '</td>' +
           '<td class="num">' + (neto ? fMonto(neto) : '—') + '</td>' +
           '<td><span style="display:flex;gap:6px;flex-wrap:wrap">' +
             '<button class="btn secundario chico" data-presu-ot="' + esc(o.id) + '">' +

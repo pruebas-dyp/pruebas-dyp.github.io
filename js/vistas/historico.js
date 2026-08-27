@@ -368,7 +368,9 @@ function vHistoricoEstadisticas() {
         </fieldset>
 
         <fieldset class="bloque" style="grid-column:1/-1">
-          <legend>Últimas ${d.ultimasSinPresupuesto.length} órdenes sin OR</legend>
+          ${/* «sin presupuesto», no «sin OR» (27-08-2026): la lista sale de
+               `ultimasSinPresupuesto` —el nombre ya lo decía— y todas tienen OR. */''}
+          <legend>Últimas ${d.ultimasSinPresupuesto.length} órdenes sin presupuesto</legend>
           <div class="grid-envoltorio"><table class="grid">
             <thead><tr><th style="width:80px">OT</th><th style="width:100px">Patente</th><th>Cliente</th>
               <th style="width:120px">Fecha</th><th style="width:90px"></th></tr></thead>
@@ -443,7 +445,7 @@ function impresoEstadisticas() {
   ${tabla('Modelo con Más Vehículos Siniestrados', ['Modelo', 'Marca', 'Total'],
     d.modelos.map((m) => '<tr><td>' + esc(m.modelo) + '</td><td>' + esc(m.marca) + '</td><td>' +
       m.n + '</td></tr>').join(''))}
-  ${tabla('Últimas órdenes sin OR', ['OT', 'Patente', 'Cliente', 'Fecha'],
+  ${tabla('Últimas órdenes sin presupuesto', ['OT', 'Patente', 'Cliente', 'Fecha'],
     d.ultimasSinPresupuesto.map((o) => '<tr><td>' + o.numeroOT + '</td><td>' + esc(o.patente) +
       '</td><td>' + esc(o.cliente) + '</td><td>' + fFechaHora(o.fechaIngreso) + '</td></tr>').join(''))}
   ${pieImpreso()}`;

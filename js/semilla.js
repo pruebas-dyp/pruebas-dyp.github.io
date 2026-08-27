@@ -1600,10 +1600,10 @@ const Semilla = (function () {
          el indicador de "sin presupuesto" — esas son órdenes que el taller
          **no puede cobrar todavía**.
 
-         Se excluyen las que tienen que mostrar un repuesto pendiente: sin OR
+         Se excluyen las que tienen que mostrar un repuesto pendiente: sin presupuesto
          no hay presupuesto, sin presupuesto no hay línea de cambio y sin línea
          de cambio no hay repuesto que pedir. Antes no se excluían y quedaban
-         ocho autos sin OR con repuestos pendientes — Marco lo cachó el
+         ocho autos sin presupuesto con repuestos pendientes — Marco lo cachó el
          16-08-2026 mirando la demostración, y tenía razón. */
       const sinPresupuesto = viva && idx % 8 === 3 && !conRepPend;
 
