@@ -35,7 +35,6 @@ const Sala = (function () {
   let versionEnviada = -1;     // la última versión del MODELO que ya subí
   let aplicando = false;       // estoy escribiendo lo que llegó: no rebotar
   let ultimoError = null;
-  let pisado = null;           // aviso de que lo de otro equipo tapo lo mio
   let sincronizando = false;
 
   /* Quién soy. Sirve para no repintarme con mi propio eco: si la sala dice
@@ -162,23 +161,10 @@ const Sala = (function () {
       ultimoError = 'La sala trajo algo que no es una base del sistema: ' + malo;
       return false;
     }
-    /* 🔴 ANTES ESTO PISABA EN SILENCIO (SIS-2, 23-08-2026).
-
-       Si los dos dispositivos cambiaron algo dentro de la misma ventana —hasta
-       2,5 s de latido más 1,2 s de espera—, el que llega segundo escribe lo del
-       otro encima de lo suyo. Sin mezcla, sin conflicto, sin una palabra. Y esa
-       ventana es la de dos personas trabajando en paralelo, que es justo lo que
-       va a pasar en la demostración con el cliente.
-
-       Mezclar es H1. Lo que se puede hacer hoy —y es infinitamente mejor que
-       nada— es DARSE CUENTA y decirlo.
-
-       ⚠️ Va acá y no en `latido()` por dos razones, y la segunda pesa más:
-       ésta es la función que pisa, y ésta es la que se puede probar. `latido()`
-       es asíncrona y habría que fingir la red entera para tocarla; `aplicar` es
-       síncrona y ya salía exportada para eso mismo. */
-    const yoTambienCambie = versionEnviada >= 0 && Modelo.versionGuardada() !== versionEnviada;
-
+    /* ⚠️ `aplicar` APLICA. La decisión de si conviene aplicar o no es de
+       `queHacerConLoQueLlega()`, más abajo, y la toma `latido()` antes de
+       llamar acá. Estuvieron juntas un rato y fue un error: dejó sin forma de
+       sincronizar a las dos pruebas que usan `aplicar` justamente para eso. */
     aplicando = true;
     try {
       localStorage.setItem(Modelo.CLAVE, JSON.stringify(fila.db));
@@ -199,15 +185,14 @@ const Sala = (function () {
          entrara con la versión anterior del código lo volvía a imponer. */
       if (ok === 'resembrado') versionEnviada = -1;          // fuerza la subida
       else versionEnviada = Modelo.versionGuardada();        // esto sí está allá
-      if (ok && yoTambienCambie) {
-        pisado = 'Llegaron cambios de otro equipo y se aplicaron encima. ' +
-          'Lo que estabas haciendo acá se perdió: hay que volver a hacerlo.';
-        /* `avisar` vive en `js/app/acciones.js`, que carga DESPUÉS que este
-           archivo, así que se busca al usarla y no antes. Si no está —el arnés
-           de consola, por ejemplo— el aviso igual queda guardado y lo puede
-           leer `porQueSePerdio()`. */
-        if (typeof avisar === 'function') avisar({ ok: false, motivo: pisado }, '', { persistente: true });
-      }
+      /* 🔴 ACÁ IBA EL AVISO «llegaron cambios y se aplicaron encima». Ya no
+         puede pasar: si yo hubiera cambiado algo, arriba se rechazó y no
+         llegamos hasta acá. El aviso se quedó sin caso que avisar.
+
+         ⚠️ LO QUE SÍ PUEDE PERDERSE, y queda dicho: el equipo que YA había
+         subido lo suyo y está quieto recibe esto y lo aplica. Si el otro
+         trabajó sobre una copia sin ese cambio, ese cambio se va. Detectarlo
+         exige comparar los dos documentos, que es la mezcla, que es H1. */
       if (ok && typeof render === 'function') render();
       return ok;
     } catch (e) {
@@ -234,6 +219,35 @@ const Sala = (function () {
      obliga a fingir la red entera. Acá la decisión es síncrona, se exporta, y
      hay una prueba que la corre — que es la única forma de que este error no
      vuelva a entrar sin que nadie se entere. */
+  /* 🔴 ¿SE APLICA LO QUE LLEGÓ, O SE SUBE LO DE ACÁ? (27-08-2026, Marco: «me
+     pasa el panel de la creación, pero después me vuelve hacia atrás y me dice
+     que hay datos manipulados en vivo... no me permite crear el presupuesto»).
+
+     Hasta hoy no había decisión: lo que llegaba se aplicaba, y si tapaba algo se
+     avisaba con un cartel que decía «hay que volver a hacerlo». Volver a hacerlo
+     no servía de nada, porque volvía a pasar: con dos ventanas abiertas contra
+     la misma sala —una trabajando y otra quieta con una copia más vieja— la
+     quieta sube lo suyo cada 2,5 segundos y borra lo de la que está escribiendo.
+     En bucle. Marco no pudo generar un presupuesto en toda la tarde.
+
+     La regla es una línea: SI ACÁ HAY ALGO SIN MANDAR, NO SE APLICA LO QUE
+     LLEGA; se sube lo de acá y el otro equipo lo recibe.
+
+     ⚠️ SIGUE SIENDO «GANA EL ÚLTIMO», no es mezcla —mezclar es H1 y no está
+     construido—. Lo que cambia es QUIÉN gana: antes ganaba el que llegaba
+     segundo aunque estuviera quieto; ahora gana el que acaba de escribir. El que
+     pierde es el que ya subió lo suyo y no está haciendo nada, que es el único
+     orden que no interrumpe a nadie en la mitad de algo.
+
+     ⚠️ Y ES UNA FUNCIÓN APARTE, no una línea dentro de `latido()`: `latido` es
+     asíncrona y probarla obliga a fingir la red entera. Acá la decisión es
+     síncrona, se exporta, y hay una prueba que la corre —que es la única forma
+     de que esto no se caiga sin que nadie se entere—. Es la misma leccion que
+     dejó `hayQueSubir()`, ahí abajo. */
+  function queHacerConLoQueLlega() {
+    return hayQueSubir() ? 'subir' : 'aplicar';
+  }
+
   function hayQueSubir() {
     return !aplicando && Modelo.versionGuardada() !== versionEnviada;
   }
@@ -264,6 +278,14 @@ const Sala = (function () {
 
            Mezclar es H1. Lo que se puede hacer hoy —y es infinitamente mejor
            que nada— es DARSE CUENTA y decirlo. */
+        /* Se decide ANTES de bajar los 2,4 MB: si acá hay algo sin mandar,
+           lo que llega no se va a aplicar igual, así que no se baja. */
+        if (queHacerConLoQueLlega() === 'subir') {
+          const proxima = Math.max(Number(cabeza.version) || 0, versionVista) + 1;
+          await subir(proxima);
+          versionVista = proxima; versionEnviada = Modelo.versionGuardada();
+          ultimoError = null; return;
+        }
         const fila = await bajar();
         aplicar(fila);
         ultimoError = null; return;
@@ -292,7 +314,34 @@ const Sala = (function () {
     pendiente = setTimeout(latido, ESPERA);
   }
 
-  /* ── Encender y apagar ───────────────────────────────────────────────── */
+  /* ── DOS PESTAÑAS DEL MISMO NAVEGADOR ─────────────────────────────
+
+     🔴 27-08-2026. Y éste es el caso de verdad de Marco: la ficha se abre en
+     una pestaña nueva —doble clic en la Torre— y quedan dos, o tres, del mismo
+     navegador. Comparten `localStorage`, o sea comparten el documento; pero
+     cada una tiene su propia copia EN MEMORIA y su propio contador. La pestaña
+     quieta no se enteraba de que la otra había escrito, y en su siguiente
+     latido subía a la sala su copia vieja —que desde la sala se ve igual que
+     «otro equipo»— y borraba lo recién hecho. En bucle, cada 2,5 segundos.
+
+     El navegador avisa esto solo: `storage` se dispara en las OTRAS pestañas
+     del mismo origen cuando una escribe. No hace falta red ni sala: alcanza con
+     escucharlo y volver a leer del disco.
+
+     ⚠️ NO SE DISPARA EN LA PESTAÑA QUE ESCRIBIÓ —así está en la norma—, que es
+     justamente lo que hace que esto no se muerda la cola. */
+  window.addEventListener('storage', (ev) => {
+    if (!ev || ev.key !== Modelo.CLAVE || aplicando) return;
+    const ok = Modelo.recargarDeDisco();
+    if (!ok) return;
+    /* Lo que acaba de escribir la otra pestaña es de este mismo navegador: no
+       hay nada que subir por este cambio, lo sube ella. Salvo que haya habido
+       resiembra, que sí hay que empujar. */
+    versionEnviada = ok === 'resembrado' ? -1 : Modelo.versionGuardada();
+    if (typeof render === 'function') render();
+  });
+
+  /* ── Encender y apagar ────────────────────────────────────────── */  /* ── Encender y apagar ───────────────────────────────────────────────── */
 
   function encender() {
     if (encendida) return;
@@ -340,14 +389,12 @@ const Sala = (function () {
     };
   }
 
-  /* El aviso de que lo de otro equipo tapó lo mío. Se lee y se olvida, igual
-     que `porQueSeResembro` del modelo: se muestra una vez y no reaparece en
-     cada repintado. */
-  function porQueSePerdio() {
-    const m = pisado;
-    pisado = null;
-    return m;
-  }
+  /* 🔴 ACÁ VIVÍA `porQueSePerdio()` (27-08-2026). Devolvía el aviso de «lo de
+     otro equipo tapó lo tuyo». Ya no hay nada que avisar: desde que
+     `queHacerConLoQueLlega()` decide, la sala no aplica encima de lo que se
+     está escribiendo. Un lector de un aviso que nadie escribe devuelve null
+     para siempre, y eso se lee como «no pasó nada» cuando lo correcto es que
+     ya no puede pasar. */
 
   function estado() {
     const p = peso();
@@ -396,6 +443,6 @@ const Sala = (function () {
      es lo unico que separa el sistema de un documento cualquiera puesto por un
      tercero, y una defensa que no se puede probar no se sabe si esta. */
   return { iniciar, encender, apagar, alternar, estado, empujar, latido, reponer, aplicar,
-           peso, porQueSePerdio, hayQueSubir,
+           peso, hayQueSubir, queHacerConLoQueLlega,
            esBaseCreible };
 })();

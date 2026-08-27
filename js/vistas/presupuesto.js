@@ -148,7 +148,17 @@ function vPresupuestoListado() {
       <div><h2>${ico('presupuesto', 'g')}Presupuesto</h2>
         <div class="desc">Las 9 columnas del original, con el total neto por orden</div></div>
       <div class="filtros"><input type="search" id="q-presu" placeholder="OT, OR, patente o cliente" value="${esc(p.busqueda)}">
-        <button class="btn secundario" id="presu-solo-sin" title="Ver solo las órdenes que todavía no tienen OR abierta">Sin OR</button></div>
+        ${/* 🔴 DECÍA «SIN OR» (27-08-2026, Marco: «no debiese colocarse sin OR,
+             sino que debiese estar con una alerta de sin presupuesto, porque la
+             OR siempre va a estar creada, asociada a la OT»).
+
+             Y así es desde el 26-08: toda orden nace con su OR. Un filtro
+             llamado «Sin OR» listaba órdenes que SÍ tienen OR —lo que no tienen
+             es presupuesto— y eso hace dudar de si el sistema perdió el
+             número. El filtro es el mismo; lo que cambia es que ahora dice la
+             verdad. */''}
+        <button class="btn secundario" id="presu-solo-sin"
+          title="Ver sólo las órdenes a las que todavía no se les generó el presupuesto">Sin presupuesto</button></div>
     </div>
     <div class="grid-envoltorio"><table class="grid">
       <thead><tr><th>OT</th><th>Cliente</th><th>Patente</th><th>Marca</th><th>Modelo</th>
@@ -347,8 +357,7 @@ function vElegirReparacion(o) {
         'Guardar y Generar Presupuesto</button>'
       : '<div class="pie-nota" style="margin:0">Este perfil no valoriza: abre el presupuesto ' +
         'el evaluador. Se puede mirar, no generar.</div>'}
-    <div class="pie-nota" style="margin:0">La OR ya existe desde que se recibió el vehículo.
-      Acá no se crea: se le pone precio.</div>
+
   </div>`;
 }
 
@@ -489,7 +498,7 @@ function grillaPresupuesto(o, pr, editable, $) {
         <span class="rot">Tempario · valor de la hora</span>
         <span class="val">${$(pr.tempario)}</span>
         <span class="pie">${editable
-          ? 'Fijado al abrir la OR. Lo cambia administración en Configuración → Parámetros'
+          ? 'Fijado al abrir la OR'
           : 'El que tenía el taller cuando se cotizó esta OR'}${
           desfasado ? ' · <strong>hoy la tarifa es ' + $(tempActual) +
             '</strong>: esta OR conserva la suya. Para recotizar, versión nueva' : ''}</span>
@@ -535,10 +544,17 @@ function grillaPresupuesto(o, pr, editable, $) {
       </select>
       <button class="btn" id="l-agregar">Enviar</button>
     </div>
-    <div class="pie">Agrega una línea de <strong>Mano de Obra</strong>. La OP dice qué se le
-      hace a esa pieza —<strong>Cambio</strong>, <strong>Reparar</strong> o
-      <strong>Externo</strong>— y las horas se escriben después, en la propia fila.
-      Los repuestos y los trabajos externos se agregan en sus tablas, más abajo.</div>
+    ${/* 🔴 MENOS TEXTO (27-08-2026, Marco: «la visual está buena, es solamente
+         hacerla como que no tenga tanto texto y que sea más simple para ellos»).
+
+         Estas cuatro líneas explicaban lo que la propia pantalla muestra: que
+         la línea va a Mano de Obra —lo dice el bloque de abajo—, qué opciones
+         tiene la OP —están en el desplegable— y que las horas se escriben en la
+         fila —están las columnas—. Texto que repite lo que se ve no enseña: se
+         deja de leer, y de paso entrena a no leer lo que sí importa.
+
+         Lo que NO se ve queda, pero como globo del control que corresponde. */''}
+    <div class="pie">Las horas se escriben después, en la propia fila.</div>
   </div>`;
 
   /* ── Bloque 1 · Mano de Obra ───────────────────────────────────────── */
@@ -590,7 +606,7 @@ function grillaPresupuesto(o, pr, editable, $) {
 
   const bloqueMO = `
   <section class="bloque-presu mano-obra">
-    ${cabBloquePresu(1, 'Mano de Obra', 'El trabajo del taller: horas \u00d7 tempario', t.manoObra, $)}
+    ${cabBloquePresu(1, 'Mano de Obra', 'Horas \u00d7 tempario', t.manoObra, $)}
     <div class="grid-envoltorio"><table class="grid">
       <thead><tr><th style="width:44px">N°</th><th>Descripción</th><th style="width:132px">OP</th>
         ${COL_HORAS.map((c) => '<th class="num" style="width:120px" title="' + esc(c.ayuda) +
@@ -624,7 +640,9 @@ function grillaPresupuesto(o, pr, editable, $) {
       // Se escribe: esta tabla se llena a mano, no hereda de nadie.
       '<td>' + campoLinea(l, 'descripcion', 'text', '100%', ' placeholder="La pieza, como se pide"') + '</td>' +
       '<td>' + campoLinea(l, 'proveedor', 'text', '152px',
-        ' placeholder="DYP, SURA, …" list="lista-proveedores"') + '</td>' +
+        ' placeholder="DYP, SURA, …" list="lista-proveedores"' +
+        ' title="Quién pone la pieza. Sólo se le cobran al cliente las que pone el taller:' +
+        ' escribir DYP en cualquier forma es el mismo proveedor."') + '</td>' +
       '<td class="num">' + campoLinea(l, 'precio_unitario', 'number', '120px', ' min="0" placeholder="0"') + '</td>' +
       '<td class="num">' + (cobra
         ? '<strong>' + $(Reglas.cobroRepuesto(l)) + '</strong>'
@@ -636,8 +654,7 @@ function grillaPresupuesto(o, pr, editable, $) {
 
   const bloqueRep = `
   <section class="bloque-presu repuestos">
-    ${cabBloquePresu(2, 'Repuestos', 'Se escriben a mano. Son la solicitud que ve Bodega',
-      t.repuestos, $)}
+    ${cabBloquePresu(2, 'Repuestos', 'Las piezas que hay que comprar', t.repuestos, $)}
     <div class="grid-envoltorio"><table class="grid">
       <thead><tr><th style="width:130px">Código</th><th style="width:84px">Cantidad</th>
         <th>Descripción</th><th style="width:172px">Proveedor</th>
@@ -651,11 +668,11 @@ function grillaPresupuesto(o, pr, editable, $) {
     </table></div>
     ${editable ? '<div class="pie-anadir"><button class="btn secundario" data-anadir="repuesto">' +
       'Añadir fila</button></div>' : ''}
-    <span class="ayuda"><strong>Esta tabla es la solicitud de repuestos.</strong> Lo que se
-      escribe acá viaja a Bodega, al check-list, al consolidado y al detalle de lo que está
-      pendiente — sin que bodega lo vuelva a escribir y sin esperar la aprobación de la
-      compañía. Sólo se le cobran al cliente las piezas que pone el taller: escribir
-      <strong>DYP</strong> en cualquier forma es el mismo proveedor.</span>
+    ${/* 🔴 ERAN CINCO LÍNEAS Y ADEMÁS HABÍAN QUEDADO FALSAS (27-08-2026).
+         Decían que lo escrito ací «viaja a Bodega», y desde hoy no viaja solo:
+         viaja cuando lo mandan. Las dos reglas que sí hacen falta —quién cobra
+         y cómo se escribe DYP— están en el globo de la columna Proveedor, que
+         es donde se necesitan. */''}
   </section>`;
 
   /* ── Bloque 3 · Externos (T.O.T.) ──────────────────────────────────── */
@@ -671,7 +688,7 @@ function grillaPresupuesto(o, pr, editable, $) {
   const bloqueExt = `
   <section class="bloque-presu externos">
     ${cabBloquePresu(3, 'Trabajos externos \u00b7 T.O.T.',
-      'Se escriben a mano. Lo que hace un tercero y el taller factura', t.tot, $)}
+      'Lo que hace un tercero', t.tot, $)}
     <div class="grid-envoltorio"><table class="grid">
       <thead><tr><th style="width:130px">Código</th><th>Descripción</th>
         <th style="width:190px">Proveedor</th><th class="num" style="width:130px">Precio</th>

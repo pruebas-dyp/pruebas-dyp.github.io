@@ -2421,6 +2421,9 @@ const Modelo = (function () {
        hora en Chile y como viene en el documento real. `Number("1,20")` da
        NaN, y sin esta línea el evaluador escribía 1,20, veía cómo se le
        borraba, y la línea quedaba en cero sin que nadie avisara. */
+    // Lo que decía la línea ANTES de este cambio: lo necesita la gemela.
+    const descAntes = l.descripcion;
+
     const aNumero = (x) => Number(String(x).replace(/\s/g, '').replace(',', '.'));
     ['horas_dm', 'horas_rep', 'horas_pint'].forEach((k) => {
       if (!(k in cambios)) return;
@@ -2455,20 +2458,41 @@ const Modelo = (function () {
     if ('proceso' in cambios && cambios.proceso !== l.proceso &&
         ['cambio', 'reparar', 'externo'].indexOf(cambios.proceso) >= 0) {
       const antes = l.proceso;
-      const suyo = repuestoDeLinea(linea_id);
-      if (antes !== 'cambio' && cambios.proceso === 'cambio' && !suyo) {
+      const gemela = gemelaDeLinea(linea_id);
+      if (antes !== 'cambio' && cambios.proceso === 'cambio' && !gemela) {
         l.proceso = cambios.proceso;
-        bajarRepuestoABodega(p, l);
-      } else if (antes === 'cambio' && cambios.proceso !== 'cambio' && suyo) {
-        if (suyo.fecha_bodega)
-          return { ok: false, motivo: 'El repuesto «' + suyo.descripcion + '» ya llegó a bodega. ' +
+        bajarLineaARepuestos(p, l);
+      } else if (antes === 'cambio' && cambios.proceso !== 'cambio' && gemela) {
+        /* El límite es el mismo de siempre y sigue siendo el que importa: si la
+           pieza YA LLEGÓ a bodega no se borra nada. Llegó, está en la repisa y
+           alguien la pagó; que el presupuesto se corrija después no la hace
+           desaparecer. Lo que cambió es dónde se mira: la pieza de bodega ahora
+           cuelga de la GEMELA, no de la línea de mano de obra. */
+        const pedida = db.repuesto.find((x) => x.presupuesto_linea_id === gemela.id);
+        if (pedida && pedida.fecha_bodega)
+          return { ok: false, motivo: 'El repuesto «' + gemela.descripcion + '» ya llegó a bodega. ' +
             'Cambiarle la operación a esta línea lo dejaría fuera del presupuesto con la pieza ' +
             'adentro del taller: primero hay que devolverlo desde Bodega.' };
-        db.repuesto = db.repuesto.filter((x) => x.id !== suyo.id);
+        if (pedida) db.repuesto = db.repuesto.filter((x) => x.id !== pedida.id);
+        db.presupuesto_linea = db.presupuesto_linea.filter((x) => x.id !== gemela.id);
         l.proceso = cambios.proceso;
       } else {
         l.proceso = cambios.proceso;
       }
+    }
+
+    /* 🔴 LA GEMELA SIGUE A SU LÍNEA, PERO SÓLO MIENTRAS NADIE LA HAYA TOCADO
+       (27-08-2026). Marco pidió las dos cosas y no se contradicen: «igualar la
+       descripción que le ponen al cambio, igualarlo al repuesto» y «deja la
+       opción que esa data también la pueden llenar y modificar ellos».
+
+       La regla que las junta: si la gemela todavía dice lo que decía la línea
+       antes de este cambio, nadie la editó y se le pone el texto nuevo. Si dice
+       otra cosa, alguien la escribió a mano y no se le pisa. Pisarla sería
+       borrarle a un evaluador lo que acaba de escribir, sin avisar. */
+    const gemelaAhora = gemelaDeLinea(linea_id);
+    if (gemelaAhora && 'descripcion' in cambios && gemelaAhora.descripcion === descAntes) {
+      gemelaAhora.descripcion = l.descripcion;
     }
 
     /* La pieza de bodega sigue a su línea: es la MISMA pieza. Sin esto,
@@ -2546,7 +2570,7 @@ const Modelo = (function () {
 
        Si después le cambian la OP, `actualizar_linea_presupuesto` deshace o
        rehace la bajada. */
-    if (nueva.proceso === 'cambio') bajarRepuestoABodega(p, nueva);
+    if (nueva.proceso === 'cambio') bajarLineaARepuestos(p, nueva);
 
     recalcularPresupuesto(pid);
 
@@ -2588,8 +2612,14 @@ const Modelo = (function () {
     nueva.proveedor = Reglas.normalizarProveedor(nueva.proveedor);
     db.presupuesto_linea.push(nueva);
 
-    // La pieza baja a bodega apenas existe la fila.
-    if (bloque === 'repuesto') bajarRepuestoABodega(p, nueva);
+    /* 🔴 ACÁ LA FILA SE IBA SOLA A BODEGA (27-08-2026, Marco: «la idea es que
+       después, cuando se generen los repuestos en el mismo presupuesto, ahí
+       viaje la información a bodega»).
+
+       Bajaba en el acto, recién creada y todavía en blanco: bodega recibía una
+       solicitud sin descripción, sin proveedor y sin precio, y el evaluador
+       seguía escribiéndola después. Ahora la fila se escribe entera y viaja
+       cuando la mandan, con «Generar repuestos». */
 
     recalcularPresupuesto(pid);
     tocado();
@@ -2623,6 +2653,41 @@ const Modelo = (function () {
     });
   }
 
+  /* 🔴 LA FILA DE REPUESTOS QUE NACE DE UNA «CAMBIO» (27-08-2026, Marco).
+
+     ⚠️ AYER ESTO ESTABA MAL Y ES MÍO. La OP «Cambio» creaba la pieza
+     directamente en BODEGA —`db.repuesto`— y no en el bloque de Repuestos del
+     presupuesto, que es la tabla que el evaluador tiene delante. Resultado en
+     pantalla: el aviso decía «su repuesto quedó abajo» y abajo decía «Sin
+     repuestos». Las dos cosas eran ciertas, en tablas distintas.
+
+     Marco: «la idea es que después, cuando se generen los repuestos en el mismo
+     presupuesto, ahí viaje la información a bodega. Lo hiciste al revés». Y así
+     es: a bodega se va desde el presupuesto, con `generar_repuestos_desde_
+     presupuesto`, que ya existía y sigue siendo el único camino.
+
+     La gemela nace EN BLANCO —cantidad 1, sin proveedor, sin monto— y se puede
+     editar como cualquier otra fila: eso también es textual. Lo único que
+     hereda es la descripción, que es el texto que hoy escriben dos veces. */
+  function bajarLineaARepuestos(p, l) {
+    const n = db.presupuesto_linea.filter((x) => x.presupuesto_id === p.id).length;
+    db.presupuesto_linea.push({
+      id: nuevoId('pl'), presupuesto_id: p.id, orden: n + 1,
+      bloque: 'repuesto', proceso: 'cambio',
+      /* De qué línea de mano de obra nació. Es lo que permite deshacerla si le
+         corrigen la OP, y lo que permite seguirle la descripción. */
+      nacio_de: l.id,
+      descripcion: l.descripcion, codigo: '', cantidad: 1,
+      proveedor: '', precio_unitario: 0,
+      horas_dm: 0, horas_rep: 0, horas_pint: 0
+    });
+  }
+
+  /* La fila de Repuestos que nacio de esta linea de Mano de Obra. */
+  function gemelaDeLinea(linea_id) {
+    return db.presupuesto_linea.find((x) => x.nacio_de === linea_id) || null;
+  }
+
   /* La pieza que nacio de esta linea, si es que nacio. */
   function repuestoDeLinea(linea_id) {
     return db.repuesto.find((r) => r.presupuesto_linea_id === linea_id) || null;
@@ -2631,6 +2696,21 @@ const Modelo = (function () {
   function quitar_linea_presupuesto(linea_id) {
     const l = db.presupuesto_linea.find((x) => x.id === linea_id);
     if (!l) return { ok: false, motivo: 'La línea no existe.' };
+    /* 🔴 Y SE LLEVA SU GEMELA (27-08-2026). Quitar la línea de mano de obra
+       «cambio de parachoque» y dejar el repuesto «cambio de parachoque» en la
+       lista de compras es pedir una pieza para un trabajo que ya no está. Si
+       la pieza ya llegó a bodega no se toca nada: ahí la línea se queda y hay
+       que devolverla desde Bodega primero, igual que al corregir la OP. */
+    const gemela = gemelaDeLinea(linea_id);
+    if (gemela) {
+      const pedida = db.repuesto.find((x) => x.presupuesto_linea_id === gemela.id);
+      if (pedida && pedida.fecha_bodega)
+        return { ok: false, motivo: 'El repuesto «' + gemela.descripcion + '» ya llegó a bodega. ' +
+          'Quitar esta línea lo dejaría fuera del presupuesto con la pieza adentro del taller: ' +
+          'primero hay que devolverlo desde Bodega.' };
+      if (pedida) db.repuesto = db.repuesto.filter((x) => x.id !== pedida.id);
+      db.presupuesto_linea = db.presupuesto_linea.filter((x) => x.id !== gemela.id);
+    }
     const p = db.presupuesto.find((x) => x.id === l.presupuesto_id);
     if (p && p.estado !== 'borrador')
       return { ok: false, motivo: 'El presupuesto ya no está en borrador: no se edita.' };
@@ -2662,7 +2742,12 @@ const Modelo = (function () {
     if (p.estado !== 'borrador')
       return { ok: false, motivo: 'La OR ' + p.numero_or + ' está ' + p.estado +
         '. Un presupuesto que ya salió del taller no se borra: se anula o se versiona.' };
-    const conRepuestos = db.repuesto.some((r) => r.presupuesto_id === pid);
+    /* 🔴 ESTO MIRABA `r.presupuesto_id` Y ESE CAMPO NO EXISTE EN `repuesto`
+       (27-08-2026). La tabla guarda `presupuesto_linea_id`, no el presupuesto:
+       la comprobación daba `false` siempre y el guardia no guardaba nada. Se
+       podía borrar un presupuesto con sus piezas ya pedidas a bodega. */
+    const mias = db.presupuesto_linea.filter((l) => l.presupuesto_id === pid).map((l) => l.id);
+    const conRepuestos = db.repuesto.some((r) => mias.indexOf(r.presupuesto_linea_id) >= 0);
     if (conRepuestos)
       return { ok: false, motivo: 'La OR ' + p.numero_or + ' ya tiene repuestos pedidos a bodega. ' +
         'Hay que quitarlos primero.' };

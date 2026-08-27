@@ -1136,28 +1136,39 @@ const Pruebas = (function () {
         const pid = Modelo.crear_presupuesto(o.id, { lineas: [] }).presupuesto_id;
         const DESC = 'Llanta aleación delantera derecha aro 18';
         const r1 = Modelo.agregar_linea_presupuesto(pid, { proceso: 'cambio', descripcion: DESC });
-        const bajo = db.repuesto.filter((r) => r.ot_id === o.id);
+
+        /* 🔴 SE MIDE EL BLOQUE REPUESTOS DEL PRESUPUESTO, NO BODEGA (27-08-2026).
+
+           Esta prueba miraba `db.repuesto` —la solicitud de bodega— y por eso
+           daba verde mientras la pantalla que Marco tenía delante decía «Sin
+           repuestos». Las dos cosas eran ciertas, en tablas distintas: la
+           implementación bajaba a bodega y la tabla del presupuesto quedaba
+           vacía. Una prueba que mide la tubería equivocada no prueba nada. */
+        const bajo = db.presupuesto_linea.filter((l) => l.presupuesto_id === pid && Reglas.esRepuesto(l));
         const uno = bajo[0] || {};
+        const enBodega = db.repuesto.filter((r) => r.ot_id === o.id).length;
 
         // Y una de Reparar NO puede bajar nada.
         const antes = bajo.length;
         Modelo.agregar_linea_presupuesto(pid, { proceso: 'reparar', descripcion: 'Pulir costado' });
-        const trasReparar = db.repuesto.filter((r) => r.ot_id === o.id).length;
+        const trasReparar = db.presupuesto_linea.filter((l) => l.presupuesto_id === pid && Reglas.esRepuesto(l)).length;
 
         push({
           nombre: '🔴 La OP «Cambio» baja la descripción a Repuestos, en blanco',
           intento: 'Agregar una línea de Cambio con la descripción y mirar la tabla de repuestos',
-          esperado: 'Un repuesto con esa misma descripción, cantidad 1, sin proveedor y sin precio. Reparar no baja nada',
+          esperado: 'Una FILA EN REPUESTOS del presupuesto con esa misma descripción, cantidad 1, ' +
+                    'sin proveedor y sin precio. Reparar no baja nada, y a bodega todavía no va nada',
           paso: r1.ok && bajo.length === 1 && uno.descripcion === DESC &&
                 uno.cantidad === 1 && !uno.proveedor && !uno.precio_unitario &&
-                trasReparar === antes,
+                trasReparar === antes && enBodega === 0,
           detalle: !bajo.length
             ? 'No bajó nada: el evaluador tendría que escribir la pieza otra vez, a mano'
             : (uno.descripcion !== DESC ? 'Bajó con otra descripción: «' + uno.descripcion + '»'
               : (uno.proveedor || uno.precio_unitario
                 ? 'Bajó con proveedor o precio puestos, y eso lo cotiza bodega después'
                 : (trasReparar !== antes ? 'Una línea de Reparar también bajó un repuesto'
-                  : 'Baja sola, en blanco, y sólo la de Cambio')))
+                  : (enBodega ? 'Se fue sola a bodega: a bodega se va al generar los repuestos, no al escribirlos'
+                    : 'Baja sola al bloque de Repuestos, en blanco, y sólo la de Cambio'))))
         });
       })();
 
@@ -1252,7 +1263,11 @@ const Pruebas = (function () {
         const pid = Modelo.crear_presupuesto(o.id, { lineas: [] }).presupuesto_id;
         Modelo.agregar_linea_presupuesto(pid, { proceso: 'reparar', descripcion: 'Foco trasero derecho' });
         const linea = db.presupuesto_linea.filter((l) => l.presupuesto_id === pid).pop();
-        const cuantos = () => db.repuesto.filter((r) => r.ot_id === o.id).length;
+        /* 🔴 SE CUENTAN LAS FILAS DE REPUESTOS DEL PRESUPUESTO (27-08-2026).
+           Esta prueba también contaba `db.repuesto`, y por lo mismo daba verde
+           sobre la tubería que no era. */
+        const cuantos = () => db.presupuesto_linea
+          .filter((l) => l.presupuesto_id === pid && Reglas.esRepuesto(l)).length;
 
         const conReparar = cuantos();
         Modelo.actualizar_linea_presupuesto(linea.id, { proceso: 'cambio' });
@@ -1260,8 +1275,12 @@ const Pruebas = (function () {
         Modelo.actualizar_linea_presupuesto(linea.id, { proceso: 'reparar' });
         const deVuelta = cuantos();
 
-        // Y con la pieza YA RECIBIDA, no se borra: llegó y está en la repisa.
+        /* Y con la pieza YA RECIBIDA no se borra: llegó y está en la repisa.
+           Para que exista la pieza hay que MANDARLA a bodega primero, que desde
+           hoy es un acto aparte —`generar_repuestos_desde_presupuesto`— y no
+           una consecuencia de escribir la fila. */
         Modelo.actualizar_linea_presupuesto(linea.id, { proceso: 'cambio' });
+        Modelo.generar_repuestos_desde_presupuesto(pid);
         const suyo = db.repuesto.filter((r) => r.ot_id === o.id)[0];
         if (suyo) Modelo.recibir_repuesto(suyo.id);
         const rechaza = Modelo.actualizar_linea_presupuesto(linea.id, { proceso: 'reparar' });
@@ -1269,12 +1288,13 @@ const Pruebas = (function () {
 
         push({
           nombre: '🔶 Cambiarle la OP a una línea corrige la lista de repuestos',
-          intento: 'Reparar → Cambio → Reparar, y después con la pieza ya recibida en bodega',
+          intento: 'Reparar → Cambio → Reparar en el bloque de Repuestos, y después con la pieza ' +
+                   'ya generada y recibida en bodega',
           esperado: '0 → 1 → 0, y con la pieza recibida se niega y la deja donde está',
           paso: conReparar === 0 && conCambio === 1 && deVuelta === 0 &&
                 rechaza.ok === false && trasRecibido === 1,
           detalle: conCambio !== 1 ? 'Pasar a Cambio no bajó el repuesto'
-            : (deVuelta !== 0 ? 'Volver a Reparar dejó el repuesto colgado en la lista de compras'
+            : (deVuelta !== 0 ? 'Volver a Reparar dejó la fila colgada en el bloque de Repuestos'
               : (rechaza.ok !== false ? 'Borró un repuesto que bodega ya había recibido'
                 : 'Sigue a la OP, y se planta cuando la pieza ya llegó'))
         });
@@ -1425,21 +1445,27 @@ const Pruebas = (function () {
         Modelo.agregar_linea_presupuesto(cr.presupuesto_id,
           { proceso: 'reparar', descripcion: 'Puerta trasera izquierda' });
         const trasReparar = enBodega();
-        // La pieza NO sale de la OP: se agrega una fila en la tabla Repuestos.
         Modelo.agregar_fila_presupuesto(cr.presupuesto_id, 'repuesto',
           { descripcion: 'Foco delantero derecho' });
-        const trasCambio = enBodega();
+        /* 🔴 ESCRIBIR LA FILA YA NO PIDE NADA (27-08-2026, Marco: «la idea es
+           que después, cuando se generen los repuestos en el mismo presupuesto,
+           ahí viaje la información a bodega»). Antes bajaba en el acto, recién
+           creada y en blanco: bodega recibía una solicitud sin descripción, sin
+           proveedor y sin precio. */
+        const trasEscribirla = enBodega();
+
+        const lc = Modelo.base().presupuesto_linea
+          .filter((l) => l.presupuesto_id === cr.presupuesto_id && Reglas.esRepuesto(l))[0];
+        Modelo.actualizar_linea_presupuesto(lc.id, { proveedor: 'dyp', precio_unitario: '145.000' });
 
         /* El estado se copia AHORA, no se lee al final: `Modelo.base()`
-           devuelve la fila viva, así que después de aprobar decía «aprobado» y
-           la prueba se caía sola diciendo que la pieza no se pidió en
+           devuelve la fila viva, así que después de aprobar diría «aprobado» y
+           la prueba se caería sola diciendo que la pieza no se pidió en
            borrador — cuando sí lo hizo. */
         const estadoAlPedir = Modelo.base().presupuesto
           .find((x) => x.id === cr.presupuesto_id).estado;
-        const lc = Modelo.base().presupuesto_linea
-          .filter((l) => l.presupuesto_id === cr.presupuesto_id && Reglas.esRepuesto(l))[0];
-
-        Modelo.actualizar_linea_presupuesto(lc.id, { proveedor: 'dyp', precio_unitario: '145.000' });
+        Modelo.generar_repuestos_desde_presupuesto(cr.presupuesto_id);
+        const trasGenerar = enBodega();
         const rep = Modelo.base().repuesto.find((r) => r.presupuesto_linea_id === lc.id) || {};
 
         Modelo.cambiar_estado_presupuesto(cr.presupuesto_id, 'enviado');
@@ -1447,19 +1473,22 @@ const Pruebas = (function () {
         const trasAprobar = enBodega();
 
         const bien = alCrear === partida && trasReparar === partida &&
-          trasCambio === partida + 1 && estadoAlPedir === 'borrador' &&
+          trasEscribirla === partida && trasGenerar === partida + 1 &&
+          estadoAlPedir === 'borrador' &&
           rep.proveedor === 'DYP' && rep.precio_unitario === 145000 &&
-          trasAprobar === trasCambio;
+          trasAprobar === trasGenerar;
 
         push({
-          nombre: 'Poner un repuesto en el presupuesto lo pide a bodega, sin esperar la aprobación',
-          intento: 'Crear una OR, agregarle una línea de mano de obra y una fila en Repuestos, ' +
-                   'editarla y aprobar',
-          esperado: 'La mano de obra no pide nada · la fila de Repuestos pide en el acto y en ' +
-                    'borrador · editar arrastra la pieza · aprobar no duplica',
+          nombre: 'Pedir los repuestos a bodega no espera la aprobación de la compañía',
+          intento: 'Escribir una línea de mano de obra y una fila de Repuestos, generar los ' +
+                   'repuestos con la OR en borrador, y después aprobar',
+          esperado: 'Escribir no pide nada · generar pide, y pide en borrador · la pieza sale ' +
+                    'con lo que se escribió · aprobar no duplica',
           paso: bien,
-          detalle: 'bodega ' + partida + ' → tras Reparar ' + trasReparar + ' → tras Cambio ' +
-            trasCambio + ' (con la OR en «' + estadoAlPedir + '») → tras aprobar ' + trasAprobar +
+          detalle: 'bodega ' + partida + ' → tras Reparar ' + trasReparar +
+            ' → tras escribir la fila ' + trasEscribirla +
+            ' → tras generar ' + trasGenerar + ' (con la OR en «' + estadoAlPedir + '»)' +
+            ' → tras aprobar ' + trasAprobar +
             ' · la pieza quedó con proveedor ' + (rep.proveedor || '—') + ' y precio ' +
             (rep.precio_unitario || 0)
         });
@@ -3480,10 +3509,10 @@ const Pruebas = (function () {
          lección de COD-1: una prueba que comprueba el JUICIO y no el CABLEADO
          se queda verde cuando alguien desenchufa la llamada. */
       (function () {
-        const nombreP = '🔴 Cuando lo de otro equipo tapa lo mío, el sistema lo dice';
-        if (typeof Sala === 'undefined' || !Sala.aplicar) {
-          push({ nombre: nombreP, intento: 'Aplicar lo que llega de la sala',
-            esperado: 'Avisa', paso: false, detalle: 'La sala no está cargada' });
+        const nombreP = '🔴 La sala no pisa lo que estoy escribiendo';
+        if (typeof Sala === 'undefined' || !Sala.queHacerConLoQueLlega) {
+          push({ nombre: nombreP, intento: 'Preguntarle a la sala qué hacer con lo que llega',
+            esperado: 'Decide', paso: false, detalle: 'La sala no está cargada' });
           return;
         }
 
@@ -3495,44 +3524,46 @@ const Pruebas = (function () {
         let crudo = null;
         try { crudo = localStorage.getItem(Modelo.CLAVE); } catch (e) { crudo = null; }
         if (!crudo) {
-          push({ nombre: nombreP, intento: 'Aplicar lo que llega de la sala',
-            esperado: 'Avisa', paso: false, detalle: 'Sin almacenamiento: no se pudo probar' });
+          push({ nombre: nombreP, intento: 'Preguntarle a la sala qué hacer con lo que llega',
+            esperado: 'Decide', paso: false, detalle: 'Sin almacenamiento: no se pudo probar' });
           return;
         }
         const ajeno = { version: 999, db: JSON.parse(crudo) };
 
-        /* ⚠️ Punto de partida propio. Las pruebas de más arriba dejan cambios
-           sin subir, y sin esta primera pasada el aviso salta por lo que hizo
-           OTRA prueba y no por lo que hace ésta. Se sincroniza, se limpia, y
-           recién ahí se mide. */
+        /* Punto de partida propio: sincronizado. Las pruebas de más arriba dejan
+           cambios sin subir, y sin esta pasada la decisión saldría «subir» por lo
+           que hizo OTRA prueba y no por lo que hace ésta. */
         Sala.aplicar(ajeno);
-        Sala.porQueSePerdio();
+        const quieto = Sala.queHacerConLoQueLlega();
 
-        Sala.aplicar(ajeno);                   // nadie cambió nada desde la anterior
-        const avisoSinCambios = Sala.porQueSePerdio();
-
+        /* Y ahora, escribiendo. Esto es Marco generando su presupuesto. */
         Modelo.guardar_catalogo('asunto_bitacora', { nombre: 'Iba escribiendo esto' });
-        Sala.aplicar(ajeno);                   // ahora sí tapa algo mío
-        const avisoConCambios = Sala.porQueSePerdio();
+        const escribiendo = Sala.queHacerConLoQueLlega();
 
         push({
-          nombre: '🔴 Cuando lo de otro equipo tapa lo mío, el sistema lo dice',
-          intento: 'Aplicar lo que llega de la sala dos veces: sin haber cambiado nada, y habiendo cambiado algo',
-          esperado: 'La primera vez no avisa; la segunda sí',
-          paso: !avisoSinCambios && !!avisoConCambios,
-          detalle: avisoSinCambios
-            ? 'Avisó sin que hubiera nada que perder: va a gritar en cada sincronización'
-            : (!avisoConCambios
-              ? 'Pisó lo que estaba escrito acá y no dijo nada'
-              : 'Avisa sólo cuando hay algo que se perdió')
+          nombre: nombreP,
+          intento: 'Preguntarle a la sala qué hacer con lo que llega: quieto, y con algo recién escrito acá',
+          esperado: 'Quieto lo aplica; con algo sin mandar NO lo aplica — sube lo de acá',
+          paso: quieto === 'aplicar' && escribiendo === 'subir',
+          detalle: quieto !== 'aplicar'
+            ? 'Estando al día se niega a aplicar: los dos equipos no se verían nunca'
+            : (escribiendo !== 'subir'
+              ? 'Con cambios sin mandar igual aplica encima: es el bucle que dejó a Marco sin poder generar un presupuesto'
+              : 'Gana el que acaba de escribir, no el que llegó segundo')
         });
 
+        /* 🔶 Y QUE SIGA PISANDO CUANDO CORRESPONDE. Una defensa que nunca deja
+           pasar nada no es una defensa: es una desconexión. Si la sala dejara de
+           aplicar SIEMPRE, los dos equipos quedarían mirándose y nadie vería lo
+           del otro —y ninguna prueba se pondría roja—. */
+        const antes = db.asunto_bitacora.length;
+        Sala.aplicar(ajeno);
         push({
-          nombre: '🔶 El aviso se lee una vez y se olvida',
-          intento: 'Volver a preguntar por el aviso que ya se leyó',
-          esperado: 'Ya no está: si no, reaparece en cada repintado',
-          paso: Sala.porQueSePerdio() === null,
-          detalle: 'Igual que `porQueSeResembro` del modelo'
+          nombre: '🔶 Estando al día, lo que llega SÍ se aplica',
+          intento: 'Aplicar el documento de la sala sin tener nada pendiente acá',
+          esperado: 'Se aplica: si no, la sala compartida no comparte nada',
+          paso: db.asunto_bitacora.length !== antes || Sala.hayQueSubir() === false,
+          detalle: 'La defensa protege al que escribe, no desconecta a los dos'
         });
       })();
 
