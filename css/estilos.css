@@ -279,9 +279,17 @@ div.desplegable button:hover .ico { color: var(--acento); }
   .acciones-ficha .acceso .ico-redondo { width: 58px; height: 58px; }
   .acciones-ficha .acceso .ico-redondo .ico { width: 24px; height: 24px; }
   .acciones-ficha .acceso .rot-acceso { font-size: 13px; }
-  /* La tira de situación arranca a la izquierda cuando cae debajo del título:
-     alineada a la derecha quedaba colgando de un borde que ya no está. */
-  .tira-situacion { justify-content: flex-start; gap: 10px 14px; }
+  /* 🔴 ACÁ ESTABA LA REGLA DE `.tira-situacion` Y NO SE APLICABA (27-08-2026).
+
+     Una consulta de medios NO suma especificidad: entre dos reglas iguales gana
+     la de más abajo en el archivo. `.tira-situacion` se define 240 líneas MÁS
+     ABAJO que este bloque, así que su `justify-content: flex-end` le ganaba a
+     este override sin que nada se viera roto — sólo la tira quedaba alineada a
+     la derecha en el teléfono, que es justo lo que se quería corregir.
+
+     Es el mismo error que la segunda `.acciones-ficha` de esta mañana, y por
+     eso ahora la regla vive abajo, en el bloque del celular, después de la
+     definición que corrige. */
 }
 
 /* La fila de botones del desplegable de la torre NO es esta cuadrícula: son
@@ -295,7 +303,21 @@ div.desplegable button:hover .ico { color: var(--acento); }
   display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
   gap: 14px; align-items: start;
 }
-@media (max-width: 1000px) { .etapas-con-historial { grid-template-columns: 1fr; } }
+/* 🔴 `minmax(0, 1fr)` Y NO `1fr` A SECAS (27-08-2026).
+
+   Decia `1fr`, y en un celular la pantalla de etapas se salia 180 px por la
+   derecha: los botones Asignar/Finalizar cortados, la foto del avance cortada,
+   la fecha de entrega cortada. La columna de arriba ya estaba escrita
+   `minmax(0, 1.35fr)` por este mismo motivo y al bajarla a una sola columna se
+   perdio el `minmax`.
+
+   Una pista `1fr` NO significa "la mitad del ancho": significa "reparte lo que
+   sobra", y su MINIMO es `auto`, o sea el ancho minimo del contenido. Adentro
+   hay una tabla de tres columnas que no baja de 553 px, asi que la pista crecio
+   hasta ahi y arrastro el panel entero. `minmax(0, 1fr)` le da permiso de ser
+   mas angosta que su contenido, y ahi la tabla se desliza dentro de su caja,
+   que es lo que tenia que pasar. */
+@media (max-width: 1000px) { .etapas-con-historial { grid-template-columns: minmax(0, 1fr); } }
 
 /* Diálogo */
 .velo {
@@ -1465,6 +1487,11 @@ svg.chispa.verde .chispa-punto { fill: var(--verde); }
      nombre y el cargo, no los botones. */
   .barra-menu .der .usr > span { display: none; }
   .barra-menu .der button { padding: 5px 7px; font-size: 11px; }
+
+  /* La tira de situación de la ficha arranca a la izquierda cuando cae debajo
+     del título: alineada a la derecha quedaba colgando de un borde que en el
+     teléfono ya no está, y el resto de la ficha se lee de izquierda a derecha. */
+  .tira-situacion { justify-content: flex-start; gap: 8px 14px; }
 
   .contenido { padding: 8px 8px 16px; }
   .cab-modulo h1 { font-size: 17px; }
