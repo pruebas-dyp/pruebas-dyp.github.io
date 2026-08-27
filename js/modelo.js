@@ -471,7 +471,11 @@ const Modelo = (function () {
         devueltaMotivo: x.devuelta_motivo || null,
         devoluciones: x.devoluciones || 0,
         devueltaPendiente: !!x.devuelta_at && !x.terminada_at && !x.salio_at,
-        responsable: (ix.persona.get(x.persona_id) || {}).nombres || null
+        responsable: (ix.persona.get(x.persona_id) || {}).nombres || null,
+        /* Y su id, que hace falta para dejar el desplegable de la etapa ya
+           puesto en quien la tiene. Sin esto, abrir la pantalla y guardar
+           cambiaba de responsable sin que nadie lo pidiera. */
+        responsableId: x.persona_id || null
       })),
       asignado: (() => {
         const p = actual && ix.persona.get(actual.persona_id);

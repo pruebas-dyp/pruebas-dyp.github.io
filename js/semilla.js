@@ -153,7 +153,12 @@ const Semilla = (function () {
   /* 15 → 16 el 27-08-2026: la semilla trae una tabla nueva, `compromiso`. Una
      base guardada de ayer no la tiene, y sin resembrar la ficha mostraría todas
      las órdenes «sin fecha comprometida». */
-  const FORMA_DATOS = 16;
+  /* 16 → 17 el 27-08-2026, y esta vez es para LIMPIAR: verificando la pantalla
+     nueva de etapas escribí sobre la sala compartida —asigné dos etapas, cerré
+     una y moví una fecha de entrega en la OT 23368—. Borrar la base local no
+     alcanza: la sala vuelve a repartir su copia al encender. Subir el sello es
+     el único camino, y es el que existe justamente para esto. */
+  const FORMA_DATOS = 17;
   // TEMPARIO_HORA ($10.000, reglas §C.15) se eliminó el 13-08-2026 junto con
   // el tempario entero. La cifra queda medida en `reglas`, no en el sistema.
 

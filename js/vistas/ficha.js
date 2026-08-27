@@ -26,7 +26,7 @@ const tabsVisibles = () => FICHA_TABS.filter((t) => !t.permiso || Modelo.puede(t
 function fichaEstado() {
   if (!ui.ficha) {
     ui.ficha = {
-      tab: 'ficha', modoEtapas: null,
+      tab: 'ficha',
       // Los dos arrancan sin elegir, como el original: `Seleccionar`.
       bitacora: { asunto: null, destinatario: null, mensaje: '' }
     };
@@ -47,9 +47,12 @@ function fichaEstado() {
 function fichaAplicarDireccion() {
   const f = fichaEstado();
   const tab = typeof PARAM_TAB === 'function' ? PARAM_TAB() : null;
-  const modo = typeof PARAM_MODO === 'function' ? PARAM_MODO() : null;
   if (tab && FICHA_TABS.some((t) => t.id === tab)) f.tab = tab;
-  if (modo === 'asignar' || modo === 'finalizar') f.modoEtapas = modo;
+  /* 🔴 `&modo=asignar` YA NO SELECCIONA NADA (27-08-2026, Marco: «el asignar y
+     el finalizar etapas debe quedar todo en uno»). Eran dos pantallas con un
+     conmutador y ahora es una sola tabla: no hay modo que elegir. El enlace
+     sigue funcionando —lleva a Etapas— y el parámetro se ignora en vez de
+     reventar, que es lo que le puede haber quedado guardado a alguien. */
   return f;
 }
 
@@ -959,7 +962,6 @@ function pFichaOT(o) {
 
   document.querySelectorAll('[data-fichatab]').forEach((b) => b.addEventListener('click', () => {
     f.tab = b.dataset.fichatab;
-    if (f.tab === 'etapas') f.modoEtapas = f.modoEtapas || modoEtapasPorDefecto(o);
     refrescarFicha();
   }));
 
