@@ -19,6 +19,7 @@ function vEtapas(o) {
   const cuerpo = modo === 'asignar' ? vAsignarEtapas(o) : vFinalizarEtapas(o);
 
   return `
+  <div class="etapas-con-historial">
   <div class="panel">
     <div class="cab">
       <div><h2>${ico('taller', 'g')}${modo === 'asignar' ? 'Asignar etapas' : 'Finalizar etapas'}
@@ -33,6 +34,17 @@ function vEtapas(o) {
     </div>
     <div class="cuerpo">${cuerpo}</div>
   </div>
+  ${/* 🔴 EL HISTORIAL, AL LADO (26-08-2026, Marco: «acuérdate lo que te pedí con
+       Etapas: si lo estamos sacando, debería abrir otro lado»).
+
+       Al sacar las pestañas de la ficha, esta pantalla dejó de ser una pestaña
+       y pasó a abrirse sola — y sola le faltaba la mitad. En el sistema que
+       usan, «Asignar etapas» tiene el HISTORIAL a la derecha, y no es adorno:
+       se reparte una etapa mirando quién hizo la anterior y cuándo la cerró.
+
+       Es el MISMO panel del historial, no una copia: se pinta con
+       `fichaHistorial`. Dos copias de la misma tabla se despegan sin que nadie
+       lo note. */''}
   ${/* 🔶 LA BITÁCORA VA DEBAJO, como en el sistema actual (15-08-2026).
 
        En el original la pantalla de asignar etapas termina en `Bitácora de
@@ -44,6 +56,8 @@ function vEtapas(o) {
        Es el MISMO panel de la pestaña Bitácora, no una copia: se pinta con
        `fichaBitacora` y se cablea con `pFichaBitacora`. Dos copias del mismo
        formulario se despegan sin que nadie lo note. */''}
+  ${Modelo.puede('ficha.completa') ? fichaHistorial(o) : ''}
+  </div>
   ${Modelo.puede('ficha.completa') ? fichaBitacora(o) : ''}`;
 }
 
