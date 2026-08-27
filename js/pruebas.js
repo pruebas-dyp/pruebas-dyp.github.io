@@ -1244,7 +1244,12 @@ const Pruebas = (function () {
            vacía. Una prueba que mide la tubería equivocada no prueba nada. */
         const bajo = db.presupuesto_linea.filter((l) => l.presupuesto_id === pid && Reglas.esRepuesto(l));
         const uno = bajo[0] || {};
-        const enBodega = db.repuesto.filter((r) => r.ot_id === o.id).length;
+        /* Y de la fila de Repuestos a bodega, que es automatico: la pieza que
+           hay que comprar la ve bodega desde que se escribe, sin esperar la
+           aprobacion de la compania. Lo que se corrigio hoy no fue CUANDO
+           viaja: fue DE DONDE sale — del bloque Repuestos y no de la OP. */
+        const enBodega = db.repuesto.filter((r) => r.ot_id === o.id);
+        const laPieza = enBodega.filter((r) => r.presupuesto_linea_id === (bajo[0] || {}).id)[0];
 
         // Y una de Reparar NO puede bajar nada.
         const antes = bajo.length;
@@ -1255,18 +1260,19 @@ const Pruebas = (function () {
           nombre: '🔴 La OP «Cambio» baja la descripción a Repuestos, en blanco',
           intento: 'Agregar una línea de Cambio con la descripción y mirar la tabla de repuestos',
           esperado: 'Una FILA EN REPUESTOS del presupuesto con esa misma descripción, cantidad 1, ' +
-                    'sin proveedor y sin precio. Reparar no baja nada, y a bodega todavía no va nada',
+                    'sin proveedor y sin precio, y su pieza en bodega. Reparar no baja nada',
           paso: r1.ok && bajo.length === 1 && uno.descripcion === DESC &&
                 uno.cantidad === 1 && !uno.proveedor && !uno.precio_unitario &&
-                trasReparar === antes && enBodega === 0,
+                trasReparar === antes && enBodega.length === 1 &&
+                !!laPieza && laPieza.descripcion === DESC,
           detalle: !bajo.length
             ? 'No bajó nada: el evaluador tendría que escribir la pieza otra vez, a mano'
             : (uno.descripcion !== DESC ? 'Bajó con otra descripción: «' + uno.descripcion + '»'
               : (uno.proveedor || uno.precio_unitario
                 ? 'Bajó con proveedor o precio puestos, y eso lo cotiza bodega después'
                 : (trasReparar !== antes ? 'Una línea de Reparar también bajó un repuesto'
-                  : (enBodega ? 'Se fue sola a bodega: a bodega se va al generar los repuestos, no al escribirlos'
-                    : 'Baja sola al bloque de Repuestos, en blanco, y sólo la de Cambio'))))
+                  : (!laPieza ? 'Quedó en el presupuesto y bodega no se enteró: la pieza hay que comprarla'
+                    : 'Baja sola al bloque de Repuestos, en blanco, y de ahí a bodega'))))
         });
       })();
 
@@ -1545,11 +1551,13 @@ const Pruebas = (function () {
         const trasReparar = enBodega();
         Modelo.agregar_fila_presupuesto(cr.presupuesto_id, 'repuesto',
           { descripcion: 'Foco delantero derecho' });
-        /* 🔴 ESCRIBIR LA FILA YA NO PIDE NADA (27-08-2026, Marco: «la idea es
-           que después, cuando se generen los repuestos en el mismo presupuesto,
-           ahí viaje la información a bodega»). Antes bajaba en el acto, recién
-           creada y en blanco: bodega recibía una solicitud sin descripción, sin
-           proveedor y sin precio. */
+        /* 🔴 ESCRIBIR LA FILA SÍ PIDE, Y ESO ESTÁ BIEN (27-08-2026, corregido).
+
+           Esta mañana puse acá que NO pedía, leyendo «cuando se generen los
+           repuestos» como si hubiera un botón de generar. No lo hay —se sacó el
+           16-08 porque Marco pidió que fuera automático— y con eso dejé el
+           camino a bodega cortado: nada llegaba. Lo que Marco separaba no era
+           cuándo viaja sino de dónde sale. */
         const trasEscribirla = enBodega();
 
         const lc = Modelo.base().presupuesto_linea
@@ -1562,6 +1570,7 @@ const Pruebas = (function () {
            borrador — cuando sí lo hizo. */
         const estadoAlPedir = Modelo.base().presupuesto
           .find((x) => x.id === cr.presupuesto_id).estado;
+        /* Y volver a pedirlas no duplica: es idempotente por linaje. */
         Modelo.generar_repuestos_desde_presupuesto(cr.presupuesto_id);
         const trasGenerar = enBodega();
         const rep = Modelo.base().repuesto.find((r) => r.presupuesto_linea_id === lc.id) || {};
@@ -1571,17 +1580,17 @@ const Pruebas = (function () {
         const trasAprobar = enBodega();
 
         const bien = alCrear === partida && trasReparar === partida &&
-          trasEscribirla === partida && trasGenerar === partida + 1 &&
+          trasEscribirla === partida + 1 && trasGenerar === partida + 1 &&
           estadoAlPedir === 'borrador' &&
           rep.proveedor === 'DYP' && rep.precio_unitario === 145000 &&
           trasAprobar === trasGenerar;
 
         push({
           nombre: 'Pedir los repuestos a bodega no espera la aprobación de la compañía',
-          intento: 'Escribir una línea de mano de obra y una fila de Repuestos, generar los ' +
-                   'repuestos con la OR en borrador, y después aprobar',
-          esperado: 'Escribir no pide nada · generar pide, y pide en borrador · la pieza sale ' +
-                    'con lo que se escribió · aprobar no duplica',
+          intento: 'Escribir una línea de mano de obra y una fila de Repuestos con la OR en ' +
+                   'borrador, volver a pedirlas, y después aprobar',
+          esperado: 'La mano de obra no pide nada · la fila de Repuestos pide en el acto y en ' +
+                    'borrador · la pieza sigue lo que se escribe · ni volver a pedir ni aprobar duplican',
           paso: bien,
           detalle: 'bodega ' + partida + ' → tras Reparar ' + trasReparar +
             ' → tras escribir la fila ' + trasEscribirla +

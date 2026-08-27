@@ -2657,14 +2657,24 @@ const Modelo = (function () {
     nueva.proveedor = Reglas.normalizarProveedor(nueva.proveedor);
     db.presupuesto_linea.push(nueva);
 
-    /* 🔴 ACÁ LA FILA SE IBA SOLA A BODEGA (27-08-2026, Marco: «la idea es que
-       después, cuando se generen los repuestos en el mismo presupuesto, ahí
-       viaje la información a bodega»).
+    /* 🔴 Y VUELVE A BAJAR SOLA (27-08-2026, y esto es una CORRECCIÓN MÍA).
 
-       Bajaba en el acto, recién creada y todavía en blanco: bodega recibía una
-       solicitud sin descripción, sin proveedor y sin precio, y el evaluador
-       seguía escribiéndola después. Ahora la fila se escribe entera y viaja
-       cuando la mandan, con «Generar repuestos». */
+       Esta mañana saqué esta línea leyendo «cuando se generen los repuestos en
+       el mismo presupuesto, ahí viaje la información a bodega» como si hubiera
+       un botón de «generar». No lo hay: se eliminó el 16-08-2026 a pedido de
+       Marco —«eso no debería estar, ya que se pide por los repuestos y eso es
+       automáticamente»—. O sea que entre esta mañana y ahora NADA llegaba a
+       bodega: dejé el camino cortado y no lo noté porque las pruebas medían lo
+       que yo acababa de escribir.
+
+       Lo que Marco está separando no es CUÁNDO viaja sino DE DÓNDE sale: sale
+       del bloque Repuestos del presupuesto, no de la OP de una línea de mano de
+       obra. Eso se corrigió y se queda. El viaje sigue siendo automático.
+
+       ⚠️ Y NO VIAJA EN BLANCO: `actualizar_linea_presupuesto` le arrastra a la
+       pieza de bodega la descripción, el proveedor y el precio cada vez que se
+       escriben. Bodega ve la fila desde el minuto uno y la ve completarse. */
+    if (bloque === 'repuesto') bajarRepuestoABodega(p, nueva);
 
     recalcularPresupuesto(pid);
     tocado();
@@ -2716,7 +2726,7 @@ const Modelo = (function () {
      hereda es la descripción, que es el texto que hoy escriben dos veces. */
   function bajarLineaARepuestos(p, l) {
     const n = db.presupuesto_linea.filter((x) => x.presupuesto_id === p.id).length;
-    db.presupuesto_linea.push({
+    const fila = {
       id: nuevoId('pl'), presupuesto_id: p.id, orden: n + 1,
       bloque: 'repuesto', proceso: 'cambio',
       /* De qué línea de mano de obra nació. Es lo que permite deshacerla si le
@@ -2725,7 +2735,11 @@ const Modelo = (function () {
       descripcion: l.descripcion, codigo: '', cantidad: 1,
       proveedor: '', precio_unitario: 0,
       horas_dm: 0, horas_rep: 0, horas_pint: 0
-    });
+    };
+    db.presupuesto_linea.push(fila);
+    /* Y su pieza en bodega, igual que cualquier otra fila de Repuestos: una
+       sola regla para las dos formas de crear la fila. */
+    bajarRepuestoABodega(p, fila);
   }
 
   /* La fila de Repuestos que nacio de esta linea de Mano de Obra. */

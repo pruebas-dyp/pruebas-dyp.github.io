@@ -371,7 +371,12 @@ function vElegirReparacion(o) {
          y de sitio; lo que hace sigue siendo irreversible. */''}
     ${puede
       ? '<button class="btn" id="presu-generar" data-crea="generar-presupuesto">' +
-        'Guardar y Generar Presupuesto</button>'
+        /* 🔴 DECÍA «Guardar y Generar Presupuesto» (27-08-2026, Marco: «ahí
+           debería decir siguiente»). Y tiene razón: acá no se guarda nada —no
+           hay nada escrito todavía— y «generar» suena a que el presupuesto sale
+           hecho. Lo único que pasa es que se pasa a la pantalla donde se
+           escribe. Es un paso, y se llama como un paso. */
+        'Siguiente'  + ico('chevron') + '</button>'
       : '<div class="pie-nota" style="margin:0">Este perfil no valoriza: abre el presupuesto ' +
         'el evaluador. Se puede mirar, no generar.</div>'}
 
@@ -731,8 +736,8 @@ function grillaPresupuesto(o, pr, editable, $) {
       ${editable
         ? '<textarea id="presu-obs" rows="6" placeholder="Lo que la compañía tiene que leer junto ' +
           'al monto">' + esc(pr.observacion) + '</textarea>' +
-          '<div style="margin-top:8px"><button class="btn secundario" id="presu-obs-guardar">' +
-          'Guardar la observación</button></div>'
+          '<div class="ayuda" style="margin-top:6px">Se guarda con ' +
+          '<strong>Guardar borrador</strong>, arriba.</div>'
         : (pr.observacion
           ? '<div class="nota">' + esc(pr.observacion) + '</div>'
           : '<div class="ayuda">Sin observación.</div>')}
@@ -836,6 +841,24 @@ function vPresupuestoDetalle(o, pr) {
     ${o.presupuestos.filter((x) => x.numeroOR === pr.numeroOR).length > 1
       ? '<span class="et gris">versión ' + pr.version + '</span>' : ''}
     <span style="flex:1"></span>
+    ${/* 🔴 GUARDAR EL BORRADOR (27-08-2026, Marco: «necesito un botón de
+         guardar presupuesto borrador»).
+
+         ⚠️ Y NO ES UN BOTÓN DECORATIVO, que era el riesgo: acá cada casilla se
+         guarda sola al salir de ella, así que un «Guardar» que no hiciera nada
+         sería mentir para tranquilizar. Hace dos cosas reales:
+
+           · SUELTA LA CASILLA QUE TIENE EL FOCO. Una casilla recién escrita y
+             no abandonada todavía no se guardó —el `change` no disparó—. Quien
+             escribe las últimas horas y se va a otra ventana o aprieta F5 las
+             pierde. El botón las cierra antes de guardar.
+           · GUARDA LA OBSERVACIóN, que tenía su propio botón chico adentro de su
+             recuadro y era fácil no verlo. Ese se fue: un solo Guardar.
+
+         Y confirma. Saber que lo escrito está a salvo es la mitad del valor de
+         un botón de guardar. */''}
+    ${editable ? '<button class="btn secundario" id="presu-guardar">' + ico('documento') +
+      'Guardar borrador</button>' : ''}
     ${editable ? '<button class="btn" data-presu-estado="enviado">Enviar a la compañía</button>' : ''}
     ${pr.estado === 'enviado' ? '<button class="btn" data-presu-estado="aprobado">Marcar aprobado</button>' +
       '<button class="btn secundario" data-presu-estado="rechazado">Marcar rechazado</button>' : ''}
@@ -1096,13 +1119,35 @@ function pPresupuesto() {
     });
   });
 
-  /* ── La observación ───────────────────────────────────────────────── */
-  const obsGuardar = document.getElementById('presu-obs-guardar');
-  if (obsGuardar) obsGuardar.addEventListener('click', () => {
+  /* ── Guardar el borrador ─────────────────────────────────── */
+  const guardar = document.getElementById('presu-guardar');
+  if (guardar) guardar.addEventListener('click', () => {
     const pr = presuActual();
+    if (!pr) return;
+    /* ⚠️ PRIMERO CERRAR LA CASILLA QUE TIENE EL FOCO. Si el evaluador escribió
+       «1,20» y apretó Guardar sin salir de ella, esa casilla todavía no se
+       guardó: el `change` no disparó.
+
+       Se le DISPARA el `change` y después se suelta, en ese orden. Disparar el
+       evento —en vez de confiar en que `blur()` lo dispare— no es rebuscado:
+       el navegador sólo emite `change` si considera que el valor lo cambió una
+       persona, y esa condición no se puede comprobar desde una prueba. Con el
+       evento disparado a mano corre EL MISMO manejador de siempre —no hay una
+       segunda forma de guardar una casilla— y además queda demostrable.
+
+       Y va ANTES de guardar la observación, que repinta la pantalla y se
+       llevaría la casilla con ella. */
+    const foco = document.activeElement;
+    if (foco && foco !== document.body && foco.tagName &&
+        /^(INPUT|SELECT|TEXTAREA)$/.test(foco.tagName)) {
+      foco.dispatchEvent(new Event('change', { bubbles: true }));
+      if (typeof foco.blur === 'function') foco.blur();
+    }
+
     const ta = document.getElementById('presu-obs');
-    if (!pr || !ta) return;
-    ejecutar(() => Modelo.fijar_observacion_presupuesto(pr.id, ta.value), 'Observación guardada.');
+    if (ta) ejecutar(() => Modelo.fijar_observacion_presupuesto(pr.id, ta.value),
+      'Borrador guardado.');
+    else avisar({ ok: true, motivo: '' }, 'Borrador guardado.');
   });
 
   /* «Añadir fila» en Repuestos y en Externos. La fila entra EN BLANCO y se
