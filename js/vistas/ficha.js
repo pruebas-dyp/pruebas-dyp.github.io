@@ -429,6 +429,22 @@ function fichaInventario(inv) {
    también desde la vista recortada del taller, que no lleva acciones. */
 let fichaAcciones = '';
 
+/* 🔴 SI LA FECHA YA PASÓ, HAY QUE DECIRLO (27-08-2026, Marco: «no queda claro
+   la parte de la fecha de entrega»).
+
+   Y no quedaba, porque la pantalla decía «Entrega comprometida 18-08» con el
+   auto adentro y el calendario en 27-08. La fecha era correcta y la lectura
+   imposible: parecía que faltaba, cuando en realidad ya se había pasado hace
+   nueve días. Un dato que obliga a hacer la resta mentalmente para saber si es
+   bueno o malo no está informando. */
+function atraso(o, fecha) {
+  if (!fecha || o.esFinal) return '';   // entregada: la comparación es con la real
+  const dias = Math.floor((Date.now() - new Date(fecha).getTime()) / 86400000);
+  if (dias <= 0) return '';
+  return ' <span class="et roja" title="La fecha comprometida ya pasó y el vehículo sigue acá">' +
+    'vencida hace ' + dias + (dias === 1 ? ' día' : ' días') + '</span>';
+}
+
 /* Las fechas comprometidas de la orden. Una línea si nunca se movió; la
    promesa, la vigente y el detalle de los cambios si se movió. */
 function compromisosFicha(o, dato) {
@@ -437,16 +453,16 @@ function compromisosFicha(o, dato) {
   if (!vigente) return dato('Fecha de Entrega', '<span style="color:var(--gris-2)">Sin comprometer</span>',
     'Todavía no se le ha dado fecha al cliente');
   if (h.length < 2) {
-    return dato('Fecha de Entrega comprometida', fFechaHora(vigente),
-      'La que se le dio al cliente. No se ha movido.');
+    return dato('Entrega comprometida', fFechaHora(vigente) + atraso(o, vigente),
+      'La fecha que se le dio al cliente. No se ha movido.');
   }
   const primera = h[0];
   const dias = Math.round((new Date(vigente) - new Date(primera.fecha)) / 86400000);
-  return dato('Comprometida al cliente', fFechaHora(primera.fecha),
+  return dato('Entrega comprometida', fFechaHora(primera.fecha),
       'La primera fecha que se le dio al cliente. Contra ésta se mide si se entregó a tiempo.') +
-    dato('Estimada hoy', '<strong>' + fFechaHora(vigente) + '</strong>' +
+    dato('Entrega reprogramada', '<strong>' + fFechaHora(vigente) + '</strong>' +
       (dias > 0 ? ' <span class="et ambar" title="' + dias + ' días después de lo comprometido">+' +
-        dias + ' d</span>' : ''),
+        dias + ' d</span>' : '') + atraso(o, vigente),
       'La fecha vigente. Se movió ' + (h.length - 1) +
       (h.length === 2 ? ' vez' : ' veces') + '.') +
     '<div class="historia-entrega">' + h.map((x) =>
@@ -503,13 +519,6 @@ function fichaResumen(o) {
     <div style="margin-top:11px">${Modelo.puede('presupuesto.ver') ? fichaTrabajoAutorizado(o) : ''}</div>
     </div></div>`;
   }
-
-  const hitos = ETAPAS.map((et) => {
-    const a = o.etapasAsignadas.find((x) => x.codigo === et.codigo);
-    const cls = !a ? '' : a.finalizada ? 'hecho' : 'actual';
-    return '<div class="hito ' + cls + '" title="' + esc(et.nombre) +
-      (a ? (a.finalizada ? ' · cerrada' : ' · abierta') : ' · no asignada') + '"></div>';
-  }).join('');
 
   return `
   <div class="panel"><div class="cuerpo">${fichaAcciones || ''}<div class="ficha-rejilla">
@@ -609,7 +618,14 @@ function fichaResumen(o) {
            misma sale una sola línea, que es el caso normal. */''}
       ${compromisosFicha(o, dato)}
       ${o.fechaEntrega ? dato('Fecha de Entrega real', fFechaHora(o.fechaEntrega)) : ''}
-      <div class="linea-tiempo">${hitos}</div>
+      ${/* 🔴 ACÁ IBA UNA TIRA DE CUADRITOS DE COLORES (27-08-2026, Marco:
+           «por qué salen cosas verdes abajo, deberíamos eliminarlo nomás»).
+
+           Era una etapa por cuadrito: verde la cerrada, azul la abierta, gris
+           la no asignada. Nadie sabía leerla —no decía cuál era cuál ni cuántas
+           faltaban— y estaba metida entre las fechas, que es donde uno viene a
+           buscar un día concreto. Las etapas se ven en Etapas, con su nombre,
+           su responsable y su fecha de cierre. */''}
     </fieldset>
 
     <fieldset class="bloque"><legend>Repuestos y presupuestos</legend>

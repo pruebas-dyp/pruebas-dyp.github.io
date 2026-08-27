@@ -847,15 +847,24 @@ body.ventana-registro .sidebar { display: none; }
 /* Fila expandida como ficha */
 tr.detalle > td { background: var(--superficie-3); padding: 0; border-bottom: 2px solid var(--borde-fuerte); }
 .ficha-detalle { padding: 10px 12px 12px; }
-.ficha-rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.ficha-rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; }
 fieldset.bloque {
-  border: 1px solid var(--borde); border-radius: 3px; padding: 7px 10px 9px; margin: 0; background: var(--superficie);
+  border: 1px solid var(--borde); border-radius: 3px; padding: 5px 9px 6px; margin: 0; background: var(--superficie);
 }
 fieldset.bloque legend {
   font-size: 10px; text-transform: uppercase; letter-spacing: .6px; color: var(--gris);
   font-weight: 700; padding: 0 5px;
 }
-.dato { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; font-size: 11.5px; }
+/* 🔴 MÁS APRETADO (27-08-2026, Marco: «comprímeme un poco los 4 cuadros»).
+
+   Cada fila pasa de 2 px de aire arriba y abajo a 1, y el bloque de 7/9 a 5/6.
+   Son 26 filas entre los cuatro cuadros: descontando, la ficha entera sube unos
+   40 píxeles y en un portátil los cuatro bloques caben sin cortar el último.
+
+   ⚠️ EL TAMAÑO DE LETRA NO BAJA. Comprimir apretando el aire es gratis;
+   comprimir achicando la letra se lo cobra al que lee el RUT o la patente, que
+   es exactamente para lo que se abre esta pantalla. */
+.dato { display: flex; justify-content: space-between; gap: 10px; padding: 1px 0; font-size: 11.5px; }
 .dato .k { color: var(--gris); }
 .dato .v { color: var(--tinta); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
 /* 🔴 ACÁ HABÍA UNA SEGUNDA `.acciones-ficha` (27-08-2026).

@@ -216,7 +216,12 @@ function modoRegistro(numero) {
     const ajena = Modelo.otFueraDeAlcance(numero);
     document.title = (ajena ? 'OT fuera de tu alcance' : 'OT no encontrada') + ' · Automotora DyP';
     document.getElementById('ruta').innerHTML =
-      '<a class="volver-sistema" href="index.html">' + ico('chevron') + 'Volver al sistema</a>' +
+      /* 🔴 CON SU ICONO (27-08-2026, Marco: «el volver al sistema me sacaste el
+     emoticono y eso me gustaba, favor reingresarlo»). Al subirlo a la línea de
+     la ruta le puse un chevron, que es el de «volver» genérico. El de la torre
+     dice ADÓNDE se vuelve, que es más. Van los dos: la flecha y el destino. */
+    '<a class="volver-sistema" href="index.html">' + ico('chevron') +
+    ico('torre') + 'Volver al sistema</a>' +
       '<span>Torre de control</span>';
     document.getElementById('titulo').innerHTML = ico(ajena ? 'candado' : 'alerta', 'g') +
       (ajena ? 'Esta orden no está asignada a ti' : 'Orden de trabajo no encontrada');
@@ -264,7 +269,12 @@ function modoRegistro(numero) {
      salida de esta pestaña y en un teléfono estaba al final de una fila que se
      desliza —o sea, escondido detrás de siete botones que ya no están—. */
   document.getElementById('ruta').innerHTML =
-    '<a class="volver-sistema" href="index.html">' + ico('chevron') + 'Volver al sistema</a>' +
+    /* 🔴 CON SU ICONO (27-08-2026, Marco: «el volver al sistema me sacaste el
+     emoticono y eso me gustaba, favor reingresarlo»). Al subirlo a la línea de
+     la ruta le puse un chevron, que es el de «volver» genérico. El de la torre
+     dice ADÓNDE se vuelve, que es más. Van los dos: la flecha y el destino. */
+    '<a class="volver-sistema" href="index.html">' + ico('chevron') +
+    ico('torre') + 'Volver al sistema</a>' +
     '<span>Operación diaria</span>' + ico('chevron') + '<span>Torre de control</span>' +
     ico('chevron') + '<span>OT ' + o.numeroOT + '</span>';
 
