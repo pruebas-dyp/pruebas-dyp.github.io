@@ -107,6 +107,38 @@ const CSS_IMPRESO = `
 .impreso .ficha-doc .f span:first-child{color:#777;white-space:nowrap}
 .impreso .ficha-doc .f span:last-child{text-align:right;font-weight:600}
 
+/* ── El presupuesto por BLOQUES (27-08-2026) ───────────────────────────────
+   Cada bloque es su propia tabla, con las columnas que ese bloque necesita y
+   una sola columna de plata. La banda azul del titulo separa; antes separaban
+   columnas vacias, que es lo que lo hacia parecer una planilla. */
+.impreso table.bloque-doc{margin:0 0 5mm;page-break-inside:auto}
+.impreso table.bloque-doc tr.titulo-bloque th{
+  background:#292D78;color:#fff;font-size:9px;letter-spacing:1.4px;padding:3.5px 6px}
+.impreso table.bloque-doc thead tr:last-child th{
+  background:#eef0f7;color:#292D78;border:1px solid #ccd;font-size:8px}
+.impreso table.bloque-doc th.der{text-align:right}
+.impreso table.bloque-doc td.prov{color:#777;font-size:8.5px}
+.impreso table.bloque-doc td.vacio{color:#999;font-style:italic;font-size:8.5px}
+.impreso table.bloque-doc tfoot td{background:#f4f5fb;border-top:1.5px solid #ccd}
+.impreso table.bloque-doc tfoot td.rot-sub{
+  text-align:right;color:#555;font-size:8.5px;text-transform:uppercase;letter-spacing:.5px}
+
+/* El pie: observaciones a la izquierda y la cadena de totales a la derecha.
+   Es donde se mira primero un presupuesto, asi que va sola en su caja y con la
+   ultima linea destacada. */
+.impreso .cierre-doc{display:grid;grid-template-columns:1fr 72mm;gap:6mm;
+  margin-top:4mm;page-break-inside:avoid;align-items:start}
+.impreso table.totales-doc{width:100%;border-collapse:collapse;font-size:10px;margin:0}
+.impreso table.totales-doc td{border:none;padding:2.6px 7px}
+.impreso table.totales-doc td:first-child{color:#555}
+.impreso table.totales-doc td.n{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.impreso table.totales-doc tr.raya td{border-top:1px solid #ccd;font-weight:700;color:#222}
+.impreso table.totales-doc tr.resta td{color:#a35a00}
+.impreso table.totales-doc tr.gran-total td{
+  background:#292D78;color:#fff;font-weight:800;font-size:11.5px;padding:5px 7px}
+.impreso table.totales-doc tr.gran-total td:first-child{
+  color:#fff;text-transform:uppercase;letter-spacing:1px;font-size:9.5px}
+
 .impreso table.detalle{width:100%;border-collapse:collapse;font-size:10px;margin:0}
 .impreso table.detalle th{background:#292D78;color:#fff;border:1px solid #292D78;padding:4px 5px;
   font-size:8px;text-transform:uppercase;letter-spacing:.5px;text-align:left}
@@ -473,126 +505,134 @@ function impresoPresupuesto(o, p) {
   const db = Modelo.base();
   const ivaPct = Reglas.parametro(db, 'iva', 19);
   const estado = ESTADO_PRESUPUESTO[p.estado] ? ESTADO_PRESUPUESTO[p.estado].txt : p.estado;
-  const t = p.totales || Reglas.totalesPresupuesto(p.lineas, p.tempario, o.deducible, ivaPct);
+  const t = p.totales || Reglas.totalesPresupuesto(p.lineas, p.tempario, o.deducible, ivaPct, p.descuento);
   const lineas = p.lineas || [];
   const hs = (n) => (Number(n) || 0).toFixed(2).replace('.', ',');
 
-  /* ── LA TABLA, CON LAS COLUMNAS DEL EXCEL DE MARCO ─────────────────
-     N° · Descripción · Cantidad · Desmontar y Montar · Reparar · Pintar ·
-     Repuestos · Externos · Total neto · IVA · Total con IVA.
+  /* \u{1F534} EL DOCUMENTO, REHECHO (27-08-2026, Marco: \u00abla idea de la tabla est\u00e1
+     buena pero parece casi un excel feo y desordenado. \u00bfLo podemos cambiar?
+     Prop\u00f3n t\u00fa un cambio\u00bb).
 
-     TODO EN PESOS, incluidas las tres de mano de obra: «todos estos valores
-     en $». Las horas se quedan en la pantalla, que es donde se escriben; el
-     papel que firma la compañía muestra plata.
+     Lo que lo hac\u00eda parecer planilla eran las columnas: cada fila cruzaba NUEVE
+     columnas num\u00e9ricas \u2014desmontar, reparar, pintar, repuestos, externos, neto,
+     IVA, total\u2014 y ocho de las nueve iban vac\u00edas. Un presupuesto que se manda a
+     una compa\u00f1\u00eda no es una matriz: es una lista de lo que hay que hacer, con su
+     precio a la derecha.
 
-     Una fila por ítem —da lo mismo si es mano de obra, repuesto o externo— y
-     el monto cayendo en SU columna. Eso ya separa Cambio, Reparar y Externo
-     sin títulos de grupo: la separación SON las columnas. Antes las agrupé
-     con encabezados y quedó cargado. */
-  const MONEDA = [
-    { id: 'dm',   rot: 'Desmontar y montar' },
-    { id: 'rep',  rot: 'Reparar' },
-    { id: 'pint', rot: 'Pintar' },
-    { id: 'reps', rot: 'Repuestos' },
-    { id: 'ext',  rot: 'Externos' }
-  ];
+     Lo que cambia:
 
-  const suma = { dm: 0, rep: 0, pint: 0, reps: 0, ext: 0 };
-  let nfila = 0;
+       \u00b7 TRES BLOQUES en vez de una tabla \u00fanica \u2014Mano de obra, Repuestos,
+         Trabajos externos\u2014, cada uno con las columnas que ese bloque necesita y
+         con su subtotal. La separaci\u00f3n ahora la hace el t\u00edtulo, no una columna
+         vac\u00eda.
+       \u00b7 UNA SOLA COLUMNA DE PLATA por fila. El IVA no va l\u00ednea por l\u00ednea: el IVA
+         es del documento, no del tornillo.
+       \u00b7 LOS TOTALES AL PIE, a la derecha, con la cadena completa y a la vista:
+         subtotal, descuento, deducible, neto, IVA y TOTAL. Es como se lee
+         cualquier presupuesto y es lo que pidieron de DyP.
+       \u00b7 EL PROVEEDOR en su propia columna y en letra chica, no \u00ab\u00b7 lo pone SURA\u00bb
+         colgando de la descripci\u00f3n.
+       \u00b7 SIN TEMPARIO. Es el costo de la hora del taller: no tiene por qu\u00e9 ir en
+         el papel que ve la compa\u00f1\u00eda. Sigue en la pantalla, que es donde se
+         trabaja. */
 
-  const filas = lineas.map((l) => {
-    const v = { dm: 0, rep: 0, pint: 0, reps: 0, ext: 0 };
-    let cant = '';
-    if (Reglas.esManoObra(l)) {
-      v.dm   = Math.round((Number(l.horas_dm)   || 0) * p.tempario);
-      v.rep  = Math.round((Number(l.horas_rep)  || 0) * p.tempario);
-      v.pint = Math.round((Number(l.horas_pint) || 0) * p.tempario);
-    } else if (Reglas.esRepuesto(l)) {
-      v.reps = Reglas.cobroRepuesto(l);
-      cant = l.cantidad || 1;
-    } else {
-      v.ext = Number(l.precio_unitario) || 0;
-    }
+  const manoObra = lineas.filter(Reglas.esManoObra);
+  const repuestos = lineas.filter(Reglas.esRepuesto);
+  const externos = lineas.filter(Reglas.esExterno);
 
-    const neto = v.dm + v.rep + v.pint + v.reps + v.ext;
-    // Una línea en cero no se imprime: alarga el documento y no dice nada.
-    // El repuesto que pone la compañía sí va, con su rótulo: es parte del
-    // trabajo aunque no se cobre.
-    if (!neto && !Reglas.esRepuesto(l)) return '';
-    MONEDA.forEach((c) => { suma[c.id] += v[c.id]; });
+  const OPS = { cambio: 'Cambio', reparar: 'Reparar', externo: 'Externo' };
 
-    const iva = Math.round(neto * ivaPct / 100);
-    return '<tr><td class="n">' + (++nfila) + '</td>' +
-      '<td>' + esc(l.descripcion || '—') +
-        (Reglas.esRepuesto(l) && !Reglas.esProveedorTaller(l.proveedor)
-          ? ' <span style="color:#777">· lo pone ' + esc(l.proveedor || 'un tercero') + '</span>'
-          : (l.proveedor ? ' <span style="color:#777">· ' + esc(l.proveedor) + '</span>' : '')) + '</td>' +
-      '<td class="n">' + cant + '</td>' +
-      MONEDA.map((c) => '<td class="n' + (v[c.id] ? ' puesto' : '') + '">' +
-        (v[c.id] ? fMonto(v[c.id]) : '') + '</td>').join('') +
-      '<td class="n tot corte">' + fMonto(neto) + '</td>' +
-      '<td class="n tot">' + fMonto(iva) + '</td>' +
-      '<td class="n tot final">' + fMonto(neto + iva) + '</td></tr>';
-  }).join('');
+  const bloque = (titulo, cabeceras, filas, subtotal) => !filas.length ? '' : `
+    <table class="detalle bloque-doc">
+      <thead>
+        <tr class="titulo-bloque"><th colspan="${cabeceras.length}">${esc(titulo)}</th></tr>
+        <tr>${cabeceras.map((c) => '<th' + (c.an ? ' style="width:' + c.an + '"' : '') +
+          (c.der ? ' class="der"' : '') + '>' + esc(c.rot) + '</th>').join('')}</tr>
+      </thead>
+      <tbody>${filas.join('')}</tbody>
+      <tfoot><tr><td colspan="${cabeceras.length - 1}" class="rot-sub">Subtotal ${esc(titulo.toLowerCase())}</td>
+        <td class="n destaca">${fMonto(subtotal)}</td></tr></tfoot>
+    </table>`;
 
-  const netoTabla = MONEDA.reduce((a, c) => a + suma[c.id], 0);
-  const ivaTabla = Math.round(netoTabla * ivaPct / 100);
+  let n = 0;
+  const bMO = bloque('Mano de obra',
+    [{ rot: 'N\u00b0', an: '8mm' }, { rot: 'Descripci\u00f3n' }, { rot: 'Operaci\u00f3n', an: '20mm' },
+     { rot: 'Horas', an: '16mm', der: true }, { rot: 'Valor', an: '24mm', der: true }],
+    manoObra.map((l) => {
+      const horas = (Number(l.horas_dm) || 0) + (Number(l.horas_rep) || 0) + (Number(l.horas_pint) || 0);
+      const v = Math.round(horas * p.tempario);
+      if (!v) return '';
+      return '<tr><td class="c">' + (++n) + '</td>' +
+        '<td>' + esc(l.descripcion || '\u2014') + '</td>' +
+        '<td class="c">' + esc(OPS[l.proceso] || l.proceso || '\u2014') + '</td>' +
+        '<td class="n">' + hs(horas) + '</td>' +
+        '<td class="n">' + fMonto(v) + '</td></tr>';
+    }), t.manoObra);
 
-  const pieTabla = '<tr class="cierre-t"><td colspan="3" class="rot">Totales</td>' +
-    MONEDA.map((c) => '<td class="n">' + fMonto(suma[c.id]) + '</td>').join('') +
-    '<td class="n tot corte">' + fMonto(netoTabla) + '</td>' +
-    '<td class="n tot">' + fMonto(ivaTabla) + '</td>' +
-    '<td class="n tot final">' + fMonto(netoTabla + ivaTabla) + '</td></tr>';
+  n = 0;
+  const bRep = bloque('Repuestos',
+    [{ rot: 'N\u00b0', an: '8mm' }, { rot: 'Descripci\u00f3n' }, { rot: 'Proveedor', an: '26mm' },
+     { rot: 'Cant.', an: '13mm', der: true }, { rot: 'Valor', an: '24mm', der: true }],
+    repuestos.map((l) => {
+      const v = Reglas.cobroRepuesto(l);
+      const loPone = !Reglas.esProveedorTaller(l.proveedor);
+      return '<tr><td class="c">' + (++n) + '</td>' +
+        '<td>' + esc(l.descripcion || '\u2014') + '</td>' +
+        '<td class="prov">' + esc(l.proveedor || '\u2014') + '</td>' +
+        '<td class="n">' + (l.cantidad || 1) + '</td>' +
+        /* La pieza que pone la compa\u00f1\u00eda va igual \u2014es parte del trabajo\u2014 pero
+           sin monto: no la desembols\u00f3 el taller, as\u00ed que no la cobra. */
+        '<td class="n' + (loPone ? ' vacio' : '') + '">' +
+          (loPone ? 'no se cobra' : fMonto(v)) + '</td></tr>';
+    }), t.repuestos);
 
-  /* SIN el bloque del deducible (16-08-2026, Marco: «esas dos cosas no
-     debiesen estar»). El deducible sigue a la vista en la ficha del
-     siniestro, arriba del documento, junto a la compania y al liquidador.
-     La tabla queda mostrando lo que vale el trabajo, que es lo que se
-     esta cotizando. */
+  n = 0;
+  const bExt = bloque('Trabajos externos',
+    [{ rot: 'N\u00b0', an: '8mm' }, { rot: 'Descripci\u00f3n' }, { rot: 'Proveedor', an: '26mm' },
+     { rot: 'Valor', an: '24mm', der: true }],
+    externos.map((l) => {
+      const v = Number(l.precio_unitario) || 0;
+      if (!v) return '';
+      return '<tr><td class="c">' + (++n) + '</td>' +
+        '<td>' + esc(l.descripcion || '\u2014') + '</td>' +
+        '<td class="prov">' + esc(l.proveedor || '\u2014') + '</td>' +
+        '<td class="n">' + fMonto(v) + '</td></tr>';
+    }), t.tot);
 
-  const tablaUnica = !lineas.length ? '' : `
-    <table class="detalle"><thead>
-      <tr class="grupos">
-        <th colspan="3" class="izq">Detalle del trabajo</th>
-        <th colspan="${MONEDA.length}">Todos estos valores en $</th>
-        <th colspan="3" class="tot corte">Totales</th>
-      </tr>
-      <tr>
-        <th style="width:8mm">N°</th><th>Descripción</th><th style="width:14mm">Cantidad</th>
-        ${MONEDA.map((c) => '<th style="width:21mm">' + esc(c.rot) + '</th>').join('')}
-        <th class="tot corte" style="width:22mm">Total neto</th>
-        <th class="tot" style="width:19mm">IVA ${ivaPct}%</th>
-        <th class="tot final" style="width:23mm">Total con IVA</th>
-      </tr>
-    </thead>
-    <tbody>${filas}</tbody>
-    <tfoot>${pieTabla}</tfoot></table>
-    ${/* SIN la nota al pie de la tabla (16-08-2026, Marco). El tempario ya
-         esta en la ficha de arriba, con su propio rotulo, y el repuesto que
-         pone la compania lo dice su propia fila. Explicarlo otra vez abajo
-         era llenar de letra chica un documento que se lee por sus numeros. */''}
-`;
+  /* Los totales. Cada l\u00ednea del descuento se muestra SOLO si existe: un
+     \u00abDescuento $0\u00bb en un presupuesto sin descuento es una pregunta que nadie
+     hizo. Lo que siempre va es subtotal, neto, IVA y total. */
+  const fila = (rot, val, cls) => '<tr' + (cls ? ' class="' + cls + '"' : '') +
+    '><td>' + esc(rot) + '</td><td class="n">' + val + '</td></tr>';
 
-  const cerroTotal = (rot, val, fuerte) =>
-    '<tr' + (fuerte ? ' class="cierre-t"' : '') + '><td>' + esc(rot) + '</td>' +
-    '<td class="n"' + (fuerte ? ' style="font-weight:700"' : '') + '>' + val + '</td></tr>';
+  const totales = `
+    <table class="totales-doc">
+      ${fila('Mano de obra', fMonto(t.manoObra))}
+      ${t.repuestos ? fila('Repuestos', fMonto(t.repuestos)) : ''}
+      ${t.tot ? fila('Trabajos externos', fMonto(t.tot)) : ''}
+      ${fila('Subtotal', fMonto(t.subtotalNeto), 'raya')}
+      ${t.descuento ? fila('Descuento', '\u2212 ' + fMonto(t.descuento), 'resta') : ''}
+      ${t.deducible ? fila('Deducible de la p\u00f3liza', '\u2212 ' + fMonto(t.deducible), 'resta') : ''}
+      ${fila('Neto', fMonto(t.neto), 'raya')}
+      ${fila('IVA ' + ivaPct + '%', fMonto(t.iva))}
+      ${fila('Total', fMonto(t.total), 'gran-total')}
+    </table>`;
 
   return `
   <div class="cab-presu">
     <div class="marca">
       ${logoImpreso()}
       <div class="giro">Desabolladura y pintura</div>
-      <div class="dir">Taller de reparación automotriz · Chile</div>
+      <div class="dir">Taller de reparaci\u00f3n automotriz \u00b7 Chile</div>
     </div>
     <div class="folio">
       <div class="tit">PRESUPUESTO</div>
       <table class="folio-t">
-        <tr><td>N° OR</td><td><strong>${esc(p.numeroOR)}</strong></td></tr>
-        <tr><td>Versión</td><td>${p.version}</td></tr>
+        <tr><td>N\u00b0 OR</td><td><strong>${esc(p.numeroOR)}</strong></td></tr>
+        <tr><td>Versi\u00f3n</td><td>${p.version}</td></tr>
         <tr><td>Orden de trabajo</td><td>${o.numeroOT}</td></tr>
         <tr><td>Fecha</td><td>${fFechaHora(HOY)}</td></tr>
         <tr><td>Estado</td><td><strong>${esc(estado)}</strong></td></tr>
-        <tr><td>Tempario</td><td>${fMonto(p.tempario)} la hora</td></tr>
       </table>
     </div>
   </div>
@@ -601,47 +641,39 @@ function impresoPresupuesto(o, p) {
     <div class="ficha-doc">
       <div class="ficha-tit">Cliente</div>
       <div class="f"><span>Nombre</span><span>${esc(o.cliente)}</span></div>
-      <div class="f"><span>RUT</span><span>${esc(o.rut || '—')}</span></div>
-      <div class="f"><span>Teléfono</span><span>${esc(o.telefono || '—')}</span></div>
-      <div class="f"><span>Domicilio</span><span>${esc(o.direccion || '—')}</span></div>
+      <div class="f"><span>RUT</span><span>${esc(o.rut || '\u2014')}</span></div>
+      <div class="f"><span>Tel\u00e9fono</span><span>${esc(o.telefono || '\u2014')}</span></div>
+      <div class="f"><span>Domicilio</span><span>${esc(o.direccion || '\u2014')}</span></div>
     </div>
     <div class="ficha-doc">
-      <div class="ficha-tit">Vehículo</div>
+      <div class="ficha-tit">Veh\u00edculo</div>
       <div class="f"><span>Patente</span><span><strong>${esc(o.patente)}</strong></span></div>
-      <div class="f"><span>Marca y modelo</span><span>${esc([o.marca, o.modelo].filter(Boolean).join(' ') || '—')}</span></div>
-      <div class="f"><span>Año</span><span>${o.anio || '—'}</span></div>
-      <div class="f"><span>VIN</span><span>${esc(o.vin || '—')}</span></div>
+      <div class="f"><span>Marca y modelo</span><span>${esc([o.marca, o.modelo].filter(Boolean).join(' ') || '\u2014')}</span></div>
+      <div class="f"><span>A\u00f1o</span><span>${o.anio || '\u2014'}</span></div>
+      <div class="f"><span>VIN</span><span>${esc(o.vin || '\u2014')}</span></div>
     </div>
     <div class="ficha-doc">
       <div class="ficha-tit">Siniestro</div>
-      <div class="f"><span>Compañía</span><span>${esc(o.compania)}</span></div>
-      <div class="f"><span>N° siniestro</span><span>${esc(o.siniestro || '—')}</span></div>
+      <div class="f"><span>Compa\u00f1\u00eda</span><span>${esc(o.compania)}</span></div>
+      <div class="f"><span>N\u00b0 siniestro</span><span>${esc(o.siniestro || '\u2014')}</span></div>
       <div class="f"><span>Deducible</span><span>${fMonto(o.deducible)}</span></div>
-      <div class="f"><span>Liquidador</span><span>${esc(o.liquidador || '—')}</span></div>
+      <div class="f"><span>Liquidador</span><span>${esc(o.liquidador || '\u2014')}</span></div>
     </div>
   </div>
 
-  ${tablaUnica}
+  ${bMO}${bRep}${bExt}
 
   ${!lineas.length ? '<div style="text-align:center;padding:8mm;color:#888">' +
-    'Este presupuesto todavía no tiene líneas cargadas.</div>' : ''}
+    'Este presupuesto todav\u00eda no tiene l\u00edneas cargadas.</div>' : ''}
 
-  <div class="cierre">
+  <div class="cierre-doc">
     <div class="condiciones">
       <div class="ficha-tit">Observaciones</div>
       ${p.observacion
         ? '<div style="white-space:pre-wrap">' + esc(p.observacion) + '</div>'
         : '<div style="color:#888">Sin observaciones.</div>'}
-      ${/* SIN el bloque de condiciones (16-08-2026, Marco). Lo que decía ya
-           está donde corresponde: la tarifa y el trato de los repuestos de la
-           compañía van al pie de la tabla, y el deducible es una fila del
-           documento. Repetirlo en una lista era hacer más largo un papel que
-           se firma. */''}
     </div>
-    ${/* SIN columna de totales al pie. Quedo vacia al sacar la caja, el
-         deducible y las firmas, y una caja vacia igual dibuja su marco:
-         en el papel se veia una raya suelta al lado de Observaciones. */''}
-
+    ${lineas.length ? totales : ''}
   </div>
 
 ` + pieImpreso();

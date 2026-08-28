@@ -489,7 +489,7 @@ function grillaPresupuesto(o, pr, editable, $) {
   const ivaPct = Number(Reglas.parametro(Modelo.base(), 'iva', 19)) || 0;
   const veMontos = Modelo.puede('presupuesto.montos');
   const t = pr.totales ||
-    Reglas.totalesPresupuesto(pr.lineas, pr.tempario, o.deducible, ivaPct);
+    Reglas.totalesPresupuesto(pr.lineas, pr.tempario, o.deducible, ivaPct, pr.descuento);
   /* Los tres bloques son INDEPENDIENTES y se separan por `bloque`. La OP de
      una línea de mano de obra clasifica ESE trabajo —cambiar, reparar,
      mandar afuera— y no pone nada en las otras dos tablas: Repuestos y
@@ -750,9 +750,21 @@ function grillaPresupuesto(o, pr, editable, $) {
         ${fila('Mano de Obra', $(t.manoObra))}
         ${fila('Repuestos neto', $(t.repuestos))}
         ${fila('T.O.T. neto', $(t.tot))}
-        ${fila('Subtotal neto', $(t.subtotalNeto), true)}
-        ${fila('Deducible neto', t.deducible ? '&minus; ' + $(t.deducible) : $(0), false, 'de la póliza')}
-        ${fila('Total neto', $(t.neto), true)}
+        ${fila('Subtotal', $(t.subtotalNeto), true)}
+        ${/* 🔴 EL DESCUENTO SE DIGITA ACÁ (27-08-2026, de DyP vía Marco:
+             «debemos agregar la opción de descuento del Ppto también»). Es un
+             monto en pesos y no un porcentaje: así se negocia por teléfono
+             —«te lo dejo en ciento veinte»— y así nadie tiene que preguntar
+             sobre qué base se aplica. Va en la misma tabla que resta, no en un
+             campo aparte: se escribe donde se ve el efecto. */''}
+        ${editable
+          ? '<tr><td>Descuento</td><td class="num">' +
+            '<input type="text" inputmode="numeric" id="presu-descuento" style="width:110px;text-align:right"' +
+            ' value="' + (t.descuento ? fMonto(t.descuento).replace(/[^0-9.]/g, '') : '') + '"' +
+            ' placeholder="0" title="Monto en pesos que se descuenta del subtotal"></td></tr>'
+          : fila('Descuento', t.descuento ? '&minus; ' + $(t.descuento) : $(0))}
+        ${fila('Deducible', t.deducible ? '&minus; ' + $(t.deducible) : $(0), false, 'de la póliza')}
+        ${fila('Neto', $(t.neto), true)}
         ${fila('IVA ' + ivaPct + '%', $(t.iva))}
         ${fila('Total', $(t.total), true)}
       </tbody></table></div>
@@ -1130,6 +1142,13 @@ function pPresupuesto() {
                 : 'Sin proveedor: no se cobra hasta que se diga quién la pone.'))
           : null);
     });
+  });
+
+  const desc = document.getElementById('presu-descuento');
+  if (desc) desc.addEventListener('change', () => {
+    const pr = presuActual();
+    if (!pr) return;
+    ejecutar(() => Modelo.fijar_descuento_presupuesto(pr.id, desc.value), 'Descuento guardado.');
   });
 
   /* ── Guardar el borrador ─────────────────────────────────── */

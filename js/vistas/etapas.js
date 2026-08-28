@@ -145,7 +145,11 @@ function vEtapasTabla(o) {
     return '<tr' + (a ? ' class="ya"' : '') + '>' +
       '<td class="num">' + aplica + '</td>' +
       '<td><i class="punto" style="background:' + esc(e.color) + '"></i>' + esc(e.nombre) +
-        (e.opcional ? ' <span class="et gris" title="Un tapabarro o un espejo no pasa por mecánica">no siempre</span>' : '') +
+      /* 🔴 ACÁ IBA LA ETIQUETA «no siempre» DE MECÁNICA (27-08-2026, Marco:
+         «sácale lo que dice a Mecánica el no siempre»). Era verdad —un
+         tapabarro no pasa por mecánica— pero es verdad de TODAS: por eso
+         existe la columna Aplica. Un cartel al lado de una sola etapa hace
+         pensar que las otras ocho sí son obligatorias. */
       '</td>' +
       '<td>' + quien + '</td>' +
       '<td class="num">' + cerrar + '</td>' +
@@ -192,6 +196,16 @@ function vEtapasTabla(o) {
     </div>` : ''}
 
     <div class="pie-asignar">
+      ${/* 🔴 MARCAR TODAS (27-08-2026, Marco: «nos falta un botón de asignar
+           todas las etapas»). El caso normal es que el auto pase por casi
+           todas: marcar ocho casillas a mano, una por una, para desmarcar una
+           es trabajo que el sistema puede hacer.
+
+           ⚠️ MARCA, NO GUARDA. Deja las casillas puestas y el encargado por
+           elegir; guardar sigue siendo un acto aparte. Un botón que asignara
+           las nueve de una vez, sin encargado y sin revisar, sería más rápido
+           de apretar y más caro de deshacer. */''}
+      ${reparte ? '<button class="btn secundario" id="btn-etapas-todas">Marcar todas</button>' : ''}
       <button class="btn" id="btn-etapas-guardar">Guardar</button>
       <button class="btn secundario" id="btn-cancelar-etapas">Cancelar</button>
       <span class="pie-nota" style="margin:0">Un solo guardado: lo que marques en
@@ -219,6 +233,19 @@ function pEtapas(o) {
       const sel = fila.querySelector('select[data-resp]');
       if (c.checked && sel) sel.focus();
     });
+  });
+
+  const todas = document.getElementById('btn-etapas-todas');
+  if (todas) todas.addEventListener('click', () => {
+    const libres = Array.from(document.querySelectorAll('[data-asignar]')).filter((c) => !c.checked);
+    if (!libres.length) return avisar({ ok: false, motivo: 'Todas las etapas que se pueden asignar ya están marcadas.' });
+    libres.forEach((c) => { c.checked = true; });
+    // El foco al primer encargado sin elegir: es lo que falta contestar.
+    const sel = document.querySelector('select[data-resp]');
+    if (sel) sel.focus();
+    avisar({ ok: true, motivo: '' }, libres.length +
+      (libres.length === 1 ? ' etapa marcada' : ' etapas marcadas') +
+      '. Elige los encargados y aprieta Guardar.');
   });
 
   document.querySelectorAll('[data-quitaretapa]').forEach((b) => b.addEventListener('click', () =>

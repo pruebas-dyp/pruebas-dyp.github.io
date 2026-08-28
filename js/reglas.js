@@ -603,7 +603,7 @@ const Reglas = (function () {
   const esRepuesto = (l) => l.bloque === 'repuesto';
   const esExterno  = (l) => l.bloque === 'externo';
 
-  function totalesPresupuesto(lineas, tempario, deducible, ivaPct) {
+  function totalesPresupuesto(lineas, tempario, deducible, ivaPct, descuento) {
     const ls = lineas || [];
     const tarifa = Number(tempario) || 0;
     const h = { dm: 0, rep: 0, pint: 0 };
@@ -621,29 +621,39 @@ const Reglas = (function () {
       .reduce((s, l) => s + (Number(l.precio_unitario) || 0), 0);
 
     const subtotalNeto = manoObra + repuestos + tot;
-    const ded = Math.min(Number(deducible) || 0, subtotalNeto);
 
-    /* 🔴 EL NETO ES LO QUE VALE EL TRABAJO, sin descontar el deducible.
-       Lo descontaba, y desde que el deducible salió del documento (16-08-2026)
-       eso dejó dos totales distintos para la misma OR: la lista mostraba $0
-       —el deducible de $100.000 se comía un trabajo de $53.800— y el PDF
-       mostraba $64.022. Marco lo vio de inmediato: «la información no está
-       fluyendo».
+    /* 🔴 LA CADENA DE DESCUENTOS DEL DOCUMENTO (27-08-2026).
 
-       El que estaba mal era este. Un presupuesto cotiza lo que cuesta
-       reparar; quién paga cada parte —la compañía o el cliente con su
-       deducible— es una conversación posterior y no cambia el valor del
-       trabajo. Además, restándolo, la venta parada del taller salía menos
-       de lo que realmente hay presupuestado.
+       Marco trae lo que le escribieron de DyP: «el deducible se descuenta del
+       neto en ppto» y «debemos agregar la opción de descuento del Ppto
+       también». Así que el presupuesto que sale para la compañía hace:
 
-       `deducible` se sigue devolviendo: la ficha del siniestro lo muestra. */
-    const neto = subtotalNeto;
+         subtotal − descuento − deducible = NETO · + IVA = TOTAL
+
+       ⚠️ Y ESTO REVIERTE A MEDIAS UNA CORRECCIÓN DEL 16-08-2026. Ese día se
+       DEJÓ de restar el deducible porque la lista mostraba $0 mientras el PDF
+       mostraba $64.022 —dos totales distintos para la misma OR— y Marco lo vio
+       al tiro: «la información no está fluyendo».
+
+       El error de entonces no era restar: era restar en un lado y no en el
+       otro. Ahora se resta SIEMPRE y en un solo lugar, y el número que el
+       taller usa para medir su venta parada tiene nombre propio y aparte:
+       `subtotalNeto`, lo que vale el trabajo. Quién paga cada parte —la
+       compañía o el cliente con su deducible— no cambia lo que vale repararlo,
+       y por eso la venta del taller NO puede leer `neto`. */
+    const desc = Math.max(0, Math.min(Number(descuento) || 0, subtotalNeto));
+    const ded = Math.min(Number(deducible) || 0, Math.max(0, subtotalNeto - desc));
+    const neto = Math.max(0, subtotalNeto - desc - ded);
     const iva = Math.round(neto * (Number(ivaPct) || 0) / 100);
     return {
       horas: h, tempario: tarifa,
       dm, reparar, pintar, manoObra,
       repuestos, tot, subtotalNeto,
-      deducible: ded, neto, iva, total: neto + iva
+      descuento: desc, deducible: ded, neto, iva, total: neto + iva,
+      /* Lo que vale el trabajo con su IVA, sin descontarle a nadie. Es lo que
+         mide la venta del taller. Va con nombre para que nunca más haya que
+         elegir entre «total» y «total». */
+      ventaTaller: subtotalNeto + Math.round(subtotalNeto * (Number(ivaPct) || 0) / 100)
     };
   }
 

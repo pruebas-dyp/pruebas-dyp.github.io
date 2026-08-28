@@ -561,11 +561,16 @@ const Modelo = (function () {
              ya los leían, pero salen de `t`. Así no hay forma de que la
              pantalla y el documento discrepen, ni hoy ni con datos viejos. */
           const t = Reglas.totalesPresupuesto(lineas, tempario, o.deducible,
-            Reglas.parametro(db, 'iva', 19));
+            Reglas.parametro(db, 'iva', 19), p.descuento || 0);
           return {
             id: p.id, version: p.version, numeroOR: p.numero_or,
             correlativo: p.correlativo, estado: p.estado,
             neto: t.neto, iva: t.iva, total: t.total,
+            /* La cadena del documento: subtotal − descuento − deducible = neto.
+               Va entera para que la pantalla y el PDF muestren lo mismo sin
+               volver a calcular ninguno de los tres. */
+            subtotalNeto: t.subtotalNeto, descuento: t.descuento,
+            deducible: t.deducible, ventaTaller: t.ventaTaller,
             tempario, observacion: p.observacion || '',
             enviadoAt: p.enviado_at || null, resueltoAt: p.resuelto_at || null,
             /* El desglose del documento. Es LA MISMA cuenta que dio `neto`,
@@ -669,9 +674,14 @@ const Modelo = (function () {
      Es plata que no existe, sumada en el número que el dueño mira todos los
      días. El rechazado tampoco es venta, pero ese ya se ve como tal; el
      anulado se veía igual que uno vivo. */
+  /* 🔴 LA VENTA DEL TALLER LEE `ventaTaller`, NO `total` (27-08-2026). Desde
+     que el documento descuenta el deducible y el descuento, `total` es lo que
+     se le cobra a la compañía —que es menos que lo que vale el trabajo—. Con
+     `total` la venta parada bajaba sola el día que alguien anotara un
+     deducible, sin que hubiera menos trabajo en el taller. */
   const totalOT = (o) => o.presupuestos
     .filter((p) => p.estado !== 'anulado')
-    .reduce((s, p) => s + p.total, 0);
+    .reduce((s, p) => s + (p.ventaTaller != null ? p.ventaTaller : p.total), 0);
   const tieneRepuestoPendiente = (o) => o.repuestos.some((r) => !r.fechaBodega);
 
   function metricas() {
@@ -2426,7 +2436,8 @@ const Modelo = (function () {
       db.presupuesto_linea.filter((l) => l.presupuesto_id === pid),
       p.tempario != null ? p.tempario : Reglas.parametro(db, 'tempario', 10000),
       o ? o.deducible : 0,
-      Reglas.parametro(db, 'iva', 19));
+      Reglas.parametro(db, 'iva', 19),
+      p.descuento || 0);
   }
 
   function recalcularPresupuesto(pid) {
@@ -2434,6 +2445,9 @@ const Modelo = (function () {
     if (!p) return;
     const t = totalesDe(pid);
     p.neto = t.neto; p.iva = t.iva; p.total = t.total;
+    /* Lo que vale el trabajo, sin descontarle el deducible ni el descuento. Es
+       lo que suma la venta parada del taller; ver `totalesPresupuesto`. */
+    p.venta_taller = t.ventaTaller;
   }
 
   /* El TEMPARIO no tiene operacion propia: no se fija por presupuesto.
@@ -2446,6 +2460,26 @@ const Modelo = (function () {
      pantalla del presupuesto. Se elimina en vez de dejarla sin llamador:
      una operacion que escribe plata y que ninguna pantalla usa es una
      puerta abierta que nadie vigila. */
+
+  /* 🔴 EL DESCUENTO DEL PRESUPUESTO (27-08-2026, de DyP vía Marco: «debemos
+     agregar la opción de descuento del Ppto también»). Es un monto en pesos,
+     no un porcentaje: así es como se negocia por teléfono —«te lo dejo en
+     ciento veinte»— y así no hay que explicar sobre qué base se aplica. */
+  function fijar_descuento_presupuesto(pid, monto) {
+    const p = db.presupuesto.find((x) => x.id === pid);
+    if (!p) return { ok: false, motivo: 'El presupuesto no existe.' };
+    const abierto = Reglas.presupuestoEditable(db, p);
+    if (!abierto.ok) return abierto;
+    const crudo = String(monto == null ? '' : monto).replace(/[$\s.]/g, '').replace(',', '.');
+    const v = crudo === '' ? 0 : Number(crudo);
+    if (isNaN(v) || v < 0) return { ok: false, motivo: 'El descuento tiene que ser un monto en pesos, y no negativo.' };
+    p.descuento = Math.round(v);
+    recalcularPresupuesto(pid);
+    registrarEvento(p.ot_id, 'modificacion', 'Descuento del presupuesto ' + p.numero_or +
+      ': ' + fPlata(p.descuento));
+    tocado();
+    return { ok: true, motivo: '' };
+  }
 
   function fijar_observacion_presupuesto(pid, texto) {
     const p = db.presupuesto.find((x) => x.id === pid);
@@ -4385,7 +4419,7 @@ const Modelo = (function () {
     editar_orden,
     crear_presupuesto, agregar_linea_presupuesto, agregar_fila_presupuesto,
     quitar_linea_presupuesto,
-    actualizar_linea_presupuesto, fijar_observacion_presupuesto,
+    actualizar_linea_presupuesto, fijar_descuento_presupuesto, fijar_observacion_presupuesto,
     eliminar_presupuesto,
     cambiar_estado_presupuesto, nueva_version_presupuesto, generar_repuestos_desde_presupuesto,
     agregar_costo_adicional, costosDe,
