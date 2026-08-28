@@ -1097,7 +1097,11 @@ const Modelo = (function () {
       db.recepcion.push({
         id: rec_id, vehiculo_id: veh.id, cliente_id: cli.id, fecha: ahora(),
         km: ficha.km || null, combustible: ficha.combustible != null ? ficha.combustible : null,
-        observaciones: ficha.observaciones || '', firma_media_id: ficha.firma_media_id || null,
+        /* 🔴 ACÁ IBA `firma_media_id` (27-08-2026). Guardaba el PNG de la firma
+           que el cliente hacía en la tablet. Se fue con el lienzo: el
+           comprobante se imprime y se firma a mano. Un campo que nadie escribe
+           y nadie lee es una promesa que el sistema ya no puede cumplir. */
+        observaciones: ficha.observaciones || '',
         recibido_por: 'pe-u-recepcion'
       });
       /* El checklist llega como un mapa `item_id → estado`. Lo que no venga

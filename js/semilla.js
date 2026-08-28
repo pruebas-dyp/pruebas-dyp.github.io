@@ -158,7 +158,10 @@ const Semilla = (function () {
      una y moví una fecha de entrega en la OT 23368—. Borrar la base local no
      alcanza: la sala vuelve a repartir su copia al encender. Subir el sello es
      el único camino, y es el que existe justamente para esto. */
-  const FORMA_DATOS = 17;
+  /* 17 → 18 el 27-08-2026: la recepción perdió el campo `firma_media_id` al
+     sacarse la firma digital. Una base guardada de hace un rato lo trae, y con
+     eso el impreso podría seguir buscando una firma que ya no se estampa. */
+  const FORMA_DATOS = 18;
   // TEMPARIO_HORA ($10.000, reglas §C.15) se eliminó el 13-08-2026 junto con
   // el tempario entero. La cifra queda medida en `reglas`, no en el sistema.
 
@@ -1269,7 +1272,7 @@ const Semilla = (function () {
       recepcion.push({
         id: rec_id, vehiculo_id: veh_id, cliente_id: cli_id, fecha: fecha_ingreso,
         km: entre(15, 220) * 1000, combustible: entre(0, 8),
-        observaciones: '', firma_media_id: null, recibido_por: 'pe-u-recepcion'
+        observaciones: '', recibido_por: 'pe-u-recepcion'
       });
       /* Un solo `rnd()` por ítem, igual que cuando era un booleano: la semilla
          es determinista y cambiar la CANTIDAD de tiradas corre toda la

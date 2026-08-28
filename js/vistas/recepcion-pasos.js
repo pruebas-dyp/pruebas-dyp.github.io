@@ -554,50 +554,39 @@ function recVerificar() {
   <h3 class="rot-seccion">3 · Solicitud de reparación</h3>
   ${r.bloques.map(orden).join('')}
 
-  ${/* 🔶 LA FIRMA DEL CLIENTE (15-08-2026). Se había sacado el 13-08 con el
-       argumento de que el comprobante se firma en papel; el cliente la pidió de
-       vuelta: quiere que firme en la tablet o el celular y que salga impresa.
+  ${/* 🔴 ACÁ SE FIRMABA EN LA PANTALLA (27-08-2026, Marco: «cuando ingresemos
+       un auto necesito que saquemos el tema de la firma digital hacia el
+       cliente... cuando estuvimos allá, básicamente imprimían el documento y se
+       firmaba físico»).
 
-       Va en ESTE paso y no en otro: el cliente firma lo que acaba de revisar, y
-       lo que acaba de revisar es este resumen. Firmar antes de ver el resumen
-       sería firmar a ciegas. */''}
-  <fieldset class="bloque" style="margin-top:12px"><legend>Firma del cliente</legend>
-    <div class="firma-zona">
-      <canvas id="firma-lienzo" width="620" height="190"
-        class="${r.firma || (r.firmaTrazos || []).length ? 'firmado' : ''}" aria-label="Zona para firmar"></canvas>
-      <div class="firma-pie">
-        <span class="ayuda">${r.firma || (r.firmaTrazos || []).length
-          ? 'Firmado. Sale impreso en el comprobante de recepción.'
-          : 'El cliente firma con el dedo en la tablet o el celular, o con el mouse.'}</span>
-        ${/* 🔷 DESHACER (16-08-2026, Marco). Antes lo único que había era
-              «Borrar y volver a firmar»: si al cliente le salía mal el apellido
-              tenía que rehacer la firma entera. Deshacer saca el último trazo
-              —el que va desde que apoya el dedo hasta que lo levanta— y deja lo
-              anterior donde estaba.
+       Había un lienzo donde el cliente firmaba con el dedo, y esa firma salía
+       estampada en el comprobante. Estaba bien construido —deshacer trazo,
+       guardado asíncrono con sello para que un PNG atrasado no pisara lo
+       nuevo— y no servía para nada: en el mesón se imprime el papel y se firma
+       a mano, delante del auto. Una firma en la tablet obliga a que el cliente
+       tenga el aparato en la mano justo en ese momento, y después IGUAL hay que
+       imprimir para el archivador.
 
-              Se aprieta siempre, también con el recuadro en blanco: ahí no se
-              queda mudo, dice que no hay nada que deshacer. */''}
-        <span class="acciones-firma">
-          <button type="button" class="btn secundario" id="firma-deshacer">Deshacer el último trazo</button>
-          <button type="button" class="btn secundario" id="firma-borrar">Borrar y volver a firmar</button>
-        </span>
-      </div>
-    </div>
-    <div class="pie-nota">La firma no es obligatoria para ingresar la recepción: si el cliente dejó
-      el auto y se fue, el vehículo entra igual. Lo que no se puede es decir que firmó sin que haya
-      firmado.</div>
-  </fieldset>
+       Lo que se eliminó: el lienzo, sus dos botones, el PNG y el adjunto con
+       `momento: 'firma'`. Lo que queda es el papel con los TRES espacios de
+       firma que ellos usan —quien recepciona, el cliente y quien entrega—.
 
+       ⚠️ Y CON ESTO SE VA UNA PROMESA QUE NO PODEMOS SEGUIR HACIENDO: hasta hoy
+       el sistema podía decir «este cliente firmó». Desde ahora no lo sabe: sabe
+       que se imprimió un comprobante. Quien guarde el papel firmado es el
+       taller, como hasta ahora. */''}
   ${/* Las observaciones se escriben en el paso 4, junto al dibujo, que es donde
        están mirando el auto. Acá se muestran para revisarlas antes de firmar,
        no para escribirlas de nuevo. */''}
   <div class="dato-largo" style="margin-top:12px"><span class="k">Observaciones de la recepción</span>
     <span class="v">${v(r.campos.observaciones)}</span></div>
 
-  <div class="pie-nota">El comprobante se genera <strong>en el navegador</strong>, con
-    <strong>Guardar PDF</strong>. No queda ningún archivo en una ruta adivinable: es la corrección
-    C-10 / DP-4 del sistema actual, donde <span class="cod">/pdf/recepcion-&lt;OT&gt;.pdf</span> es
-    enumerable y lleva nombre, RUT, dirección y la firma del cliente.</div>`;
+  <div class="pie-nota">El comprobante <strong>se imprime y se firma a mano</strong>: trae los tres
+    espacios de firma —quien recepciona, el cliente y quien entrega— igual que el papel que usan hoy.
+    Se genera <strong>en el navegador</strong>, con <strong>Guardar PDF</strong>: no queda ningún
+    archivo en una ruta adivinable, que es la corrección C-10 / DP-4 del sistema actual, donde
+    <span class="cod">/pdf/recepcion-&lt;OT&gt;.pdf</span> es enumerable y lleva nombre, RUT y
+    dirección.</div>`;
 }
 
 /* ⛔ ACÁ VIVÍA LA PANTALLA DE CONFIRMACIÓN, y se eliminó el 15-08-2026 a

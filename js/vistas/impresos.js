@@ -54,8 +54,14 @@ const CSS_IMPRESO = `
 .impreso .danado{color:#a35a00;font-weight:700}
 .impreso .sinver{color:#888;font-weight:700}
 .impreso .leyenda-inv{font-size:8.5px;color:#666;margin-top:3px}
-/* Recuadro en blanco: el documento se imprime y se firma a mano. */
-.impreso .firma{border:1px solid #999;height:26mm}
+/* Los tres espacios de firma del pie. La línea va arriba del rótulo, con 14 mm
+   de aire encima: una firma de verdad no cabe en menos, y un recuadro cerrado
+   obliga a firmar adentro —que es lo que hace que las firmas se salgan—. */
+.impreso .firmas{display:flex;gap:10mm;margin-top:16mm;page-break-inside:avoid}
+.impreso .firma-espacio{flex:1;text-align:center}
+.impreso .firma-espacio .raya{border-top:1px solid #333;margin-bottom:1.5mm}
+.impreso .firma-espacio .rot{
+  font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;line-height:1.5}
 .impreso .fotos{display:flex;gap:4px;flex-wrap:wrap}
 .impreso .fotos img{width:44mm;height:32mm;object-fit:cover;border:1px solid #ccc}
 /* Acá vivía la regla del sello «MODELO BORRADOR». Se borró con el rótulo el
@@ -331,11 +337,6 @@ function impresoRecepcion(o) {
     sin_verificar:'<span class="sinver">–</span>'
   };
   const cuenta = (cod) => inv.filter((i) => (i.estado || (i.presente ? 'presente' : 'no_presente')) === cod).length;
-  /* La firma: de la OT sale de los adjuntos, con su propio momento; del
-     borrador viene ya resuelta como URL, porque todavía no está guardada. */
-  const firma = o.firmaSrc
-    ? { src: o.firmaSrc }
-    : (o.id ? Modelo.mediaDe(o.id).find((m) => m.momento === 'firma') : null);
   /* 🔶 QUÉ VERSIÓN ES ESTE COMPROBANTE (15-08-2026).
      Desde que la recepción se puede corregir, el papel tiene que decir cuál
      es. Si no, quedan dos comprobantes de la misma recepción con datos
@@ -409,25 +410,31 @@ function impresoRecepcion(o) {
   ${fotos.length ? '<h2>Fotografías de ingreso</h2><div class="fotos">' +
     fotos.slice(0, 6).map((f) => '<img data-media="' + esc(f.id) + '" alt="">').join('') + '</div>' : ''}
 
-  ${/* 🔶 LA FIRMA SE ESTAMPA (15-08-2026). El cliente pidió las dos mitades:
-       firmar en pantalla Y que esa firma salga impresa. Estaba construida la
-       primera y el recuadro seguía saliendo en blanco.
+  ${/* 🔴 TRES ESPACIOS PARA FIRMAR A MANO (27-08-2026, Marco, con la foto de
+       su papel al lado: «quiero que quede un espacio abajo nomás para la firma
+       del que está en recepción y firma del cliente, pero que no se haga
+       digital, ya que cuando estuvimos allá básicamente imprimían el documento
+       y se firmaba físico»).
 
-       Si no hay firma tomada, el recuadro queda vacío como antes: el
-       comprobante se puede seguir imprimiendo para firmarlo a mano, que es como
-       trabaja el taller cuando el cliente no está con el teléfono en la mano. */''}
-  <h2>Firma del cliente</h2>
-  <div class="rej dos" style="align-items:end">
-    <div class="firma">${firma
-      ? '<img ' + (firma.src ? 'src="' + esc(firma.src) + '"' : 'data-media="' + esc(firma.id) + '"') +
-        ' alt="Firma del cliente" style="height:100%;width:auto;display:block;margin:0 auto">'
-      : ''}</div>
-    <div>
-      ${campoImpreso('Nombre', esc(o.cliente))}
-      ${campoImpreso('RUT', esc(o.rut || '—'))}
-      ${campoImpreso('Fecha', fFechaHora(o.fechaIngreso))}
-    </div>
+       Acá se estampaba la firma que el cliente hacía en la tablet. Se fue con el
+       lienzo; ver el comentario en `recepcion-pasos.js`.
+
+       Los tres rótulos y su orden son los del papel de ellos, tal cual:
+       RECEPCIONADO / NOMBRE INGRESA · NOMBRE Y FIRMA / CLIENTE · NOMBRE Y FIRMA
+       / ENTREGA. La tercera es la que se llena el día de la entrega, con el
+       mismo papel: por eso va en el comprobante de ingreso y no en otro.
+
+       ⚠️ La línea va ARRIBA del rótulo y con aire suficiente para una firma de
+       verdad —14 mm—. Un recuadro cerrado obliga a firmar adentro y las firmas
+       se salen; una línea no reclama. */''}
+  <div class="firmas">
+    ${[['Recepcionado', 'Nombre ingresa'],
+       ['Nombre y firma', 'Cliente'],
+       ['Nombre y firma', 'Entrega']]
+      .map(([a, b]) => '<div class="firma-espacio"><div class="raya"></div>' +
+        '<div class="rot">' + esc(a) + '</div><div class="rot">' + esc(b) + '</div></div>').join('')}
   </div>
+
   <div style="font-size:8.5px;color:#666;margin-top:6px">
     El cliente declara haber revisado el inventario y el estado descriptivo del vehículo.
     Los datos personales se tratan conforme a la Ley 21.719.

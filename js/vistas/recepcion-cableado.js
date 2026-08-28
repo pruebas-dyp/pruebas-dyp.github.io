@@ -389,7 +389,6 @@ function pRecepcion() {
   if (ninguno) ninguno.addEventListener('click', () => { r.inventario = {}; guardarBorrador(); render(); });
 
   montarFotos();
-  montarFirma();
 
   const limpiar = document.getElementById('rec-limpiar');
   if (limpiar) limpiar.addEventListener('click', () => {
@@ -459,130 +458,16 @@ function recIrAVerificar() {
   avisar({ ok: true, motivo: '' }, 'Todo completo. Revisa el resumen antes de ingresar la recepción.');
 }
 
-/* 🔴 EL PNG QUE LLEGA TARDE. `canvas.toBlob` es asíncrono: el PNG se arma
-   después, y el navegador se toma lo que se toma. Si mientras tanto la firma
-   cambió —el cliente apretó Deshacer— el PNG viejo llegaba igual y se guardaba
-   ENCIMA del estado nuevo. Medido el 16-08-2026: tres trazos, tres veces
-   Deshacer, el recuadro quedaba en blanco en pantalla y el sistema seguía
-   teniendo una firma guardada. El comprobante habría impreso una firma que ya
-   no estaba a la vista, que es exactamente lo que este panel promete que no
-   puede pasar.
+/* ── ACÁ VIVÍA EL LIENZO DE FIRMA ─────────────────────────────────
 
-   Cada cambio sube el sello; el PNG que llega con un sello viejo se descarta.
-   Va FUERA de `montarFirma` a propósito: cada render vuelve a montar el lienzo,
-   y con el contador adentro el trazo viejo se comparaba contra su propio
-   contador —el de la vuelta anterior— y siempre se daba por vigente. */
-let selloFirma = 0;
+   🔴 27-08-2026. Se eliminó entero: `montarFirma`, `repintarFirma`, el sello
+   que descartaba los PNG atrasados y los dos botones. El comprobante se imprime
+   y se firma a mano, que es como trabajan en el mesón. Ver el comentario largo
+   en `recepcion-pasos.js`.
 
-/* ── La firma ──────────────────────────────────────────────────────────
-   El lienzo de firma. Sin librerías: es trazo sobre canvas.
-
-   Se escucha `pointer*` y no `mouse*` porque la firma se toma en una tablet o
-   un teléfono, que es donde va a pasar de verdad. `touch-action:none` en el CSS
-   evita que el dedo haga scroll de la página mientras se firma — sin eso, la
-   pantalla se mueve y el trazo sale cortado. */
-function montarFirma() {
-  const c = document.getElementById('firma-lienzo');
-  if (!c) return;
-  const r = rec();
-  const ctx = c.getContext('2d');
-
-  ctx.lineWidth = 2.2;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.strokeStyle = '#111';
-
-  // Si ya había firma, se repinta: cambiar de paso no puede borrarla.
-  if (r.firmaTrazos && r.firmaTrazos.length) repintarFirma(ctx, r.firmaTrazos);
-
-  let trazando = false;
-  const punto = (ev) => {
-    const caja = c.getBoundingClientRect();
-    return { x: (ev.clientX - caja.left) * (c.width / caja.width),
-             y: (ev.clientY - caja.top) * (c.height / caja.height) };
-  };
-
-  c.addEventListener('pointerdown', (ev) => {
-    trazando = true;
-    c.setPointerCapture(ev.pointerId);
-    r.firmaTrazos = r.firmaTrazos || [];
-    r.firmaTrazos.push([punto(ev)]);
-  });
-  c.addEventListener('pointermove', (ev) => {
-    if (!trazando) return;
-    const p = punto(ev);
-    const trazo = r.firmaTrazos[r.firmaTrazos.length - 1];
-    trazo.push(p);
-    ctx.beginPath();
-    ctx.moveTo(trazo[trazo.length - 2].x, trazo[trazo.length - 2].y);
-    ctx.lineTo(p.x, p.y);
-    ctx.stroke();
-  });
-  const soltar = () => {
-    if (!trazando) return;
-    trazando = false;
-    // El PNG se guarda al vuelo: si el navegador se cierra a mitad de la
-    // recepción, la firma ya está en el borrador.
-    const mio = ++selloFirma;
-    // El primer trazo cambia el rótulo del pie —de "el cliente firma con el
-    // dedo" a "Firmado"— y el borde del recuadro. Sin este repintado había que
-    // cambiar de paso para que la pantalla admitiera que ya estaba firmada.
-    const primero = (r.firmaTrazos || []).length === 1;
-    c.toBlob((blob) => {
-      if (mio !== selloFirma) return;      // llegó tarde: la firma ya cambió
-      r.firma = blob; guardarBorrador();
-      if (primero) render();
-    }, 'image/png');
-  };
-  c.addEventListener('pointerup', soltar);
-  c.addEventListener('pointerleave', soltar);
-  c.addEventListener('pointercancel', soltar);
-
-  const borrar = document.getElementById('firma-borrar');
-  if (borrar) borrar.addEventListener('click', () => {
-    selloFirma++;                          // mata cualquier PNG en camino
-    ctx.clearRect(0, 0, c.width, c.height);
-    r.firmaTrazos = []; r.firma = null;
-    guardarBorrador(); render();
-  });
-
-  /* Deshacer el último trazo. Los trazos ya se guardaban uno por uno —cada uno
-     es lo que se dibujó entre apoyar el dedo y levantarlo—, así que deshacer es
-     sacar el último y repintar los que quedan. El PNG se rehace, porque es lo
-     que se imprime en el comprobante: si el dibujo y la imagen guardada se
-     separan, el papel muestra una firma que en pantalla ya no está. */
-  const deshacer = document.getElementById('firma-deshacer');
-  if (deshacer) deshacer.addEventListener('click', () => {
-    const trazos = r.firmaTrazos || [];
-    if (!trazos.length) {
-      return avisar({ ok: false,
-        motivo: 'No hay ningún trazo que deshacer: el recuadro está en blanco.' });
-    }
-    trazos.pop();
-    const mio = ++selloFirma;
-    // Se repinta al tiro, sin esperar al PNG: el que firma tiene que ver que
-    // pasó algo en el momento en que aprieta.
-    ctx.clearRect(0, 0, c.width, c.height);
-    repintarFirma(ctx, trazos);
-
-    const cerrar = () => { guardarBorrador(); render(); };
-    if (!trazos.length) { r.firma = null; return cerrar(); }
-    c.toBlob((blob) => {
-      if (mio !== selloFirma) return;
-      r.firma = blob; cerrar();
-    }, 'image/png');
-  });
-}
-
-function repintarFirma(ctx, trazos) {
-  trazos.forEach((t) => {
-    if (t.length < 2) return;
-    ctx.beginPath();
-    ctx.moveTo(t[0].x, t[0].y);
-    for (let i = 1; i < t.length; i++) ctx.lineTo(t[i].x, t[i].y);
-    ctx.stroke();
-  });
-}
+   Se borra en vez de dejarse apagado por lo de siempre: código que no corre
+   nadie lo mantiene, y el día que alguien lo despierte va a estar hablando de
+   un campo —`firma_media_id`— que tampoco existe ya. */
 
 /* ── Fotos ─────────────────────────────────────────────────────────────── */
 
@@ -646,11 +531,7 @@ function recComprobanteBorrador() {
                observacion: r.obsInventario[it.id] || '' };
     }),
     // Las fotos todavía no cuelgan de ninguna OT: van directo desde el borrador.
-    fotosIngreso: r.fotos,
-    // Y la firma, que tampoco está guardada: se resuelve del Blob del borrador
-    // para que el papel que se revisa con el cliente sea el mismo que después
-    // queda archivado, firma incluida.
-    firmaSrc: r.firma ? URL.createObjectURL(r.firma) : null
+    fotosIngreso: r.fotos
   }), 'recepcion-borrador-' + (r.campos.patente || 'sin-patente'));
 }
 
@@ -697,16 +578,6 @@ function guardarRecepcion() {
 
     // Las fotos se amarran a la recepción y a todas sus órdenes.
     Modelo.adjuntar_media(res.recepcion_id, res.ordenes.map((o) => o.ot_id), r.fotos);
-
-    /* Y la firma del cliente, que va como un archivo más pero con su propio
-       momento: el impreso la busca por ahí para estamparla en el comprobante. */
-    if (r.firma) {
-      Media.guardarBlob(r.firma, { momento: 'firma', nombre: 'firma-cliente.png',
-        recepcion_id: res.recepcion_id })
-        .then((f) => Modelo.adjuntar_media(res.recepcion_id,
-          res.ordenes.map((o) => o.ot_id), [f]))
-        .catch(() => { /* sin IndexedDB la firma no se guarda; la recepción sí */ });
-    }
 
     /* 🔶 GUARDADA LA RECEPCIÓN SE VUELVE AL MENÚ, Y LIMPIO (15-08-2026).
        El cliente pidió primero volver al inicio del módulo, y después que la
