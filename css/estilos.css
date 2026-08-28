@@ -1053,29 +1053,72 @@ tr.detalle > td { background: var(--superficie-3); padding: 0; border-bottom: 2p
    que se desplaza: la tabla se corre a lo ancho y el desplegable se queda
    quieto y entero. El ancho se ata a la VENTANA —no a la tabla— y por eso va
    en `100vw` menos el respiro de los costados. */
-/* ⚠️ LA CABECERA DE LA TABLA NO SE PEGA, Y QUEDA ANOTADO (28-08-2026).
+/* ═════ LA PRIMERA FILA DE CADA TABLA QUEDA FIJA (28-08-2026) ══════════════
+   Marco: «me gustaría que dejaras fijo la primera fila de cada una de las
+   tablas».
 
-   `table.grid th` pide `position: sticky; top: 0` desde siempre y NO funciona
-   en ninguna parte, ni en el teléfono ni en el escritorio. `sticky` se ancla al
-   ancestro QUE DESPLAZA, y ese es `.grid-envoltorio` —basta con que un eje no
-   sea `visible` para que la caja sea contenedor de desplazamiento—. Y el
-   envoltorio no tiene alto acotado: crece con la tabla, o sea que su sobrante
-   vertical es CERO y no hay contra qué pegarse. Medido en la Torre a 390 px:
-   bajando 4.000 px la cabecera queda en y = −3.795.
+   `table.grid th` pedía `position: sticky; top: 0` desde siempre y NO funcionaba
+   en ninguna parte —ni en el teléfono ni en el escritorio—. `sticky` se ancla al
+   ancestro QUE DESPLAZA, y ese era `.grid-envoltorio`: basta con que un eje no
+   sea `visible` para que la caja lo sea. Y el envoltorio no tiene alto acotado,
+   crece con la tabla, así que su sobrante vertical es CERO y no hay contra qué
+   pegarse. Medido en la Torre a 390 px: bajando 4.000 px la cabecera quedaba en
+   y = −3.795.
 
-   Se probó el arreglo —quitarle el desplazamiento al envoltorio para que el
-   `th` se ancle a `#contenido`— y SÍ funciona: la cabecera se pega en y = 10.
-   Pero mueve el desplazamiento lateral a la PÁGINA, y entonces la fila de
-   filtros se va de lado con ella. Se cambia un problema por otro.
+   EL ARREGLO, en tres piezas que se necesitan las tres:
 
-   La salida buena no es de CSS: es no mostrar veintiuna columnas en un
-   teléfono. Con las cinco que importan —OT, patente, cliente, etapa, días— la
-   tabla entra, no hay desplazamiento lateral, la cabecera se pega sola y el
-   resto de los datos ya vive en el desplegable de la fila, que desde hoy se lee
-   entero. Eso es una decisión de qué columnas, y esa la toma el taller.
+   1. El envoltorio deja de desplazar. Así el `th` se ancla a `#contenido`, que
+      sí tiene alto acotado, y se pega. Pero solo, esto manda el desplazamiento
+      lateral a la página y la fila de filtros se va de lado con ella.
+   2. El PANEL crece hasta el ancho de su tabla —`min-content`, no `max-content`:
+      con `max-content` la tabla pide su ancho preferido y pasa de 1.260 a 1.892
+      px, seiscientos de más que hay que deslizar—. Esto le da a lo de adentro
+      contra qué pegarse en horizontal.
+   3. Y lo que NO debe irse de lado —la cabecera del panel con su buscador y sus
+      desplegables, la fila de chips, el pie del paginado y la pista de
+      deslizar— se pega al borde izquierdo con el ancho de lo que se ve.
 
-   Hasta entonces el envoltorio sigue desplazando de lado, que es lo que había,
-   y la página no se mueve en horizontal. */
+   Ese ancho lo escribe `anchoUtilDeLaPantalla()` en tabla.js: en el escritorio
+   `#contenido` es más angosto que la ventana —la barra lateral se lleva 208 px—
+   así que `100vw` no sirve y hay que medirlo.
+
+   MEDIDO DESPUÉS: las 12 tablas del sistema se pegan a 390 px y las 9 del
+   escritorio a 1440. Los filtros se corren 18 px —el relleno del panel— y ahí se
+   quedan. El desplazamiento lateral de la página en el escritorio es de 30 a 63
+   px, que es lo que las tablas ya se salían dentro de su caja.
+
+   ⚠️ `:has()` NO EXISTE EN NAVEGADORES VIEJOS. Va dentro de un `@supports`: el
+   que no lo entienda se queda con lo de antes —la caja desplaza de lado y la
+   cabecera no se pega—, que es exactamente el comportamiento de ayer. No se
+   rompe nada; simplemente no mejora. Safari lo trae desde 16.4 y Chrome desde
+   la 105. */
+@supports selector(:has(*)) {
+  /* El panel crece con su tabla, y con él TODA caja que esté entre el panel y
+     la tabla. No se enumeran niveles porque no son uno: el listado la cuelga
+     del panel, siete pantallas la meten dentro de `.cuerpo` y la OR del
+     presupuesto la baja un tercer nivel, a `section.bloque-presu`. */
+  .panel:has(.grid-envoltorio),
+  .panel :has(.grid-envoltorio) { width: min-content; min-width: 100%; }
+
+  /* La caja de la tabla deja de desplazar: el `th` se ancla a `#contenido`. */
+  .panel .grid-envoltorio { overflow: visible; }
+
+  /* Y lo que se queda quieto cuando la tabla se corre de lado, esté a la altura
+     que esté: la cabecera del panel con sus filtros, la fila de chips, el pie
+     del paginado y la pista de deslizar. */
+  .panel:has(.grid-envoltorio) > .cab,
+  .panel:has(.grid-envoltorio) .pie-grid,
+  .panel:has(.grid-envoltorio) .pista-desliza,
+  .panel:has(.grid-envoltorio) > .cuerpo:not(:has(.grid-envoltorio)) {
+    position: sticky; left: 0;
+    width: var(--ancho-util, 100vw); box-sizing: border-box;
+  }
+
+  /* La cabecera va sobre el cuerpo y sobre la tarjeta del desplegable, que
+     también se pega. Sin esto, al bajar, las filas pasan por encima. */
+  table.grid th { z-index: 3; }
+  tr.detalle > td > * { z-index: 1; }
+}
 
 @media (max-width: 860px), (max-height: 520px) and (pointer: coarse) {
   tr.detalle > td > * {
@@ -2629,4 +2672,25 @@ table.grid td.abre-ot:hover { text-decoration: underline; }
    por eso va acá abajo y no dentro del bloque de arriba. */
 @media (max-width: 620px) {
   #q-torre { min-width: 0; flex: 1 1 100%; max-width: none; }
+}
+
+
+/* 🔴 `overflow: clip` EN LOS BLOQUES DE LA OR (28-08-2026).
+
+   `section.bloque-presu` lleva `overflow: hidden` para redondear sus esquinas, y
+   `hidden` convierte la caja en contenedor de desplazamiento: las tres tablas de
+   la OR quedaban ancladas a su propia sección —que no tiene sobrante vertical— y
+   su cabecera no se pegaba. Medido: bajando por la tabla de Mano de obra, la
+   cabecera se iba a y = −278.
+
+   `clip` recorta EXACTAMENTE igual —las esquinas siguen redondas— pero no crea
+   contenedor de desplazamiento, así que el `th` vuelve a anclarse a
+   `#contenido`.
+
+   ⚠️ VA AL FINAL DEL ARCHIVO, y no junto al resto del arreglo de la cabecera.
+   Lo escribí allá primero y no hizo nada: `.bloque-presu { overflow: hidden }`
+   vive en la línea 2333 y con la MISMA especificidad gana la última del archivo.
+   Es la tercera vez esta semana que me pasa lo mismo. */
+@supports (overflow: clip) {
+  .bloque-presu { overflow: clip; }
 }

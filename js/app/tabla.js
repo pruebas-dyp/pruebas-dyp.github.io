@@ -73,7 +73,26 @@ function valorDeCelda(td) {
   return { n: null, t: t.toLowerCase() };
 }
 
+/* 🔴 CUÁNTO SE VE DE ANCHO (28-08-2026).
+
+   Lo necesita el CSS que deja fija la primera fila de cada tabla: la cabecera
+   del panel se pega al borde izquierdo con este ancho. No sirve `100vw` porque
+   en el escritorio la barra lateral se lleva 208 px y `#contenido` es más
+   angosto que la ventana —y en el teléfono, el relleno—.
+
+   Se escribe después de cada pintada y al cambiar el tamaño de la ventana, que
+   son los dos momentos en que puede cambiar. */
+function anchoUtilDeLaPantalla() {
+  const c = document.getElementById('contenido');
+  if (!c || !document.documentElement) return;
+  document.documentElement.style.setProperty('--ancho-util', c.clientWidth + 'px');
+}
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('resize', anchoUtilDeLaPantalla);
+}
+
 function mejorarTablas() {
+  anchoUtilDeLaPantalla();
   document.querySelectorAll('#contenido table.grid').forEach((tabla, i) => {
     // Las tablas anidadas del desplegable no: son cuatro filas dentro de una
     // fila, y ordenarlas por su cuenta confunde más de lo que ayuda.
@@ -137,9 +156,22 @@ function avisarQueHayMasColumnas() {
   document.querySelectorAll('#contenido .grid-envoltorio').forEach((env) => {
     const previo = env.nextElementSibling;
     if (previo && previo.classList && previo.classList.contains('pista-desliza')) previo.remove();
-    // 4 px de margen: un par de píxeles de diferencia son redondeo del
-    // navegador, no una columna escondida.
-    if (env.scrollWidth <= env.clientWidth + 4) return;
+    /* 🔴 SE MIDE CONTRA LO QUE SE VE, NO CONTRA LA CAJA (28-08-2026).
+
+       Antes se comparaba el contenido del envoltorio contra el propio
+       envoltorio. Desde que la caja dejó de desplazar —para que la cabecera de
+       la tabla se pueda pegar— esa comparación da siempre igual: la caja mide
+       exactamente lo que mide su tabla. La pista dejaba de aparecer justo
+       cuando más falta hace.
+
+       Lo que hay que comparar es la TABLA contra el hueco visible, que es
+       `#contenido`. 4 px de margen: un par de píxeles son redondeo del
+       navegador, no una columna escondida. */
+    const visible = document.getElementById('contenido');
+    const hueco = visible ? visible.clientWidth : env.clientWidth;
+    const anchoTabla = Math.max(env.scrollWidth, env.firstElementChild
+      ? env.firstElementChild.getBoundingClientRect().width : 0);
+    if (anchoTabla <= hueco + 4) return;
     const pista = document.createElement('div');
     pista.className = 'pista-desliza';
     pista.textContent = 'Desliza la tabla para ver las demás columnas';
