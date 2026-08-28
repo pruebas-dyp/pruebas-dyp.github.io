@@ -782,6 +782,64 @@ montarLateral();
    sin puerta de por medio, que es como lo resuelve el sistema que ellos usan
    todos los días. */
 
+/* 🔴 EL TECLADO DEL TELÉFONO TAPABA EL CAMPO QUE SE ESTABA LLENANDO
+   (28-08-2026, Marco: «el teclado del celular tapa el campo que estás
+   llenando» → «arreglar»).
+
+   Cuando el teclado sube, `window.innerHeight` NO CAMBIA: para la página la
+   ventana sigue midiendo lo mismo y la mitad de abajo queda debajo del teclado.
+   Y como el armazón es `height: 100dvh` con `overflow: hidden`, esa mitad no se
+   puede alcanzar: el campo enfocado, el botón Siguiente y el de Guardar quedan
+   tapados y no hay a dónde desplazarse.
+
+   `visualViewport` es la única pieza del navegador que sabe cuánto se ve DE
+   VERDAD. Se escucha, se escribe el alto en una variable de CSS y el armazón
+   mide contra eso: al subir el teclado la aplicación se encoge, y su
+   `#contenido` —que ya desplaza— se hace cargo del resto.
+
+   Y al enfocar un campo se lo lleva al centro de lo que queda visible. Va con
+   espera porque el teclado tarda en subir: desplazar antes de que termine mide
+   contra la ventana vieja y no sirve de nada.
+
+   ⚠️ Se apoya en `visualViewport`, que no existe en navegadores viejos. Si no
+   está, no se hace nada y todo queda como estaba —no se rompe: simplemente no
+   mejora—. Safari lo trae desde 2018 y Chrome desde 2017. */
+(function elTecladoNoTapa() {
+  const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+  if (!vv || !document.documentElement) return;
+  const raiz = document.documentElement;
+  let ultimo = 0;
+
+  const medir = () => {
+    const alto = Math.round(vv.height);
+    if (alto === ultimo) return;
+    ultimo = alto;
+    raiz.style.setProperty('--alto-visible', alto + 'px');
+    /* «Hay teclado» es que la ventana visible se encogió de golpe. El margen de
+       120 px deja fuera la barra del navegador, que aparece y desaparece sola
+       al desplazar y no es un teclado. */
+    raiz.classList.toggle('con-teclado', alto < window.innerHeight - 120);
+  };
+
+  vv.addEventListener('resize', medir);
+  vv.addEventListener('scroll', medir);
+  medir();
+
+  document.addEventListener('focusin', (ev) => {
+    const el = ev.target;
+    if (!el || !el.tagName) return;
+    if (!/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) return;
+    setTimeout(() => {
+      // Si el teclado no subió —computador, o un desplegable nativo— no se mueve
+      // nada: correr la pantalla sin motivo es peor que no hacerlo.
+      if (!raiz.classList.contains('con-teclado')) return;
+      if (typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }, 300);
+  });
+})();
+
 /* La sala compartida se enciende al final, cuando el modelo y las pantallas ya
    están en pie: al arrancar puede traer el estado de la sala y repintar, y para
    eso `render` tiene que existir. Si no hay internet, falla en silencio y el

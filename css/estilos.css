@@ -143,10 +143,18 @@ svg.ico.g { width: 16px; height: 16px; flex-basis: 16px; }
    muesca, la última franja quedaba debajo del indicador de inicio. */
 .app {
   display: flex; flex-direction: column; overflow: hidden;
-  height: 100vh; height: 100dvh;
+  /* Y `--alto-visible`, que escribe `elTecladoNoTapa()` en app.js con lo que
+     `visualViewport` dice que se ve de verdad. Manda sobre las otras dos porque
+     es la única que se entera del teclado: `dvh` sigue el alto de la ventana,
+     no el del hueco que deja el teclado. Si el navegador no trae
+     `visualViewport`, la variable no se escribe nunca y gana el respaldo. */
+  height: 100vh; height: 100dvh; height: var(--alto-visible, 100dvh);
   padding-bottom: env(safe-area-inset-bottom, 0px);
   box-sizing: border-box;
 }
+/* Con el teclado arriba, la franja del indicador de inicio queda debajo de él:
+   reservarla ahí son 34 px de pantalla regalados justo cuando menos sobra. */
+:root.con-teclado .app { padding-bottom: 0; }
 
 /* Safari infla la letra por su cuenta al acostar el teléfono —«text
    autosizing»— y después no la devuelve: el mismo panel se ve con dos tamaños
@@ -309,7 +317,7 @@ div.desplegable button:hover .ico { color: var(--acento); }
    al abrir la Ficha, no aparece esto y es sumamente importante que sí
    aparezca»). Estaban a 1.213 píxeles de scroll: los cuatro bloques de la ficha,
    que en el escritorio van en fila, en un teléfono se apilan. */
-@media (max-width: 860px) {
+@media (max-width: 860px), (max-height: 520px) and (pointer: coarse) {
   .pila-ficha .p-cabecera { order: 1; }
   .pila-ficha .p-accesos  { order: 2; }
   .pila-ficha .p-detalle  { order: 3; }
@@ -959,7 +967,7 @@ table.grid tfoot td { background: var(--superficie-2); font-weight: 600; color: 
    veces de las que se aciertan con el dedo, y cada fallo abre OTRA fila. Se le
    da la celda entera —que es lo que el dedo ya cree estar apretando— sin
    tocar el escritorio, donde el mouse acierta igual. */
-@media (max-width: 860px) {
+@media (max-width: 860px), (max-height: 520px) and (pointer: coarse) {
   td.flecha-col, th.flecha-col { min-width: 34px; text-align: center; }
   /* La Torre no usa `.flecha-col`: pinta su propia primera celda. Se le da el
      mismo blanco por la flecha que lleva dentro. */
@@ -1069,7 +1077,7 @@ tr.detalle > td { background: var(--superficie-3); padding: 0; border-bottom: 2p
    Hasta entonces el envoltorio sigue desplazando de lado, que es lo que había,
    y la página no se mueve en horizontal. */
 
-@media (max-width: 860px) {
+@media (max-width: 860px), (max-height: 520px) and (pointer: coarse) {
   tr.detalle > td > * {
     position: sticky; left: 0;
     width: calc(100vw - 26px); max-width: calc(100vw - 26px);
@@ -1720,7 +1728,22 @@ svg.chispa.verde .chispa-punto { fill: var(--verde); }
 }
 
 /* ───────── Tablet parada y celular ───────── */
-@media (max-width: 860px) {
+/* 🔴 EL TELÉFONO ACOSTADO TAMBIÉN ES UN TELÉFONO (28-08-2026, Marco: «di
+   vuelta el celular y se me fueron los módulos de arriba, eso no puede pasar»).
+
+   Toda la capa de teléfono se decidía por el ANCHO, y un iPhone Pro Max
+   acostado mide 932 px de ancho: pasaba de largo los 860 y el sistema volvía a
+   la barra lateral del escritorio, plegada a iconos. El aparato es el mismo y
+   el dedo también; lo único que cambió es cómo lo tomó.
+
+   Lo que SÍ distingue a un teléfono acostado de un computador es el ALTO: 390 o
+   430 px contra los 800 y tantos de una ventana de escritorio. Y se le suma
+   `pointer: coarse` para no atrapar a alguien que dejó una ventana bajita en su
+   computador —ahí la tira de arriba se comería el poco alto que le queda—.
+
+   520 px de tope: el teléfono más grande acostado no pasa de 430, y una ventana
+   de computador rara vez baja de 600. */
+@media (max-width: 860px), (max-height: 520px) and (pointer: coarse) {
   .barra-menu .mnu { display: none; }
   /* Los tres botones de la derecha se quedan: se ACORTAN. Ninguno se apaga
      -la regla de la casa-. Con el texto largo, a 768 px envolvian en dos
@@ -2040,7 +2063,7 @@ svg.chispa.verde .chispa-punto { fill: var(--verde); }
   padding: 5px 2px 0; letter-spacing: .2px;
 }
 .pista-desliza::before { content: '\2194\00a0'; color: var(--acento-texto); font-weight: 700; }
-@media (max-width: 860px) { .pista-desliza { display: block; } }
+@media (max-width: 860px), (max-height: 520px) and (pointer: coarse) { .pista-desliza { display: block; } }
 
 /* ═══════════════════════════════════════════════════════════════════════
    LA CAPA DE TOQUE
