@@ -609,12 +609,23 @@ body.lateral-plegado .sidebar .tirador { display: none; }
 .aviso-borrador .acc { display: flex; gap: 7px; flex-shrink: 0; }
 
 /* Barra de estado */
+/* 🔴 LA BARRA CRECE EN VEZ DE CORTAR (28-08-2026).
+
+   Estaba clavada en 24 px. A 768 px el enlace «Por Arttmize» se parte en dos
+   líneas -31,9 px- y, como la barra es el último hijo de `.app` -que es
+   `overflow: hidden`-, esos 4 px de más no aparecían por ninguna parte: se
+   cortaban arriba y abajo y el texto quedaba mordido. Medido en tablet, en las
+   catorce pantallas.
+
+   Con `min-height` la barra mide 24 cuando le alcanza y crece cuando no. Y el
+   enlace pide una sola línea, que es lo que debería haber pedido siempre. */
 .barra-estado {
-  flex: 0 0 24px; height: 24px; display: flex; align-items: center; gap: 0;
+  flex: 0 0 auto; min-height: 24px; display: flex; align-items: center; gap: 0;
   background: var(--barra-bg); border-top: 1px solid var(--borde);
   font-size: 11px; color: var(--gris); padding: 0 12px;
 }
 .barra-estado .celda { padding: 0 11px; border-right: 1px solid var(--borde); display: flex; align-items: center; gap: 5px; height: 100%; }
+.barra-estado a { white-space: nowrap; }
 .barra-estado .celda:first-child { padding-left: 0; }
 .barra-estado .celda.der { margin-left: auto; border-right: none; border-left: 1px solid var(--borde); }
 .barra-estado strong { color: var(--tinta); font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -695,12 +706,31 @@ input:focus, select:focus, textarea:focus {
   outline: none; border-color: var(--acento); box-shadow: 0 0 0 2px var(--acento-bg);
 }
 
-.chips { display: flex; gap: 0; flex-wrap: wrap; border: 1px solid var(--borde); border-radius: 3px; overflow: hidden; }
+/* 🔴 CADA CHIP, SU PROPIO BOTÓN (28-08-2026, Marco: «en la visual del
+   computador no queda claro cuáles son los bordes de los botones que sirven
+   para filtrar»).
+
+   Estaban armados como una barra segmentada: UN marco alrededor del grupo y
+   una línea de 1 px separando cada uno. De lejos eso se lee como una tira de
+   texto, no como seis botones —y el que no sabe que se aprietan, no los
+   aprieta—. La barra segmentada es correcta cuando las opciones son
+   excluyentes y pocas; acá son seis, de anchos muy distintos, y además
+   envuelven en dos y tres líneas en el teléfono, donde el marco del grupo
+   quedaba cortando por la mitad.
+
+   Ahora cada uno trae su marco, su esquina y su separación. El activo sigue
+   siendo el único sólido, que es lo que dice cuál manda. */
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
 .chip {
-  border: none; border-right: 1px solid var(--borde); background: var(--superficie); color: var(--texto);
+  /* El relleno tiene que DIFERIR del panel, no sólo el marco: `--superficie` es
+     exactamente el fondo del panel que hay detrás -medido: #151a21 los dos-, así
+     que el borde de 1 px quedaba siendo la única separación y por eso no se leían
+     como botones. Con relleno propio y el marco fuerte, se ven. */
+  border: 1px solid var(--borde-fuerte); border-radius: 4px;
+  background: var(--superficie-2); color: var(--texto);
   padding: 3px 11px; font-size: 11.5px; cursor: pointer; font-family: inherit;
 }
-.chip:last-child { border-right: none; }
+.chip.activo { border-color: var(--acento-solido); }
 .chip:hover { background: var(--superficie-2); }
 .chip.activo { background: var(--acento-solido); color: #fff; font-weight: 600; }
 /* La cuenta de cada situación, dentro del propio chip. Reemplaza la fila de
@@ -750,7 +780,30 @@ input:focus, select:focus, textarea:focus {
 .linea-presu .acc { margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; }
 
 /* Grilla de datos — el componente central del sistema */
-.grid-envoltorio { overflow-x: auto; }
+/* 🔴 EL `fieldset` TRAE UN MÍNIMO QUE NO SE VE Y DESBORDA (28-08-2026).
+
+   Todo navegador le pone al `fieldset` un `min-width: min-content` de fábrica,
+   y no se hereda de ninguna regla nuestra: viene en la hoja del navegador. En
+   el escritorio nunca estorbó; a 390 px hace que el bloque se niegue a medir
+   menos que su contenido y empuje la página 13 px a la derecha —medido en el
+   formulario de recepción—. Trece píxeles no suenan a nada, pero son los que
+   hacen que la página entera se pueda arrastrar de lado y que el dedo, al
+   bajar, la mueva en diagonal. */
+fieldset { min-width: 0; }
+
+/* 🔴 LA TABLA SE DESPLAZA A LO ANCHO Y NADA MÁS (28-08-2026).
+
+   `overflow-x: auto` a secas hace que el eje Y calcule `auto` también —la
+   regla del CSS: si un eje no es `visible`, el otro deja de serlo—. Así que
+   esta caja quedaba siendo un contenedor desplazable VERTICAL sin nada que
+   desplazar, y en táctil eso se traga el gesto de bajar: la tabla ocupa casi
+   toda la pantalla del teléfono, o sea que el dedo casi siempre empieza
+   encima de ella.
+
+   Con `hidden` el eje Y deja de ser un puerto de desplazamiento. No se pierde
+   nada: la caja crece con su tabla, nunca tiene sobrante vertical —medido:
+   0 px en las seis pantallas—. */
+.grid-envoltorio { overflow-x: auto; overflow-y: hidden; }
 table.grid { width: 100%; border-collapse: collapse; font-size: 12px; }
 table.grid th {
   text-align: left; padding: 4px 5px; background: var(--superficie-2);
@@ -847,6 +900,20 @@ table.grid tfoot td { background: var(--superficie-2); font-weight: 600; color: 
    auto correcto— va más grande todavía. */
 .cab .patente, h2 .patente, .campo-cab .patente { font-size: 15px; padding: 2px 9px; }
 .flecha { display: inline-block; width: 10px; color: var(--gris-2); transition: transform .12s; }
+/* 🔴 EN TÁCTIL, LA FLECHA ES UN BLANCO DE 10×17 PÍXELES (28-08-2026).
+
+   Es la que abre y cierra el desplegable de la fila, o sea que es también el
+   «volver atrás» del que se quejó Marco. Diez píxeles de ancho se fallan más
+   veces de las que se aciertan con el dedo, y cada fallo abre OTRA fila. Se le
+   da la celda entera —que es lo que el dedo ya cree estar apretando— sin
+   tocar el escritorio, donde el mouse acierta igual. */
+@media (max-width: 860px) {
+  td.flecha-col, th.flecha-col { min-width: 34px; text-align: center; }
+  /* La Torre no usa `.flecha-col`: pinta su propia primera celda. Se le da el
+     mismo blanco por la flecha que lleva dentro. */
+  table.grid tr.fila > td:first-child { min-width: 30px; }
+  .flecha { width: 20px; font-size: 15px; }
+}
 tr.abierta .flecha { transform: rotate(90deg); color: var(--acento); }
 
 /* Etiquetas de estado */
@@ -910,6 +977,29 @@ body.ventana-registro .sidebar { display: none; }
 
 /* Fila expandida como ficha */
 tr.detalle > td { background: var(--superficie-3); padding: 0; border-bottom: 2px solid var(--borde-fuerte); }
+
+/* 🔴 EL DESPLEGABLE SE LEE DENTRO DE LA PANTALLA, NO DENTRO DE LA TABLA
+   (28-08-2026, Marco: «cuando uno despliega, después no puede volver atrás...
+   no se ve, se pierde la información»).
+
+   La fila que se despliega es una fila de la tabla, así que medía lo que mide
+   la tabla: 1.250 px. En un teléfono de 390 se veían los rótulos —Patente,
+   Marca y modelo, Año, VIN— y los VALORES quedaban a la derecha, fuera de la
+   pantalla. Medido: 37 de los 112 elementos del desplegable caían fuera. El
+   usuario veía una lista de nombres de campo sin un solo dato, que es
+   exactamente «se pierde la información».
+
+   `position: sticky; left: 0` pega la tarjeta al borde izquierdo de la caja
+   que se desplaza: la tabla se corre a lo ancho y el desplegable se queda
+   quieto y entero. El ancho se ata a la VENTANA —no a la tabla— y por eso va
+   en `100vw` menos el respiro de los costados. */
+@media (max-width: 860px) {
+  tr.detalle > td > * {
+    position: sticky; left: 0;
+    width: calc(100vw - 26px); max-width: calc(100vw - 26px);
+    box-sizing: border-box;
+  }
+}
 .ficha-detalle { padding: 10px 12px 12px; }
 .ficha-rejilla { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 7px; }
 fieldset.bloque {
@@ -1936,6 +2026,11 @@ svg.chispa.verde .chispa-punto { fill: var(--verde); }
   .sidebar .tirador { display: none; }
   /* Que la tabla se deslice con inercia, como el resto del teléfono. */
   .grid-envoltorio { -webkit-overflow-scrolling: touch; }
+  /* 🔴 iOS HACE ZOOM SOBRE CUALQUIER CAMPO CON LETRA MENOR A 16 px, y no
+     vuelve solo: la pantalla queda corrida y hay que pellizcar para volver.
+     Los campos de filtro ya están en 16; el que faltaba era el selector de
+     «cuántas filas» del pie, que estaba en 11 px. */
+  .pie-grid .cuantas select { font-size: 16px; padding: 4px 6px; }
 }
 
 

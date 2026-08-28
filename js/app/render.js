@@ -798,7 +798,33 @@ function resolverPendiente(claveNueva) {
 }
 
 function conDobleClic(el, clave, alDoble, alSimple, abridor) {
-  const abre = (ev) => !abridor || (ev.target && abridor.contains(ev.target));
+  /* 🔴 EN TÁCTIL NO HAY DOBLE CLIC QUE VALGA (28-08-2026, Marco: «cuando uno
+     despliega después no puede volver atrás»).
+
+     El gesto en el escritorio es: un clic despliega la fila, dos clics sobre la
+     celda de la OT abren la orden en otra pestaña. Con el mouse se aprende a la
+     primera. Con el dedo, no:
+
+       · La celda de la OT es lo primero que se toca —está a la izquierda y es
+         el número grande—, así que abrir y volver a cerrar el desplegable son
+         DOS toques seguidos en el mismo punto. Dentro de los 500 ms de la
+         ventana, eso es un doble clic: en vez de cerrarse, se abre la orden en
+         una pestaña nueva. Y de una pestaña nueva, en un teléfono, no se
+         «vuelve atrás»: hay que entrar al conmutador de pestañas de Safari.
+       · Encima, el doble toque en iOS ya tiene dueño: es el zoom.
+
+     Así que donde HAY una acción simple —desplegar la fila—, en táctil se hace
+     siempre esa y no se espera ningún segundo toque. No se pierde nada: la
+     orden se abre con «Abrir en pestaña nueva», que está dentro del propio
+     desplegable, y con «Abrir la orden» de la barra de herramientas.
+
+     ⚠️ Donde NO hay acción simple —Documentos y Bodega, que no despliegan— el
+     doble toque se queda: ahí es la única forma de abrir y quitarlo dejaría la
+     fila muerta. Esos paneles igual traen sus propios botones por fila. */
+  const tactil = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  const soloSimple = tactil && !!alSimple;
+  const abre = (ev) => !soloSimple &&
+    (!abridor || (ev.target && abridor.contains(ev.target)));
 
   el.addEventListener('click', (ev) => {
     /* Fuera de la celda que abre no hay doble clic que esperar: despliega al
@@ -833,7 +859,9 @@ function conDobleClic(el, clave, alDoble, alSimple, abridor) {
     memoriaClic.pendiente = pendiente;
   });
 
-  if (abridor) {
+  /* El globo y la marca sólo donde el gesto existe. En táctil decían «doble clic
+     abre la orden» sobre una celda que ya no hace eso. */
+  if (abridor && !soloSimple) {
     abridor.classList.add('abre-ot');
     abridor.title = 'Doble clic abre la orden en otra pestaña';
   }
