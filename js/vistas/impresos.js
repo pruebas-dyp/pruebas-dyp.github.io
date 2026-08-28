@@ -107,22 +107,6 @@ const CSS_IMPRESO = `
 .impreso .ficha-doc .f span:first-child{color:#777;white-space:nowrap}
 .impreso .ficha-doc .f span:last-child{text-align:right;font-weight:600}
 
-/* ── El presupuesto por BLOQUES (27-08-2026) ───────────────────────────────
-   Cada bloque es su propia tabla, con las columnas que ese bloque necesita y
-   una sola columna de plata. La banda azul del titulo separa; antes separaban
-   columnas vacias, que es lo que lo hacia parecer una planilla. */
-.impreso table.bloque-doc{margin:0 0 5mm;page-break-inside:auto}
-.impreso table.bloque-doc tr.titulo-bloque th{
-  background:#292D78;color:#fff;font-size:9px;letter-spacing:1.4px;padding:3.5px 6px}
-.impreso table.bloque-doc thead tr:last-child th{
-  background:#eef0f7;color:#292D78;border:1px solid #ccd;font-size:8px}
-.impreso table.bloque-doc th.der{text-align:right}
-.impreso table.bloque-doc td.prov{color:#777;font-size:8.5px}
-.impreso table.bloque-doc td.vacio{color:#999;font-style:italic;font-size:8.5px}
-.impreso table.bloque-doc tfoot td{background:#f4f5fb;border-top:1.5px solid #ccd}
-.impreso table.bloque-doc tfoot td.rot-sub{
-  text-align:right;color:#555;font-size:8.5px;text-transform:uppercase;letter-spacing:.5px}
-
 /* El pie: observaciones a la izquierda y la cadena de totales a la derecha.
    Es donde se mira primero un presupuesto, asi que va sola en su caja y con la
    ultima linea destacada. */
@@ -139,56 +123,31 @@ const CSS_IMPRESO = `
 .impreso table.totales-doc tr.gran-total td:first-child{
   color:#fff;text-transform:uppercase;letter-spacing:1px;font-size:9.5px}
 
-.impreso table.detalle{width:100%;border-collapse:collapse;font-size:10px;margin:0}
-.impreso table.detalle th{background:#292D78;color:#fff;border:1px solid #292D78;padding:4px 5px;
+/* ── EL DETALLE, EN UNA SOLA TABLA (28-08-2026) ──────────────────
+   Marco: "no me gusta que sea como asi hacia abajo, la verdad deberia ser
+   tabla completa". El 27 quedo partido en tres tablas apiladas y cada una
+   traia su propia cabecera y sus propios anchos: al bajar por la hoja las
+   columnas no calzaban entre un bloque y el siguiente.
+
+   Una cabecera, un ancho de columna, todas las lineas corridas. Ninguna
+   columna queda sistematicamente vacia y la plata cae toda en la misma.
+   El <thead> se repite solo si el detalle pasa a la segunda hoja. */
+.impreso table.detalle{width:100%;border-collapse:collapse;font-size:10px;margin:0;
+  page-break-inside:auto}
+.impreso table.detalle th{background:#292D78;color:#fff;border:1px solid #292D78;padding:4px 6px;
   font-size:8px;text-transform:uppercase;letter-spacing:.5px;text-align:left}
-.impreso table.detalle th:nth-child(n+3){text-align:right}
+.impreso table.detalle th.der{text-align:right}
+.impreso table.detalle th.cen{text-align:center}
 .impreso table.detalle td{border:1px solid #dcdfe9;padding:4.2px 6px;vertical-align:top}
+.impreso table.detalle tr{page-break-inside:avoid}
 .impreso table.detalle td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .impreso table.detalle td.c{text-align:center;color:#666}
-.impreso table.detalle td.destaca{font-weight:700}
+.impreso table.detalle td.trabajo{font-size:9px;color:#333}
+/* El proveedor, mas chico (27-08-2026, Marco: "en el PDF no puede aparecer
+   lo pone sino mejor el detalle del Proveedor pero mas chico"). */
+.impreso table.detalle td.prov{font-size:8.5px;color:#777}
+.impreso table.detalle td.valor{font-weight:600}
 .impreso table.detalle tbody tr:nth-child(even) td{background:#fafbfe}
-/* La cabecera de dos pisos separa el detalle de la valorización. */
-.impreso table.detalle tr.grupos th{text-align:center;font-size:8px;letter-spacing:1.2px}
-.impreso table.detalle tr.grupos th.izq{text-align:left}
-/* Todas las columnas del mismo color: el monto se distingue por dónde CAE, no
-   por un fondo distinto. El rayado por fila alcanza para no perder la línea. */
-.impreso table.detalle td.puesto{font-weight:600}
-.impreso table.detalle tfoot td{background:#eef0f8 !important;font-weight:700;color:#292D78;
-  border-top:1.5px solid #292D78;padding:4px 5px}
-.impreso table.detalle tfoot td.rot{text-transform:uppercase;font-size:8px;letter-spacing:.8px}
-/* Los grupos y sus subtotales viven ahora DENTRO del cuerpo —el documento es
-   una sola tabla—, así que no les sirven los estilos del pie. El rótulo del
-   grupo va en una banda clara y el subtotal en una línea marcada arriba: son
-   los dos puntos donde el ojo se detiene al recorrer la hoja. */
-.impreso table.detalle tr.grupo-t td{background:#e8eaf4 !important;color:#292D78;
-  font-weight:700;text-transform:uppercase;font-size:8px;letter-spacing:.9px;
-  padding:3.5px 6px;border-top:1.2px solid #292D78}
-.impreso table.detalle tr.cierre-t td{background:#f3f4fa !important;font-weight:700;
-  color:#292D78;border-top:1px solid #b9bede}
-.impreso table.detalle tr.cierre-t td.rot{text-transform:uppercase;font-size:8px;letter-spacing:.8px}
-/* El rayado alternado se apaga en esas filas: con banda propia se ve sucio. */
-.impreso table.detalle tbody tr.grupo-t td,
-.impreso table.detalle tbody tr.cierre-t td{background-image:none}
-/* ── Las tres columnas de totales, separadas del detalle ──────────────────
-   El detalle de la izquierda se lee de a poco; el bloque de la derecha es lo
-   que se firma. Una línea vertical marca dónde termina uno y empieza el otro,
-   y las tres columnas van sobre un fondo propio que se oscurece hacia el
-   total con IVA — el número que importa queda al final del recorrido y no
-   hay que buscarlo entre once columnas iguales. */
-.impreso table.detalle td.tot{background:#f4f5fb !important;font-weight:600;color:#1f2360}
-.impreso table.detalle td.tot.final{background:#e7e9f5 !important;font-weight:700}
-.impreso table.detalle td.corte{border-left:1.6px solid #292D78}
-.impreso table.detalle th.corte{border-left:1.6px solid #fff}
-.impreso table.detalle th.tot{background:#1f2360}
-/* En el pie manda el pie: sobre la banda de totales, el bloque de la derecha
-   se marca entero para que la sumatoria se lea de un vistazo. */
-.impreso table.detalle tr.cierre-t td.tot{background:#dfe2f2 !important;color:#292D78}
-.impreso table.detalle tr.cierre-t td.tot.final{background:#292D78 !important;color:#fff}
-/* El rayado alternado no debe pisar el fondo propio de estas celdas. */
-.impreso table.detalle tbody tr:nth-child(even) td.tot{background:#eef0f8 !important}
-.impreso table.detalle tbody tr:nth-child(even) td.tot.final{background:#e1e4f2 !important}
-.impreso table.detalle tfoot td.destaca{background:#292D78 !important;color:#fff;font-size:11px}
 
 .impreso .cierre{display:grid;grid-template-columns:1fr 62mm;gap:6mm;margin-top:8px;align-items:start}
 .impreso .condiciones ul{margin:3px 0 0;padding-left:12px;font-size:8.6px;color:#555;line-height:1.5}
@@ -473,33 +432,43 @@ function impresoRecepcion(o) {
   </div>` + pieImpreso();
 }
 
-/* ── 2 · Presupuesto (la OR) ───────────────────────────────────────────
-   Rehecho el 16-08-2026 sobre el documento real que trajo Marco —la OR
-   23505-18401-001— y con su encargo textual: «la misma misma lógica pero con
-   el UPGRADE en un mejor formato y un mejor PDF como estilo tabla».
+/* ── 2 · Presupuesto (la OR) ───────────────────────────────
+   El documento que sale del taller. Rehecho el 16-08-2026 sobre la OR real
+   que trajo Marco —la 23505-18401-001—, y otra vez el 27 y el 28-08-2026,
+   que es cuando quedó como está.
 
    La lógica del original, que se respeta al pie:
 
-   · Tres secciones por COLUMNA DE TIEMPO, no por operación: Desmontar y
-     montar · Reparar · Pintar. Una misma pieza aparece en dos si se reparó y
-     se pintó — es un solo trabajo con dos tiempos.
-   · Cada renglón vale `horas × tempario`, y cada sección lleva su subtotal.
-   · Repuestos con proveedor, y Trabajos Externos (T.O.T.) aparte.
-   · El cierre: Mano de Obra + Repuestos + T.O.T. = Subtotal neto, menos el
-     deducible, más IVA.
+   · Mano de obra valorizada en `horas × tempario`; repuestos con su
+     proveedor; trabajos externos (T.O.T.) aparte.
+   · El cierre: mano de obra + repuestos + T.O.T. = subtotal, menos el
+     descuento y el deducible = neto, más IVA = total.
 
-   Lo que se agrega, y es la diferencia:
+   Las vueltas que dio, y por qué:
 
-   🔶 LAS HORAS SE MUESTRAN. El documento original imprime sólo el peso y
-      esconde el tiempo, así que la compañía discute el monto sin ver de dónde
-      sale y el taller no puede defenderlo. Acá van las horas, la tarifa y el
-      resultado, en la misma línea. Es más difícil de regatear un número que
-      se explica solo.
-   🔶 EL REPUESTO QUE NO SE COBRA SE VE. En el original la pieza que pone la
-      compañía sale con «$0» y el documento pierde cuánto vale. Acá dice
-      quién la pone y el precio de referencia queda registrado.
-   🔶 SALE COMPLETO. El PDF anterior de este prototipo imprimía una sola
-      tabla; éste imprime las cinco secciones y el pie del documento. */
+   🔶 27-08 · SE SACÓ EL TEMPARIO (Marco: «sácame el tempario, eso no debe
+      quedar visible en el PDF»). Es el costo de la hora del taller y no tiene
+      por qué viajar a la compañía; sigue en la pantalla, que es donde se
+      trabaja. Las HORAS sí se muestran: son lo que se está cobrando, y un
+      número que se explica solo es más difícil de regatear.
+   🔶 27-08 · UNA SOLA COLUMNA DE PLATA (Marco: «parece casi un excel feo y
+      desordenado»). Antes cada fila cruzaba NUEVE columnas numéricas
+      —desmontar, reparar, pintar, repuestos, externos, neto, IVA, total— y
+      ocho iban vacías. El IVA es del documento, no del tornillo: va abajo.
+   🔶 28-08 · UNA SOLA TABLA (Marco: «no me gusta que sea como así hacia
+      abajo, la verdad debería ser tabla completa»). El 27 lo partí en tres
+      tablas apiladas —mano de obra, repuestos, externos—, cada una con su
+      cabecera y sus anchos, y las columnas no calzaban entre un bloque y el
+      siguiente. Ahora es UNA tabla corrida: lo que cada línea es lo dice su
+      columna Trabajo, y los tres subtotales viven en el recuadro del pie, que
+      es donde se miran.
+   🔶 28-08 · LA PIEZA QUE PONE LA COMPAÑÍA VALE $0 (Marco: «donde sale Valor
+      no se cobra debe decir $0»). Decía «no se cobra» en letra chica: es lo
+      mismo dicho en palabras, y en un presupuesto las palabras no suman. La
+      columna Valor tiene que poder recorrerse de arriba abajo sumando.
+      Quién la pone lo sigue diciendo la columna Proveedor.
+      ⚠️ Lo que se pierde: el precio de referencia de esa pieza ya no viaja en
+      el papel. Queda en la pantalla, en la línea del presupuesto. */
 
 function impresoPresupuesto(o, p) {
   const db = Modelo.base();
@@ -509,99 +478,75 @@ function impresoPresupuesto(o, p) {
   const lineas = p.lineas || [];
   const hs = (n) => (Number(n) || 0).toFixed(2).replace('.', ',');
 
-  /* \u{1F534} EL DOCUMENTO, REHECHO (27-08-2026, Marco: \u00abla idea de la tabla est\u00e1
-     buena pero parece casi un excel feo y desordenado. \u00bfLo podemos cambiar?
-     Prop\u00f3n t\u00fa un cambio\u00bb).
-
-     Lo que lo hac\u00eda parecer planilla eran las columnas: cada fila cruzaba NUEVE
-     columnas num\u00e9ricas \u2014desmontar, reparar, pintar, repuestos, externos, neto,
-     IVA, total\u2014 y ocho de las nueve iban vac\u00edas. Un presupuesto que se manda a
-     una compa\u00f1\u00eda no es una matriz: es una lista de lo que hay que hacer, con su
-     precio a la derecha.
-
-     Lo que cambia:
-
-       \u00b7 TRES BLOQUES en vez de una tabla \u00fanica \u2014Mano de obra, Repuestos,
-         Trabajos externos\u2014, cada uno con las columnas que ese bloque necesita y
-         con su subtotal. La separaci\u00f3n ahora la hace el t\u00edtulo, no una columna
-         vac\u00eda.
-       \u00b7 UNA SOLA COLUMNA DE PLATA por fila. El IVA no va l\u00ednea por l\u00ednea: el IVA
-         es del documento, no del tornillo.
-       \u00b7 LOS TOTALES AL PIE, a la derecha, con la cadena completa y a la vista:
-         subtotal, descuento, deducible, neto, IVA y TOTAL. Es como se lee
-         cualquier presupuesto y es lo que pidieron de DyP.
-       \u00b7 EL PROVEEDOR en su propia columna y en letra chica, no \u00ab\u00b7 lo pone SURA\u00bb
-         colgando de la descripci\u00f3n.
-       \u00b7 SIN TEMPARIO. Es el costo de la hora del taller: no tiene por qu\u00e9 ir en
-         el papel que ve la compa\u00f1\u00eda. Sigue en la pantalla, que es donde se
-         trabaja. */
-
-  const manoObra = lineas.filter(Reglas.esManoObra);
-  const repuestos = lineas.filter(Reglas.esRepuesto);
-  const externos = lineas.filter(Reglas.esExterno);
-
   const OPS = { cambio: 'Cambio', reparar: 'Reparar', externo: 'Externo' };
 
-  const bloque = (titulo, cabeceras, filas, subtotal) => !filas.length ? '' : `
-    <table class="detalle bloque-doc">
-      <thead>
-        <tr class="titulo-bloque"><th colspan="${cabeceras.length}">${esc(titulo)}</th></tr>
-        <tr>${cabeceras.map((c) => '<th' + (c.an ? ' style="width:' + c.an + '"' : '') +
-          (c.der ? ' class="der"' : '') + '>' + esc(c.rot) + '</th>').join('')}</tr>
-      </thead>
-      <tbody>${filas.join('')}</tbody>
-      <tfoot><tr><td colspan="${cabeceras.length - 1}" class="rot-sub">Subtotal ${esc(titulo.toLowerCase())}</td>
-        <td class="n destaca">${fMonto(subtotal)}</td></tr></tfoot>
-    </table>`;
+  /* Qué se le hace a la pieza. En mano de obra sale de las HORAS —que es lo
+     que se está cobrando— y no del rótulo del proceso: una puerta que se
+     repara casi siempre además se pinta, y son dos tiempos distintos que el
+     documento tiene que decir. Es la información que antes daban las tres
+     columnas de plata separadas, dicha en la columna que nunca va vacía. */
+  const trabajoDe = (l) => {
+    if (Reglas.esRepuesto(l)) return 'Repuesto';
+    if (Reglas.esExterno(l)) return 'Externo';
+    const partes = [];
+    if (Number(l.horas_dm) > 0) partes.push('Desmontar y montar');
+    if (Number(l.horas_rep) > 0) partes.push('Reparar');
+    if (Number(l.horas_pint) > 0) partes.push('Pintar');
+    return partes.length ? partes.join(' + ') : (OPS[l.proceso] || l.proceso || '—');
+  };
+
+  /* El orden del documento: primero el trabajo del taller, después las piezas
+     que hay que comprar, al final lo que se manda afuera. Es el mismo orden
+     del original y el mismo del recuadro de totales. */
+  const grupo = (l) => Reglas.esManoObra(l) ? 0 : (Reglas.esRepuesto(l) ? 1 : 2);
 
   let n = 0;
-  const bMO = bloque('Mano de obra',
-    [{ rot: 'N\u00b0', an: '8mm' }, { rot: 'Descripci\u00f3n' }, { rot: 'Operaci\u00f3n', an: '20mm' },
-     { rot: 'Horas', an: '16mm', der: true }, { rot: 'Valor', an: '24mm', der: true }],
-    manoObra.map((l) => {
+  const filas = lineas.slice()
+    .sort((a, b) => grupo(a) - grupo(b) || (Number(a.orden) || 0) - (Number(b.orden) || 0))
+    .map((l) => {
       const horas = (Number(l.horas_dm) || 0) + (Number(l.horas_rep) || 0) + (Number(l.horas_pint) || 0);
-      const v = Math.round(horas * p.tempario);
-      if (!v) return '';
+      let valor, cant;
+      if (Reglas.esManoObra(l)) {
+        valor = Math.round(horas * p.tempario);
+        cant = horas ? hs(horas) + ' h' : '—';
+      } else if (Reglas.esRepuesto(l)) {
+        valor = Reglas.cobroRepuesto(l);
+        cant = l.cantidad || 1;
+      } else {
+        valor = Number(l.precio_unitario) || 0;
+        cant = l.cantidad || 1;
+      }
+      /* Una línea en cero no se imprime: alarga el documento y no dice nada.
+         La pieza que pone la compañía SÍ va —es parte del trabajo— con su
+         proveedor y con $0, que es exactamente lo que el taller cobra por
+         ella. */
+      if (!valor && !Reglas.esRepuesto(l)) return '';
       return '<tr><td class="c">' + (++n) + '</td>' +
-        '<td>' + esc(l.descripcion || '\u2014') + '</td>' +
-        '<td class="c">' + esc(OPS[l.proceso] || l.proceso || '\u2014') + '</td>' +
-        '<td class="n">' + hs(horas) + '</td>' +
-        '<td class="n">' + fMonto(v) + '</td></tr>';
-    }), t.manoObra);
+        '<td>' + esc(l.descripcion || '—') + '</td>' +
+        '<td class="trabajo">' + esc(trabajoDe(l)) + '</td>' +
+        '<td class="prov">' + esc(l.proveedor || '—') + '</td>' +
+        '<td class="n">' + esc(String(cant)) + '</td>' +
+        '<td class="n valor">' + fMonto(valor) + '</td></tr>';
+    }).join('');
 
-  n = 0;
-  const bRep = bloque('Repuestos',
-    [{ rot: 'N\u00b0', an: '8mm' }, { rot: 'Descripci\u00f3n' }, { rot: 'Proveedor', an: '26mm' },
-     { rot: 'Cant.', an: '13mm', der: true }, { rot: 'Valor', an: '24mm', der: true }],
-    repuestos.map((l) => {
-      const v = Reglas.cobroRepuesto(l);
-      const loPone = !Reglas.esProveedorTaller(l.proveedor);
-      return '<tr><td class="c">' + (++n) + '</td>' +
-        '<td>' + esc(l.descripcion || '\u2014') + '</td>' +
-        '<td class="prov">' + esc(l.proveedor || '\u2014') + '</td>' +
-        '<td class="n">' + (l.cantidad || 1) + '</td>' +
-        /* La pieza que pone la compa\u00f1\u00eda va igual \u2014es parte del trabajo\u2014 pero
-           sin monto: no la desembols\u00f3 el taller, as\u00ed que no la cobra. */
-        '<td class="n' + (loPone ? ' vacio' : '') + '">' +
-          (loPone ? 'no se cobra' : fMonto(v)) + '</td></tr>';
-    }), t.repuestos);
+  const tabla = !filas ? '' : `
+    <table class="detalle">
+      <thead><tr>
+        <th class="cen" style="width:8mm">N°</th>
+        <th>Descripción</th>
+        <th style="width:30mm">Trabajo</th>
+        <th style="width:26mm">Proveedor</th>
+        <th class="der" style="width:17mm">Cant.</th>
+        <th class="der" style="width:26mm">Valor</th>
+      </tr></thead>
+      <tbody>${filas}</tbody>
+    </table>`;
 
-  n = 0;
-  const bExt = bloque('Trabajos externos',
-    [{ rot: 'N\u00b0', an: '8mm' }, { rot: 'Descripci\u00f3n' }, { rot: 'Proveedor', an: '26mm' },
-     { rot: 'Valor', an: '24mm', der: true }],
-    externos.map((l) => {
-      const v = Number(l.precio_unitario) || 0;
-      if (!v) return '';
-      return '<tr><td class="c">' + (++n) + '</td>' +
-        '<td>' + esc(l.descripcion || '\u2014') + '</td>' +
-        '<td class="prov">' + esc(l.proveedor || '\u2014') + '</td>' +
-        '<td class="n">' + fMonto(v) + '</td></tr>';
-    }), t.tot);
-
-  /* Los totales. Cada l\u00ednea del descuento se muestra SOLO si existe: un
-     \u00abDescuento $0\u00bb en un presupuesto sin descuento es una pregunta que nadie
-     hizo. Lo que siempre va es subtotal, neto, IVA y total. */
+  /* Los totales, al pie y a la derecha. Los tres subtotales por bloque van
+     acá —ya no dentro de la tabla—, y cada línea de descuento se muestra SÓLO
+     si existe: un «Descuento $0» en un presupuesto sin descuento es una
+     pregunta que nadie hizo. Lo que siempre va es subtotal, neto, IVA y
+     total. */
   const fila = (rot, val, cls) => '<tr' + (cls ? ' class="' + cls + '"' : '') +
     '><td>' + esc(rot) + '</td><td class="n">' + val + '</td></tr>';
 
@@ -611,8 +556,8 @@ function impresoPresupuesto(o, p) {
       ${t.repuestos ? fila('Repuestos', fMonto(t.repuestos)) : ''}
       ${t.tot ? fila('Trabajos externos', fMonto(t.tot)) : ''}
       ${fila('Subtotal', fMonto(t.subtotalNeto), 'raya')}
-      ${t.descuento ? fila('Descuento', '\u2212 ' + fMonto(t.descuento), 'resta') : ''}
-      ${t.deducible ? fila('Deducible de la p\u00f3liza', '\u2212 ' + fMonto(t.deducible), 'resta') : ''}
+      ${t.descuento ? fila('Descuento', '− ' + fMonto(t.descuento), 'resta') : ''}
+      ${t.deducible ? fila('Deducible de la póliza', '− ' + fMonto(t.deducible), 'resta') : ''}
       ${fila('Neto', fMonto(t.neto), 'raya')}
       ${fila('IVA ' + ivaPct + '%', fMonto(t.iva))}
       ${fila('Total', fMonto(t.total), 'gran-total')}
@@ -623,13 +568,13 @@ function impresoPresupuesto(o, p) {
     <div class="marca">
       ${logoImpreso()}
       <div class="giro">Desabolladura y pintura</div>
-      <div class="dir">Taller de reparaci\u00f3n automotriz \u00b7 Chile</div>
+      <div class="dir">Taller de reparación automotriz · Chile</div>
     </div>
     <div class="folio">
       <div class="tit">PRESUPUESTO</div>
       <table class="folio-t">
-        <tr><td>N\u00b0 OR</td><td><strong>${esc(p.numeroOR)}</strong></td></tr>
-        <tr><td>Versi\u00f3n</td><td>${p.version}</td></tr>
+        <tr><td>N° OR</td><td><strong>${esc(p.numeroOR)}</strong></td></tr>
+        <tr><td>Versión</td><td>${p.version}</td></tr>
         <tr><td>Orden de trabajo</td><td>${o.numeroOT}</td></tr>
         <tr><td>Fecha</td><td>${fFechaHora(HOY)}</td></tr>
         <tr><td>Estado</td><td><strong>${esc(estado)}</strong></td></tr>
@@ -641,30 +586,30 @@ function impresoPresupuesto(o, p) {
     <div class="ficha-doc">
       <div class="ficha-tit">Cliente</div>
       <div class="f"><span>Nombre</span><span>${esc(o.cliente)}</span></div>
-      <div class="f"><span>RUT</span><span>${esc(o.rut || '\u2014')}</span></div>
-      <div class="f"><span>Tel\u00e9fono</span><span>${esc(o.telefono || '\u2014')}</span></div>
-      <div class="f"><span>Domicilio</span><span>${esc(o.direccion || '\u2014')}</span></div>
+      <div class="f"><span>RUT</span><span>${esc(o.rut || '—')}</span></div>
+      <div class="f"><span>Teléfono</span><span>${esc(o.telefono || '—')}</span></div>
+      <div class="f"><span>Domicilio</span><span>${esc(o.direccion || '—')}</span></div>
     </div>
     <div class="ficha-doc">
-      <div class="ficha-tit">Veh\u00edculo</div>
+      <div class="ficha-tit">Vehículo</div>
       <div class="f"><span>Patente</span><span><strong>${esc(o.patente)}</strong></span></div>
-      <div class="f"><span>Marca y modelo</span><span>${esc([o.marca, o.modelo].filter(Boolean).join(' ') || '\u2014')}</span></div>
-      <div class="f"><span>A\u00f1o</span><span>${o.anio || '\u2014'}</span></div>
-      <div class="f"><span>VIN</span><span>${esc(o.vin || '\u2014')}</span></div>
+      <div class="f"><span>Marca y modelo</span><span>${esc([o.marca, o.modelo].filter(Boolean).join(' ') || '—')}</span></div>
+      <div class="f"><span>Año</span><span>${o.anio || '—'}</span></div>
+      <div class="f"><span>VIN</span><span>${esc(o.vin || '—')}</span></div>
     </div>
     <div class="ficha-doc">
       <div class="ficha-tit">Siniestro</div>
-      <div class="f"><span>Compa\u00f1\u00eda</span><span>${esc(o.compania)}</span></div>
-      <div class="f"><span>N\u00b0 siniestro</span><span>${esc(o.siniestro || '\u2014')}</span></div>
+      <div class="f"><span>Compañía</span><span>${esc(o.compania)}</span></div>
+      <div class="f"><span>N° siniestro</span><span>${esc(o.siniestro || '—')}</span></div>
       <div class="f"><span>Deducible</span><span>${fMonto(o.deducible)}</span></div>
-      <div class="f"><span>Liquidador</span><span>${esc(o.liquidador || '\u2014')}</span></div>
+      <div class="f"><span>Liquidador</span><span>${esc(o.liquidador || '—')}</span></div>
     </div>
   </div>
 
-  ${bMO}${bRep}${bExt}
+  ${tabla}
 
-  ${!lineas.length ? '<div style="text-align:center;padding:8mm;color:#888">' +
-    'Este presupuesto todav\u00eda no tiene l\u00edneas cargadas.</div>' : ''}
+  ${!filas ? '<div style="text-align:center;padding:8mm;color:#888">' +
+    'Este presupuesto todavía no tiene líneas cargadas.</div>' : ''}
 
   <div class="cierre-doc">
     <div class="condiciones">
@@ -673,7 +618,7 @@ function impresoPresupuesto(o, p) {
         ? '<div style="white-space:pre-wrap">' + esc(p.observacion) + '</div>'
         : '<div style="color:#888">Sin observaciones.</div>'}
     </div>
-    ${lineas.length ? totales : ''}
+    ${filas ? totales : ''}
   </div>
 
 ` + pieImpreso();

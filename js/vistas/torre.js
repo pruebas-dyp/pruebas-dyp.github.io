@@ -76,6 +76,32 @@ const SITUACION_TORRE = {
   sobremeta: (o) => o.enTaller && o.sobreMeta
 };
 
+/* 🔴 LO QUE MIRA EL BUSCADOR, EN UN SOLO LUGAR (27-08-2026).
+
+   Esta lista estaba escrita DOS VECES —en `filtrarTorre` y en
+   `cuentasSituacion`— con el mismo contenido copiado. Dos listas que tienen que
+   decir lo mismo terminan diciendo cosas distintas en cuanto alguien agrega un
+   campo en una y se olvida de la otra: el chip promete una cuenta y la tabla
+   muestra otra. Ahora es una función y las dos la llaman.
+
+   Marco pidió el 27-08-2026 que además de OT, OR, patente y cliente se pudiera
+   buscar por COMPAÑÍA, ESTADO, ETAPA y ENCARGADO. Se busca por el NOMBRE que se
+   ve en pantalla, no por el código interno: quien escribe "termin" espera
+   encontrar las de Terminación, y jamás va a escribir `et-7`.
+
+   Se dejan también marca, modelo, color y siniestro, que ya estaban y no
+   estorban: el buscador es uno solo y la gente escribe lo que recuerda. */
+function henoTorre(o) {
+  const ors = [o.numeroOR].concat(o.presupuestos.map((p) => p.numeroOR));
+  return ors.concat([
+    o.numeroOT, o.patente, o.siniestro, o.cliente,
+    o.compania, o.marca, o.modelo, o.color,
+    o.estadoNombre,                       // "Fuera de taller / Espera repuesto"
+    o.etapaNombre,                        // "Terminación", "Pendiente"…
+    o.asignado || 'Sin Asignar'           // así "sin asignar" también encuentra
+  ]).filter(Boolean).join(' ').toLowerCase();
+}
+
 /* Cuantas ordenes vera el usuario si aprieta cada chip, respetando los demas
    filtros que tenga puestos. Con una busqueda activa, la cuenta del chip es
    la de ESA busqueda: prometer 41 y mostrar 3 es mentir dos veces. */
@@ -85,12 +111,7 @@ function cuentasSituacion() {
   const base = Modelo.torre().filter((o) => {
     if (f.compania !== 'todas' && o.compania !== f.compania) return false;
     if (f.etapa !== 'todas' && o.etapa !== f.etapa) return false;
-    if (q) {
-      const ors = [o.numeroOR].concat(o.presupuestos.map((p) => p.numeroOR)).join(' ');
-      const heno = [o.numeroOT, ors, o.patente, o.siniestro, o.cliente, o.marca, o.modelo]
-        .join(' ').toLowerCase();
-      if (!heno.includes(q)) return false;
-    }
+    if (q && !henoTorre(o).includes(q)) return false;
     return true;
   });
   const c = {};
@@ -107,11 +128,7 @@ function filtrarTorre() {
     if (f.compania !== 'todas' && o.compania !== f.compania) return false;
     if (f.etapa !== 'todas' && o.etapa !== f.etapa) return false;
     if (!situacion(o)) return false;
-    if (q) {
-      const ors = [o.numeroOR].concat(o.presupuestos.map((p) => p.numeroOR)).join(' ');
-      const heno = [o.numeroOT, ors, o.patente, o.siniestro, o.cliente, o.marca, o.modelo].join(' ').toLowerCase();
-      if (!heno.includes(q)) return false;
-    }
+    if (q && !henoTorre(o).includes(q)) return false;
     return true;
   }).sort((a, b) => {
     const c = compararOrden(sacar(a), sacar(b));
@@ -144,7 +161,9 @@ function vTorre() {
       <div><h2>${ico('torre', 'g')}Torre de control</h2>
         <div class="desc">Las 17 columnas del sistema actual. Un clic despliega el expandible; doble clic abre la orden</div></div>
       <div class="filtros">
-        <input type="search" id="q-torre" placeholder="OT, OR, patente, siniestro o cliente" value="${esc(f.busqueda)}">
+        <input type="search" id="q-torre" value="${esc(f.busqueda)}"
+          placeholder="OT, OR, patente, cliente, compañía, estado, etapa o encargado"
+          title="Busca en todas esas columnas a la vez. Se escribe el nombre que se ve en pantalla: «termin» encuentra las de Terminación, «sin asignar» las que no tienen encargado.">
         <select id="s-compania"><option value="todas">Todas las compañías</option>
           ${COMPANIAS.map((c) => '<option value="' + esc(c.codigo) + '"' + (f.compania === c.codigo ? ' selected' : '') + '>' + esc(c.nombre) + '</option>').join('')}</select>
         <select id="s-etapa"><option value="todas">Todas las etapas</option>

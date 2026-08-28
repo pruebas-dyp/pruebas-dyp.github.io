@@ -639,6 +639,14 @@ input[type=search], input[type=text], select, textarea {
 }
 textarea { height: auto; }
 input[type=search] { min-width: 230px; }
+
+/* 🔴 EL BUSCADOR DE LA TORRE VA MÁS ANCHO (27-08-2026, Marco: «quiero que quede
+   un poco más grande»). No es capricho de diseño: desde hoy busca por ocho
+   campos —OT, OR, patente, cliente, compañía, estado, etapa y encargado— y en
+   230 px el texto de ayuda salía cortado, así que nadie se enteraba de que se
+   podía buscar por encargado. Crece hasta 420 y se encoge en pantallas chicas
+   en vez de empujar los dos desplegables a la línea de abajo. */
+#q-torre { min-width: 340px; flex: 1 1 340px; max-width: 420px; }
 input::placeholder { color: var(--gris-2); }
 input:focus, select:focus, textarea:focus {
   outline: none; border-color: var(--acento); box-shadow: 0 0 0 2px var(--acento-bg);

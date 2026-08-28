@@ -433,8 +433,23 @@ const Modelo = (function () {
       // ── estado, con sus dos booleanos separados ──
       estado: o.estado, estadoNombre: est.nombre || o.estado, estadoClase: est.clase || 'gris',
       esFinal: !!est.es_final, cierraOrden: !!est.cierra_orden,
-      enTaller: !!Reglas.estadiaAbierta(db, o.id) && !est.es_final,
-      fueraDeTaller: !Reglas.estadiaAbierta(db, o.id) && !est.es_final,
+      /* 🔴 DÓNDE ESTÁ EL VEHÍCULO: MANDA LO QUE DICE EL ESTADO (27-08-2026).
+
+         Antes esto miraba SÓLO la estadía. Y como `cambiar_estado_ot` no la
+         cerraba al poner "Fuera de taller" —lo hacía únicamente en los estados
+         finales—, una orden podía mostrar «Fuera de taller / Espera repuesto»
+         en su columna Estado y «En taller» en Los tres relojes, y el chip
+         "Fuera de taller" no la encontraba. Marco lo pilló con la OT 23489.
+
+         El origen ya quedó tapado allá, pero eso no arregla las órdenes que
+         quedaron torcidas: sus estadías siguen abiertas. Así que acá se toma la
+         declaración del usuario como la verdad —él dijo que el auto se fue— y
+         la estadía queda para lo suyo, que es medir los relojes.
+
+         Los dos booleanos siguen siendo complementarios: si uno es verdadero el
+         otro es falso, y la suma de los chips sigue dando el total. */
+      enTaller: o.estado !== 'fuera_taller' && !!Reglas.estadiaAbierta(db, o.id) && !est.es_final,
+      fueraDeTaller: (o.estado === 'fuera_taller' || !Reglas.estadiaAbierta(db, o.id)) && !est.es_final,
 
       // ── los TRES relojes ──
       diasTotales: rel.dias_totales,
@@ -1860,6 +1875,7 @@ const Modelo = (function () {
     if (!permiso.ok) return permiso;
     const o = db.orden_trabajo.find((x) => x.id === ot_id);
     const antes = Reglas.nombreEstado(db, o.estado);
+    const eraFuera = o.estado === 'fuera_taller';
     o.estado = nuevo_estado;
     if (Reglas.esFinal(db, nuevo_estado)) {
       // La fecha de salida se llena SIEMPRE al cerrar. En el original ese
@@ -1867,6 +1883,36 @@ const Modelo = (function () {
       o.fecha_entrega_real = ahora();
       const est = Reglas.estadiaAbierta(db, ot_id);
       if (est) est.salio_at = ahora();
+    } else if (nuevo_estado === 'fuera_taller') {
+      /* 🔴 EL ESTADO Y LA ESTADÍA TIENEN QUE DECIR LO MISMO (27-08-2026).
+
+         Marco: «no me aparecen todos los fuera de taller, el primer auto no me
+         sale y está fuera de taller». Tenía razón, y el filtro no era el
+         culpable.
+
+         `fuera_taller` se alcanza por DOS puertas: `registrar_salida` —desde
+         Entrega— que cierra la estadía y pone el estado, y ésta, que se ofrece
+         en Ingreso y en Ficha (ver `alcanzable_en` del catálogo) y hasta hoy
+         sólo ponía el estado. La estadía quedaba ABIERTA.
+
+         Y la Torre no lee el estado para saber dónde está el vehículo: lee la
+         estadía (`enTaller` / `fueraDeTaller` en `torre()`). Así que la orden
+         mostraba «Fuera de taller / Espera repuesto» en su columna Estado y
+         «En taller» en Los tres relojes, y el chip no la encontraba. El dato no
+         estaba mal en un lado: estaba dicho dos veces y distinto.
+
+         Se cierra la estadía acá, igual que hace `registrar_salida`. */
+      const est = Reglas.estadiaAbierta(db, ot_id);
+      if (est) est.salio_at = ahora();
+    } else if (eraFuera && !Reglas.estadiaAbierta(db, ot_id)) {
+      /* El camino de vuelta, por el mismo motivo: si venía de estar fuera y
+         ahora vuelve a un estado de taller, el vehículo reingresó. Se abre una
+         estadía nueva —las anteriores quedan intactas— igual que
+         `registrar_reingreso`, para que el reloj de reparación se reanude en
+         vez de arrancar de cero. */
+      db.ot_estadia.push({
+        id: nuevoId('est'), ot_id, entro_at: ahora(), salio_at: null, motivo_salida: null
+      });
     }
     registrarEvento(ot_id, 'estado', "Cambio de estado: '" + antes + "' a '" +
       Reglas.nombreEstado(db, nuevo_estado) + "'" + (observacion ? '. Obs: ' + observacion : ''));
