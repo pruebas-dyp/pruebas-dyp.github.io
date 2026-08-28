@@ -6,6 +6,11 @@
 
 function documentosEstado() {
   ui.documentos = ui.documentos || { otId: null, busqueda: '' };
+  /* Campo por campo y no en el literal: ese corre una sola vez por sesión y
+     una llave nueva no le llegaría al estado ya armado. */
+  if (typeof ui.documentos.estado !== 'string') ui.documentos.estado = 'todas';
+  if (typeof ui.documentos.etapa !== 'string') ui.documentos.etapa = 'todas';
+  if (typeof ui.documentos.situacion !== 'string') ui.documentos.situacion = 'todas';
   return ui.documentos;
 }
 
@@ -14,24 +19,86 @@ function vDocumentos() {
   return d.otId ? documentosDeOT(Modelo.otPorId(d.otId)) : documentosListado();
 }
 
+/* 🔴 LOS FILTROS DEL PANEL (28-08-2026, Marco: «lo mismo en el panel de la
+   FOTO 3»).
+
+   Las columnas de acá son Estado, Etapa y Adjuntos, así que ésos son los
+   filtros: dos desplegables por las dos primeras y los chips por la tercera.
+   «Sin adjuntos» es la pregunta que este panel existe para responder —qué
+   órdenes no tienen ni un papel cargado— y hasta hoy había que recorrer las
+   102 filas a ojo.
+
+   Y el buscador mira también el NOMBRE de los archivos: buscar «factura» tiene
+   que encontrar la orden donde se subió una. */
+const SITUACION_DOC = {
+  todas: () => true,
+  con:   (x) => x.docs.length > 0,
+  sin:   (x) => !x.docs.length
+};
+
+function henoDocumentos(x) {
+  const o = x.o;
+  return [o.numeroOT, o.numeroOR, o.patente, o.cliente, o.compania, o.siniestro,
+    o.marca, o.modelo, o.color, o.estadoNombre, o.etapaNombre, o.responsableNombre]
+    .concat(x.docs.map((m) => m.nombre))
+    .filter(Boolean).join(' ').toLowerCase();
+}
+
 function documentosListado() {
   const d = documentosEstado();
   const q = d.busqueda.trim().toLowerCase();
-  const filas = Modelo.torre().filter((o) => !q ||
-    [o.numeroOT, o.patente, o.cliente].join(' ').toLowerCase().includes(q));
+
+  /* Los adjuntos se leen UNA vez por orden y viajan pegados a ella: los mira el
+     buscador, los cuenta el chip y los muestra la columna. Sin esto,
+     `Modelo.mediaDe` se llamaría tres veces por fila en cada pintada. */
+  const universo = Modelo.torre().map((o) => ({
+    o, docs: Modelo.mediaDe(o.id).filter((m) => m.momento === 'documento')
+  }));
+
+  /* Los estados y las etapas que EXISTEN acá. Este panel muestra sólo vehículos
+     en la torre, así que los estados terminales del catálogo no pueden salir. */
+  const hayEstado = new Set(universo.map((x) => x.o.estado).filter(Boolean));
+  const hayEtapa = new Set(universo.map((x) => x.o.etapa).filter(Boolean));
+  filtroVigente(d, 'estado', hayEstado);
+  filtroVigente(d, 'etapa', hayEtapa);
+
+  const base = universo.filter((x) => {
+    if (d.estado !== 'todas' && x.o.estado !== d.estado) return false;
+    if (d.etapa !== 'todas' && x.o.etapa !== d.etapa) return false;
+    if (q && !henoDocumentos(x).includes(q)) return false;
+    return true;
+  });
+  const cuentas = cuentasDeChips(base, SITUACION_DOC);
+  const filas = base.filter(SITUACION_DOC[d.situacion] || SITUACION_DOC.todas);
 
   return `
   <div class="panel">
     <div class="cab"><div><h2>${ico('documento', 'g')}Documentos</h2>
       <div class="desc">Solo vehículos en la torre, igual que el original</div></div>
-      <div class="filtros"><input type="search" id="doc-q" placeholder="OT, patente o cliente" value="${esc(d.busqueda)}"></div></div>
+      <div class="filtros">
+        <input type="search" id="doc-q" value="${esc(d.busqueda)}"
+          placeholder="OT, OR, patente, cliente, compañía, estado, etapa o nombre del archivo"
+          title="Busca también en el nombre de los archivos cargados: «factura» encuentra la orden donde se subió una.">
+        ${selectFiltro('s-doc-estado', d.estado, 'Todos los estados',
+          soloPresentes(OPCIONES_ESTADO(), hayEstado))}
+        ${selectFiltro('s-doc-etapa', d.etapa, 'Todas las etapas',
+          soloPresentes(OPCIONES_ETAPA(), hayEtapa))}
+      </div></div>
+    <div class="cuerpo" style="padding-bottom:0">
+      ${chipsFiltro('doc-sit', d.situacion, [
+        ['todas', 'Todas'],
+        ['con', 'Con adjuntos', 'Órdenes que tienen al menos un archivo cargado'],
+        ['sin', 'Sin adjuntos', 'Órdenes donde todavía no se subió ningún documento']
+      ], cuentas)}
+    </div>
     <div class="grid-envoltorio"><table class="grid">
       <thead><tr><th>OT</th><th>Patente</th><th>Marca</th><th>Modelo</th><th>Fecha de Ingreso</th>
         <th>Estado</th><th>Etapa</th><th>Adjuntos</th><th></th>${TH_LUPA}</tr></thead>
       ${/* Sin el `slice(0, 60)` que había: cortaba en sesenta y el pie decía
             «Mostrando 60 de 102» sin dar forma de llegar a las demás. */''}
-      <tbody>${filas.map((o) => {
-        const n = Modelo.mediaDe(o.id).filter((m) => m.momento === 'documento').length;
+      <tbody>${!filas.length ? filaSinResultados(10) : ''}${filas.map((x) => {
+        const o = x.o;
+        const n = x.docs.length;
         return '<tr class="fila" data-ot="' + esc(o.numeroOT) + '"><td class="num"><strong>' + o.numeroOT + '</strong></td>' +
           '<td><span class="patente">' + esc(o.patente) + '</span></td>' +
           '<td>' + esc(o.marca || '—') + '</td><td>' + esc(o.modelo || '—') + '</td>' +
@@ -199,6 +266,14 @@ function pDocumentos() {
     const n = document.getElementById('doc-q');
     n.focus(); n.setSelectionRange(n.value.length, n.value.length);
   });
+
+  document.querySelectorAll('[data-doc-sit]').forEach((x) => x.addEventListener('click', () => {
+    d.situacion = x.dataset.docSit; render();
+  }));
+  const docEst = document.getElementById('s-doc-estado');
+  if (docEst) docEst.addEventListener('change', () => { d.estado = docEst.value; render(); });
+  const docEt = document.getElementById('s-doc-etapa');
+  if (docEt) docEt.addEventListener('change', () => { d.etapa = docEt.value; render(); });
 
   // Los documentos del expediente se abren acá mismo, sin ir a la ficha.
   document.querySelectorAll('[data-doc-imprimir]').forEach((b) => b.addEventListener('click', () =>

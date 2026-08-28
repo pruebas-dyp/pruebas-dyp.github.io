@@ -127,6 +127,79 @@ function selectorTamano(id, valor) {
    pantalla que lo use. */
 const tamanoEfectivo = (tam, total) => (Number(tam) || Math.max(1, Number(total) || 1));
 
+/* ── LOS FILTROS DE UN PANEL ─────────────────────────────────────
+   Marco, 28-08-2026: «acá también debería tener los mismos filtros que en la
+   Torre de Control —obviamente no van a tener los mismos, porque no tienen las
+   mismas columnas, pero la idea es que vengan con el mayor detalle posible».
+
+   La Torre trae buscador + dos desplegables + una fila de chips con la cuenta
+   de cada uno. Lo que se repite entre paneles es el ARMADO de los chips y de
+   los desplegables, no las reglas: cada panel filtra por lo suyo. Así que acá
+   viven las dos piezas comunes y allá las reglas.
+
+   ⚠️ LA CUENTA DEL CHIP SALE DEL MISMO UNIVERSO QUE VA A MOSTRAR. Se le pasa la
+   lista YA filtrada por el buscador y los desplegables, nunca el total: un chip
+   que promete 41 y al apretarlo lista 3 miente dos veces. Es el mismo error
+   que la Torre documenta en `cuentasSituacion`, y se evita de la misma forma. */
+function cuentasDeChips(lista, mapa) {
+  const c = {};
+  Object.keys(mapa).forEach((k) => { c[k] = lista.filter(mapa[k]).length; });
+  return c;
+}
+
+/* La fila de chips, con el mismo marcado que los de la Torre. `atributo` es el
+   `data-` por el que después se enganchan, y va distinto en cada panel para que
+   dos tablas abiertas nunca se pisen los clics. */
+function chipsFiltro(atributo, activo, opciones, cuentas) {
+  return '<div class="chips">' + opciones.map((x) =>
+    '<button class="chip' + (activo === x[0] ? ' activo' : '') + '" data-' + esc(atributo) +
+    '="' + esc(x[0]) + '"' + (x[2] ? ' title="' + esc(x[2]) + '"' : '') + '>' + esc(x[1]) +
+    '<span class="cuenta">' + (cuentas[x[0]] || 0) + '</span></button>').join('') + '</div>';
+}
+
+/* Un desplegable de filtro. `todas` es siempre el valor de «todas» —uno solo,
+   para no tener que recordar si este panel decía `todos` o `todas`— y lo que
+   cambia es el rótulo que se lee. */
+function selectFiltro(id, valor, rotulo, opciones) {
+  return '<select id="' + esc(id) + '"><option value="todas">' + esc(rotulo) + '</option>' +
+    opciones.map((o) => '<option value="' + esc(o.v) + '"' + (valor === o.v ? ' selected' : '') +
+      '>' + esc(o.n) + '</option>').join('') + '</select>';
+}
+
+// Las tres listas que alimentan esos desplegables, con el mismo nombre que se ve.
+const OPCIONES_COMPANIA = () => COMPANIAS.map((x) => ({ v: x.codigo, n: x.nombre }));
+const OPCIONES_ETAPA    = () => ETAPAS.map((x) => ({ v: x.codigo, n: x.nombre }));
+const OPCIONES_ESTADO   = () => Modelo.estadosOT().map((x) => ({ v: x.codigo, n: x.nombre }));
+const OPCIONES_TIPO     = () => Modelo.catalogo('tipo_ingreso').map((x) => ({ v: x.codigo, n: x.nombre }));
+
+/* 🔴 UN DESPLEGABLE NO OFRECE LO QUE NO PUEDE ENCONTRAR (28-08-2026).
+
+   Documentos muestra Únicamente vehículos que están en la torre, así que de los
+   NUEVE estados del catálogo sólo dos pueden aparecer ahí —Recibido y Fuera de
+   taller—: los otros siete son terminales y esas órdenes ya no están en el
+   panel. Ofrecer los nueve es ofrecer siete caminos a «Sin resultados», y el
+   que los toma no sabe si filtró mal o si el sistema perdió los datos.
+
+   Las opciones se recortan contra el universo COMPLETO del panel y no contra
+   lo ya filtrado: si dependieran del filtro puesto, la lista bailaría mientras
+   el usuario elige y la opción que acaba de usar desaparecería de la lista. */
+const soloPresentes = (opciones, presentes) => opciones.filter((o) => presentes.has(o.v));
+
+/* Y si el valor elegido dejó de existir —se dio de baja la compañía, se entregó
+   la última orden de esa etapa— el desplegable mostraría «Todas» mientras la
+   tabla sigue filtrando por lo que ya no se ve. Se vuelve a «todas», que es lo
+   que el usuario está leyendo. */
+function filtroVigente(estado, llave, presentes) {
+  if (estado[llave] !== 'todas' && !presentes.has(estado[llave])) estado[llave] = 'todas';
+  return estado[llave];
+}
+
+/* La fila de «Sin resultados». La Torre ya la tenía; los demás paneles no, y con
+   chips que pueden dar cero una tabla vacía se lee como pantalla rota. */
+const filaSinResultados = (columnas) => '<tr><td colspan="' + columnas + '">' +
+  '<div class="vacio"><div class="titulo">Sin resultados</div>' +
+  '<div class="texto">Ninguna orden coincide con el filtro.</div></div></td></tr>';
+
 const ui = {
   vista: 'torre',
   // `orden`/`desc`: pedido del cliente el 15-08-2026. La torre parte SIEMPRE

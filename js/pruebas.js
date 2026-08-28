@@ -2119,6 +2119,105 @@ const Pruebas = (function () {
         });
       })();
 
+      /* 🔴 EL CHIP PROMETE LA MISMA CANTIDAD QUE LA TABLA MUESTRA (28-08-2026).
+
+         Presupuesto, Seguimiento Repuestos y Documentos estrenaron chips con la
+         cuenta al lado, igual que la Torre. El error clásico de esa forma es
+         contar sobre el universo completo y listar sobre el filtrado: el chip
+         dice 41, se aprieta, y aparecen 3. Ninguno de los dos números se ve
+         mal por su cuenta —por eso no se descubre mirando— y se paga cuando
+         alguien usó la cuenta para decidir algo.
+
+         La prueba NO compara la cuenta contra la fórmula que la produce: eso
+         sería preguntárselo dos veces al mismo. Pinta la pantalla, cuenta las
+         FILAS del HTML y las compara con el número impreso en el chip. Y lo
+         hace con un filtro puesto, que es donde el defecto aparece: sin
+         filtros, contar sobre el universo y sobre lo filtrado da igual y la
+         prueba pasaría con el error adentro. */
+      (function () {
+        const donde = (typeof window !== 'undefined') ? window : globalThis;
+        if (typeof donde.cuentasDeChips !== 'function' || typeof donde.vPresupuestoListado !== 'function') {
+          push({
+            nombre: '🔴 Los chips de los tres paneles prometen lo que muestran',
+            intento: 'Pintar cada panel con cada chip puesto y contar las filas',
+            esperado: 'La cuenta del chip es la cantidad de filas que aparecen',
+            paso: false,
+            detalle: 'Las vistas no están cargadas: no se pudo probar'
+          });
+          return;
+        }
+
+        const filasDe = (html) => (html.match(/<tr class="fila"/g) || []).length;
+        const cuentaDelChip = (html, attr, k) => {
+          const re = new RegExp('data-' + attr + '="' + k + '"[^>]*>[^<]*<span class="cuenta">(\\d+)');
+          const m = html.match(re);
+          return m ? Number(m[1]) : null;
+        };
+
+        const admin = db.persona.find((x) => /gabriel/i.test(x.usuario || ''));
+        Modelo.fijar_persona_actual(admin ? admin.id : null);
+
+        // Una compañía que exista de verdad: con `todas` no hay filtro que probar.
+        const cia = (Modelo.torre().find((o) => o.compania && o.compania !== '\u2014') || {}).compania || 'todas';
+        const malos = [];
+        let probados = 0;
+
+        const revisar = (panel, attr, mapa, poner, pintar) => {
+          Object.keys(mapa).forEach((k) => {
+            poner(k);
+            const html = pintar();
+            const prometidas = cuentaDelChip(html, attr, k);
+            const listadas = filasDe(html);
+            probados++;
+            if (prometidas === null) malos.push(panel + '/' + k + ': el chip no se pint\u00f3');
+            else if (prometidas !== listadas) {
+              malos.push(panel + '/' + k + ': promete ' + prometidas + ' y lista ' + listadas);
+            }
+          });
+        };
+
+        // 1 · Presupuesto, con una compañía puesta.
+        const p = presuEstado();
+        const guardaP = { b: p.busqueda, c: p.compania, t: p.tipo, s: p.situacion, ot: p.otId };
+        p.busqueda = ''; p.tipo = 'todas'; p.compania = cia; p.otId = null;
+        revisar('Presupuesto', 'presu-sit', SITUACION_PRESU,
+          (k) => { p.situacion = k; }, () => vPresupuestoListado());
+        p.busqueda = guardaP.b; p.compania = guardaP.c; p.tipo = guardaP.t;
+        p.situacion = guardaP.s; p.otId = guardaP.ot;
+
+        // 2 · Seguimiento Repuestos, con la misma compañía.
+        const b = bodegaEstado();
+        const guardaB = { b: b.busqueda, c: b.compania, s: b.situacion };
+        b.busqueda = ''; b.compania = cia;
+        revisar('Repuestos', 'bod-sit', SITUACION_REP,
+          (k) => { b.situacion = k; }, () => bodegaSeguimiento());
+        b.busqueda = guardaB.b; b.compania = guardaB.c; b.situacion = guardaB.s;
+
+        // 3 · Documentos, con una etapa puesta.
+        const d = documentosEstado();
+        const guardaD = { b: d.busqueda, e: d.estado, et: d.etapa, s: d.situacion, ot: d.otId };
+        const etapa = (Modelo.torre().find((o) => o.etapa) || {}).etapa || 'todas';
+        d.busqueda = ''; d.estado = 'todas'; d.etapa = etapa; d.otId = null;
+        revisar('Documentos', 'doc-sit', SITUACION_DOC,
+          (k) => { d.situacion = k; }, () => documentosListado());
+        d.busqueda = guardaD.b; d.estado = guardaD.e; d.etapa = guardaD.et;
+        d.situacion = guardaD.s; d.otId = guardaD.ot;
+
+        Modelo.fijar_persona_actual(null);
+
+        push({
+          nombre: '🔴 Los chips de los tres paneles prometen lo que muestran',
+          intento: 'Con un filtro puesto, pintar cada panel con cada chip activo y ' +
+            'contar las filas del HTML contra el número impreso en el chip',
+          esperado: 'Los dos números son el mismo, en los ' + probados + ' casos',
+          paso: !malos.length && probados > 0,
+          detalle: malos.length
+            ? malos.join(' · ')
+            : probados + ' chips revisados en Presupuesto, Repuestos y Documentos, ' +
+              'con la compañía ' + cia + ' puesta'
+        });
+      })();
+
       /* ══ COD-1 · Las tres defensas de seguridad del 22-08-2026 ═════════
          Las tres son invisibles: no cambian ni una pantalla. Si alguien las
          deshace sin querer, nada se ve distinto — sólo vuelve a estar abierto

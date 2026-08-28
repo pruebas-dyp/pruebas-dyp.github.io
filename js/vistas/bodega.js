@@ -41,6 +41,12 @@ const BODEGA_PANTALLAS = [
 function bodegaEstado() {
   // Se entra por el menú, no por una pantalla cualquiera. Igual que Recepción.
   ui.bodega = ui.bodega || { pantalla: 'menu', patente: '', otId: null, busqueda: '', presupuestoId: null };
+  /* Los filtros del seguimiento se completan campo por campo y no dentro del
+     literal de arriba: ese corre UNA sola vez por sesión, así que una llave
+     nueva puesta ahí no le llega al estado que ya estaba armado —y el filtro
+     sale `undefined`, que no es «todas» y no filtra nada. */
+  if (typeof ui.bodega.compania !== 'string') ui.bodega.compania = 'todas';
+  if (typeof ui.bodega.situacion !== 'string') ui.bodega.situacion = 'todas';
   return ui.bodega;
 }
 
@@ -315,11 +321,41 @@ function bodegaFichaRepuestos(o) {
 
 /* ── Seguimiento · 14 columnas ─────────────────────────────────────────── */
 
+/* 🔴 LOS FILTROS DEL SEGUIMIENTO (28-08-2026, Marco: «lo mismo en el panel de
+   la FOTO 2»).
+
+   Acá la pregunta no es cuál auto: es QUÉ PIEZA FALTA. Por eso el buscador mira
+   también la DESCRIPCIÓN de los repuestos —escribir «parachoques» muestra las
+   órdenes que están esperando uno, que es la pregunta que se hace bodega todos
+   los días y que hasta hoy no se podía hacer— y los chips parten la lista por
+   dónde va la pieza. */
+const SITUACION_REP = {
+  todas: () => true,
+  pend:  (o) => o.repuestos.some((r) => !r.fechaBodega),
+  ok:    (o) => o.repuestos.length > 0 && o.repuestos.every((r) => r.fechaBodega),
+  sin:   (o) => !o.repuestos.length
+};
+
+function henoRepuestos(o) {
+  return [o.numeroOT, o.numeroOR, o.patente, o.cliente, o.compania, o.siniestro,
+    o.marca, o.modelo, o.color]
+    .concat(o.presupuestos.map((p) => p.numeroOR))
+    .concat(o.repuestos.map((r) => r.descripcion))
+    .filter(Boolean).join(' ').toLowerCase();
+}
+
 function bodegaSeguimiento() {
   const b = bodegaEstado();
   const q = b.busqueda.trim().toLowerCase();
-  const filas = Modelo.torre().filter((o) => !q ||
-    [o.numeroOT, o.patente, o.cliente, o.siniestro].join(' ').toLowerCase().includes(q));
+  const hayCia = new Set(Modelo.torre().map((o) => o.compania));
+  filtroVigente(b, 'compania', hayCia);
+  const base = Modelo.torre().filter((o) => {
+    if (b.compania !== 'todas' && o.compania !== b.compania) return false;
+    if (q && !henoRepuestos(o).includes(q)) return false;
+    return true;
+  });
+  const cuentas = cuentasDeChips(base, SITUACION_REP);
+  const filas = base.filter(SITUACION_REP[b.situacion] || SITUACION_REP.todas);
 
   const lista = (o, pendientes) => o.repuestos.filter((r) => pendientes ? !r.fechaBodega : r.fechaBodega)
     .map((r) => (pendientes ? '<span style="color:var(--rojo)">' : '<span>') + esc(r.descripcion) +
@@ -328,9 +364,19 @@ function bodegaSeguimiento() {
 
   return `
   <div class="filtros" style="margin-bottom:8px">
-    <input type="search" id="bod-q" placeholder="OT, patente, cliente o siniestro" value="${esc(b.busqueda)}">
+    <input type="search" id="bod-q" value="${esc(b.busqueda)}"
+      placeholder="OT, OR, patente, cliente, siniestro o el repuesto que falta"
+      title="Busca también en la descripción de los repuestos: «parachoques» muestra las órdenes que están esperando uno.">
+    ${selectFiltro('s-bod-compania', b.compania, 'Todas las compañías',
+      soloPresentes(OPCIONES_COMPANIA(), hayCia))}
     <button class="btn secundario" data-pendiente="DESCARGAR LISTADO TOTAL|6|la exportación es un permiso aparte y queda en la traza">Descargar listado total</button>
   </div>
+  <div style="margin-bottom:8px">${chipsFiltro('bod-sit', b.situacion, [
+    ['todas', 'Todas'],
+    ['pend', 'Con repuestos por llegar', 'Tiene al menos una pieza que todavía no entra a bodega'],
+    ['ok', 'Con todo en bodega', 'Pidió piezas y llegaron todas'],
+    ['sin', 'Sin repuestos', 'El trabajo no depende de ninguna pieza']
+  ], cuentas)}</div>
 
   <div class="grid-envoltorio"><table class="grid">
     <thead><tr><th>OT</th><th>OR</th><th>Cliente</th><th>Compañia</th><th>Patente</th><th>Siniestro</th>
@@ -340,7 +386,7 @@ function bodegaSeguimiento() {
           las que hubiera y el pie decía «Mostrando 60 de 102» sin ofrecer
           ninguna forma de ver las otras 42. Eso no es paginar, es esconder. Va
           entera y el paginado le pone el pie con el selector. */''}
-    <tbody>${filas.map((o) =>
+    <tbody>${!filas.length ? filaSinResultados(14) : ''}${filas.map((o) =>
       '<tr class="fila" data-ot="' + esc(o.numeroOT) + '"><td class="num"><strong>' + o.numeroOT + '</strong></td>' +
       '<td class="num">' + esc(o.presupuestos.length ? o.presupuestos[0].numeroOR : '—') + '</td>' +
       '<td>' + esc(o.cliente) + '</td><td>' + esc(o.compania) + '</td>' +
@@ -546,6 +592,12 @@ function pBodega() {
     const n = document.getElementById('bod-q');
     n.focus(); n.setSelectionRange(n.value.length, n.value.length);
   });
+
+  document.querySelectorAll('[data-bod-sit]').forEach((x) => x.addEventListener('click', () => {
+    b.situacion = x.dataset.bodSit; render();
+  }));
+  const bodCia = document.getElementById('s-bod-compania');
+  if (bodCia) bodCia.addEventListener('change', () => { b.compania = bodCia.value; render(); });
 
   engancharRepuestos(b.otId);
 

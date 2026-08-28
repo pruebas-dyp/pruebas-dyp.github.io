@@ -29,6 +29,13 @@ function presuEstado() {
   if (typeof p.linea.proceso !== 'string') p.linea.proceso = '';
   if (typeof p.linea.descripcion !== 'string') p.linea.descripcion = '';
   if (typeof p.busqueda !== 'string') p.busqueda = '';
+  /* Los filtros del listado. Se completan acá, campo por campo, y no en un
+     literal por omisión: el estado se arma UNA vez por sesión, así que una
+     llave nueva puesta en el literal no le llega a la pantalla que ya estaba
+     abierta —y el filtro sale `undefined`, que no es «todas». */
+  if (typeof p.compania !== 'string') p.compania = 'todas';
+  if (typeof p.tipo !== 'string') p.tipo = 'todas';
+  if (typeof p.situacion !== 'string') p.situacion = p.soloSin ? 'sin' : 'todas';
   if (!('otId' in p)) p.otId = null;
   if (!('presupuestoId' in p)) p.presupuestoId = null;
   ui.presupuesto = p;
@@ -130,14 +137,63 @@ function listaPresupuestos(o) {
   }).join('');
 }
 
-function vPresupuestoListado() {
+/* 🔴 LOS FILTROS DEL PANEL (28-08-2026, Marco: «acá también debería tener los
+   mismos filtros que en la Torre de Control»).
+
+   Tenía un buscador de cuatro campos y un botón suelto que decía «Sin
+   presupuesto». Acá no se viene a buscar un auto —para eso está la Torre—: se
+   viene a ver EN QUÉ VA EL PRESUPUESTO. Así que los chips son los estados del
+   documento y el botón suelto pasó a ser uno de ellos, con su cuenta al lado.
+
+   Un chip cuenta órdenes con AL MENOS UN documento en ese estado. Una orden con
+   una versión enviada y otra aprobada sale en los dos, y así es como está: el
+   chip no reparte órdenes en cajones, muestra las que tienen algo en ese
+   estado. Por eso la suma de los chips puede pasarse del total. */
+const SITUACION_PRESU = {
+  todas:     () => true,
+  sin:       (o) => !o.presupuestos.length,
+  borrador:  (o) => o.presupuestos.some((x) => x.estado === 'borrador'),
+  enviado:   (o) => o.presupuestos.some((x) => x.estado === 'enviado'),
+  aprobado:  (o) => o.presupuestos.some((x) => x.estado === 'aprobado'),
+  rechazado: (o) => o.presupuestos.some((x) => x.estado === 'rechazado')
+};
+
+/* Lo que mira el buscador, en un solo lugar —misma regla que la Torre—. Se
+   busca por el NOMBRE que se ve en pantalla: quien escribe «aprob» espera
+   encontrar las aprobadas, y «sin presupuesto» las que todavía no tienen
+   documento. Nadie va a escribir `co-4` ni `borrador` en minúscula técnica. */
+function henoPresupuesto(o) {
+  return [o.numeroOT, o.numeroOR, o.patente, o.cliente, o.compania,
+    o.marca, o.modelo, o.color, o.siniestro, o.origenIngresoNombre]
+    .concat(o.presupuestos.map((x) => x.numeroOR))
+    .concat(o.presupuestos.map((x) => (ESTADO_PRESUPUESTO[x.estado] || {}).txt || x.estado))
+    .concat(o.presupuestos.length ? [] : ['sin presupuesto'])
+    .filter(Boolean).join(' ').toLowerCase();
+}
+
+// Todo menos los chips: es el universo del que salen SUS cuentas.
+function basePresupuesto() {
   const p = presuEstado();
   const q = p.busqueda.trim().toLowerCase();
-  const filas = Modelo.torre()
-    .filter((o) => !p.soloSin || !o.presupuestos.length)
-    .filter((o) => !q ||
-      [o.numeroOT, o.patente, o.cliente, o.presupuestos.map((x) => x.numeroOR).join(' ')]
-        .join(' ').toLowerCase().includes(q));
+  return Modelo.torre().filter((o) => {
+    if (p.compania !== 'todas' && o.compania !== p.compania) return false;
+    if (p.tipo !== 'todas' && o.origenIngreso !== p.tipo) return false;
+    if (q && !henoPresupuesto(o).includes(q)) return false;
+    return true;
+  });
+}
+
+function vPresupuestoListado() {
+  const p = presuEstado();
+  // Las compañías y los tipos que de verdad hay en el panel, antes de filtrar.
+  const universo = Modelo.torre();
+  const hayCia = new Set(universo.map((o) => o.compania));
+  const hayTipo = new Set(universo.map((o) => o.origenIngreso).filter(Boolean));
+  filtroVigente(p, 'compania', hayCia);
+  filtroVigente(p, 'tipo', hayTipo);
+  const base = basePresupuesto();
+  const cuentas = cuentasDeChips(base, SITUACION_PRESU);
+  const filas = base.filter(SITUACION_PRESU[p.situacion] || SITUACION_PRESU.todas);
 
   /* Las cuatro tarjetas de arriba —venta parada, esperando aprobación,
      aprobado y sin presupuesto— se sacaron el 16-08-2026 junto con las del
@@ -150,26 +206,40 @@ function vPresupuestoListado() {
     <div class="cab">
       <div><h2>${ico('presupuesto', 'g')}Presupuesto</h2>
         <div class="desc">Las 9 columnas del original, con el total neto por orden</div></div>
-      <div class="filtros"><input type="search" id="q-presu" placeholder="OT, OR, patente o cliente" value="${esc(p.busqueda)}">
-        ${/* 🔴 DECÍA «SIN OR» (27-08-2026, Marco: «no debiese colocarse sin OR,
-             sino que debiese estar con una alerta de sin presupuesto, porque la
-             OR siempre va a estar creada, asociada a la OT»).
-
-             Y así es desde el 26-08: toda orden nace con su OR. Un filtro
-             llamado «Sin OR» listaba órdenes que SÍ tienen OR —lo que no tienen
-             es presupuesto— y eso hace dudar de si el sistema perdió el
-             número. El filtro es el mismo; lo que cambia es que ahora dice la
-             verdad. */''}
-        <button class="btn secundario" id="presu-solo-sin"
-          title="Ver sólo las órdenes a las que todavía no se les generó el presupuesto">Sin presupuesto</button></div>
+      <div class="filtros">
+        <input type="search" id="q-presu" value="${esc(p.busqueda)}"
+          placeholder="OT, OR, patente, cliente, compañía, siniestro o estado"
+          title="Busca en todas esas columnas a la vez, y también en el estado del documento: «aprob» encuentra las aprobadas y «sin presupuesto» las que todavía no tienen.">
+        ${selectFiltro('s-presu-compania', p.compania, 'Todas las compañías',
+          soloPresentes(OPCIONES_COMPANIA(), hayCia))}
+        ${selectFiltro('s-presu-tipo', p.tipo, 'Todos los tipos de ingreso',
+          soloPresentes(OPCIONES_TIPO(), hayTipo))}
+      </div>
+    </div>
+    ${/* 🔴 EL BOTÓN «SIN PRESUPUESTO» ES AHORA UN CHIP (28-08-2026). Era un
+         botón suelto que se prendía y apagaba y no decía cuántas eran. Como chip
+         trae su cuenta y comparte fila con los demás estados, que es la
+         pregunta completa: cuántas sin presupuesto, cuántas enviadas esperando
+         respuesta y cuántas ya aprobadas. */''}
+    <div class="cuerpo" style="padding-bottom:0">
+      ${chipsFiltro('presu-sit', p.situacion, [
+        ['todas', 'Todas'],
+        ['sin', 'Sin presupuesto', 'Órdenes a las que todavía no se les generó el presupuesto'],
+        ['borrador', 'En borrador', 'Empezado y todavía no enviado a la compañía'],
+        ['enviado', 'Enviado', 'Mandado a la compañía y sin respuesta'],
+        ['aprobado', 'Aprobado'],
+        ['rechazado', 'Rechazado']
+      ], cuentas)}
     </div>
     <div class="grid-envoltorio"><table class="grid">
       <thead><tr><th>OT</th><th>Cliente</th><th>Patente</th><th>Marca</th><th>Modelo</th>
         <th>Tipo</th><th>Fecha de Ingreso</th><th>OR</th><th>Total neto</th><th>Acción</th></tr></thead>
+      ${/* Con chips que pueden dar cero, una tabla vacía se lee como pantalla
+            rota. La Torre ya decía «Sin resultados»; acá faltaba. */''}
       ${/* Sin el `slice(0, 60)` que había: mostraba sesenta órdenes de las que
             hubiera y el pie decía «Mostrando 60 de 102». Las otras 42 no
             existían para el que miraba. */''}
-      <tbody>${filas.map((o) => {
+      <tbody>${!filas.length ? filaSinResultados(11) : ''}${filas.map((o) => {
         const neto = o.presupuestos.reduce((s, x) => s + x.neto, 0);
         return '<tr class="fila" data-ot="' + esc(o.numeroOT) + '"><td class="num"><strong>' + o.numeroOT + '</strong></td>' +
           '<td>' + esc(o.cliente) + '</td>' +
@@ -959,11 +1029,13 @@ function pPresupuesto() {
     n.focus(); n.setSelectionRange(n.value.length, n.value.length);
   });
 
-  const soloSin = document.getElementById('presu-solo-sin');
-  if (soloSin) {
-    soloSin.classList.toggle('activo', !!p.soloSin);
-    soloSin.addEventListener('click', () => { p.soloSin = !p.soloSin; render(); });
-  }
+  document.querySelectorAll('[data-presu-sit]').forEach((x) => x.addEventListener('click', () => {
+    p.situacion = x.dataset.presuSit; render();
+  }));
+  const cia = document.getElementById('s-presu-compania');
+  if (cia) cia.addEventListener('change', () => { p.compania = cia.value; render(); });
+  const tipo = document.getElementById('s-presu-tipo');
+  if (tipo) tipo.addEventListener('change', () => { p.tipo = tipo.value; render(); });
 
   /* 🔴 LOS BOTONES DE FILA CORTAN EL EVENTO. La fila entera abre la orden con
      doble clic, así que sin `stopPropagation` apretar dos veces seguidas
