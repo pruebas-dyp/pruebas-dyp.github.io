@@ -813,18 +813,21 @@ function conDobleClic(el, clave, alDoble, alSimple, abridor) {
          «vuelve atrás»: hay que entrar al conmutador de pestañas de Safari.
        · Encima, el doble toque en iOS ya tiene dueño: es el zoom.
 
-     Así que donde HAY una acción simple —desplegar la fila—, en táctil se hace
-     siempre esa y no se espera ningún segundo toque. No se pierde nada: la
-     orden se abre con «Abrir en pestaña nueva», que está dentro del propio
-     desplegable, y con «Abrir la orden» de la barra de herramientas.
+     🔴 Y EL 28-08-2026 MARCO LO PIDIÓ DE VUELTA: «me eliminaste lo de apretar
+     doble clic en la OT en la visual del celular para abrir otra pestaña, ¿lo
+     puedes volver a colocar?». Vuelve, pero sin el choque que lo hizo salir.
 
-     ⚠️ Donde NO hay acción simple —Documentos y Bodega, que no despliegan— el
-     doble toque se queda: ahí es la única forma de abrir y quitarlo dejaría la
-     fila muerta. Esos paneles igual traen sus propios botones por fila. */
+     Lo que chocaba no era el doble toque: era que el toque SIMPLE sobre esa
+     misma celda también hacía algo —desplegar, después de esperar 500 ms—. Con
+     eso, abrir y volver a cerrar el desplegable eran dos toques seguidos en el
+     mismo punto, o sea un doble clic, y en vez de cerrarse se abría la pestaña.
+
+     Ahora, en táctil, la celda de la OT hace UNA sola cosa: abrir con dos
+     toques. Desplegar y cerrar se hace tocando la fila en cualquier OTRA parte,
+     y ahí es inmediato, sin ventana de espera. Cada gesto tiene su lugar y
+     ninguno pisa al otro. En el escritorio no cambia nada. */
   const tactil = typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
-  const soloSimple = tactil && !!alSimple;
-  const abre = (ev) => !soloSimple &&
-    (!abridor || (ev.target && abridor.contains(ev.target)));
+  const abre = (ev) => !abridor || (ev.target && abridor.contains(ev.target));
 
   el.addEventListener('click', (ev) => {
     /* Fuera de la celda que abre no hay doble clic que esperar: despliega al
@@ -850,7 +853,12 @@ function conDobleClic(el, clave, alDoble, alSimple, abridor) {
 
     resolverPendiente(clave);
     memoriaClic.clave = clave; memoriaClic.t = ahora;
-    if (!alSimple) return;                       // nada que aplazar
+    /* En táctil el primer toque sobre la celda de la OT no despliega: queda
+       esperando el segundo. Si desplegara, el toque para cerrar caería dentro
+       de la ventana del doble clic y abriría la pestaña —que es justo el
+       problema que Marco reportó—. La fila entera sigue desplegando al toque,
+       fuera de esta celda. */
+    if (!alSimple || tactil) return;             // nada que aplazar
     const pendiente = { clave, accion: alSimple, temporizador: 0 };
     pendiente.temporizador = setTimeout(() => {
       if (memoriaClic.pendiente === pendiente) memoriaClic.pendiente = null;
@@ -859,11 +867,13 @@ function conDobleClic(el, clave, alDoble, alSimple, abridor) {
     memoriaClic.pendiente = pendiente;
   });
 
-  /* El globo y la marca sólo donde el gesto existe. En táctil decían «doble clic
-     abre la orden» sobre una celda que ya no hace eso. */
-  if (abridor && !soloSimple) {
+  if (abridor) {
     abridor.classList.add('abre-ot');
-    abridor.title = 'Doble clic abre la orden en otra pestaña';
+    /* En táctil no hay globo que mostrar —no hay puntero que se detenga— y el
+       gesto es un doble TOQUE, no un doble clic. El texto lo dice como es. */
+    abridor.title = tactil
+      ? 'Dos toques abren la orden en otra pestaña'
+      : 'Doble clic abre la orden en otra pestaña';
   }
   /* Sin `title` en la fila entera. Lo tenía, y el globo del navegador se
      montaba encima de la etiqueta de datos —que dice bastante más que el

@@ -2489,6 +2489,14 @@ table.grid.anidada td { font-size: 12px; }
    dice antes de que alguien lo descubra probando. */
 table.grid td.abre-ot { cursor: alias; }
 table.grid td.abre-ot:hover { text-decoration: underline; }
+/* En táctil no hay hover que descubra nada, así que la celda que abre la orden
+   se marca sola: subrayado punteado bajo el número. Sin eso, «dos toques abren
+   la orden» es un secreto. */
+@media (pointer: coarse) {
+  table.grid td.abre-ot {
+    text-decoration: underline dotted var(--acento); text-underline-offset: 3px;
+  }
+}
 
 /* La celda de la sala compartida cuando está viva. Verde apagado, no un
    semáforo: es información de estado, no una alarma. Si la sala está caída la
@@ -2652,9 +2660,24 @@ table.grid td.abre-ot:hover { text-decoration: underline; }
      quedan marcados como si el dedo siguiera encima, y en una tabla eso hace
      dudar de cuál fila está elegida. Se apagan los tres que se notan. */
   tr.fila:hover td { background: inherit; }
-  .chip:hover { background: var(--superficie-2); }
+  /* 🔴 `:not(.activo)` —Y ES UN ERROR MÍO DE HOY (28-08-2026, Marco: «cuando
+     los aprieto en modo claro no sale la visual de lo que estoy apretando»).
+
+     Esta línea decía `.chip:hover` a secas. El chip activo se pinta con
+     `.chip.activo { background: var(--acento-solido) }`, que pesa lo mismo
+     —(0,2,0) las dos— y vive en la línea 795: la de acá abajo GANA por ir
+     después. Y como en táctil el hover se queda pegado tras el toque, el chip
+     recién apretado perdía su azul justo al apretarlo. Se veía peor en tema
+     claro, donde el gris del reposo y el del hover casi no se distinguen.
+
+     Apagar el hover era correcto; apagarlo TAMBIÉN sobre el activo, no. */
+  .chip:not(.activo):hover { background: var(--superficie-2); }
   .btn:hover { background: var(--acento-solido); border-color: var(--acento-solido); }
   .btn.secundario:hover { background: var(--superficie); border-color: var(--borde); }
+
+  /* Y el activo, marcado de más: en un teléfono los chips se recorren de lado y
+     el que manda tiene que reconocerse sin comparar con el de al lado. */
+  .chip.activo { box-shadow: 0 0 0 1px var(--acento-solido); }
 
   /* El tirador de ensanchar columnas son 7 px invisibles al borde de cada
      encabezado. Con el mouse es cómodo; con el dedo se traga el toque que
@@ -2693,4 +2716,36 @@ table.grid td.abre-ot:hover { text-decoration: underline; }
    Es la tercera vez esta semana que me pasa lo mismo. */
 @supports (overflow: clip) {
   .bloque-presu { overflow: clip; }
+}
+
+
+/* ═════ LOS CHIPS SE RECORREN DE LADO EN EL TELÉFONO (28-08-2026) ════════════
+   Marco: «los filtros de la visual de celular no los dejes hacia abajo —En
+   taller, Fuera de taller, Con repuesto pendiente—, déjalos hacia el lado».
+
+   Envolvían en dos y tres líneas: los seis de la Torre se llevaban 82 px de
+   alto, encima de los 132 de la fila de filtros. Doscientos catorce píxeles de
+   filtros sobre una pantalla útil de 605: un tercio de la pantalla antes de la
+   primera fila de la tabla.
+
+   En una sola línea que se desliza ocupan 40 px. Es exactamente lo que ya hace
+   la tira de módulos de arriba, y lo que hace el sistema de ellos.
+
+   ⚠️ VA AL FINAL DEL ARCHIVO. `.chips` se declara en la línea 783 con
+   `flex-wrap: wrap` y la misma especificidad: si esto se escribe antes, no se
+   aplica. Es el error que ya me comí tres veces esta semana. */
+@media (max-width: 860px), (max-height: 520px) and (pointer: coarse) {
+  .chips {
+    flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden;
+    scrollbar-width: thin; -webkit-overflow-scrolling: touch;
+    /* El desvanecido del borde derecho dice que hay más. Va como máscara del
+       propio elemento y no como una capa encima, porque una capa dentro de algo
+       que se desliza se desliza con ello. */
+    mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 22px), transparent);
+    padding-bottom: 2px;
+  }
+  /* Sin esto el navegador los aprieta para que quepan, en vez de dejarlos
+     pasar de largo. */
+  .chips > .chip { flex: 0 0 auto; white-space: nowrap; }
 }

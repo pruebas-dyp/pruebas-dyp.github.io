@@ -138,6 +138,30 @@ function mejorarTablas() {
   });
 
   avisarQueHayMasColumnas();
+  chipActivoALaVista();
+}
+
+/* 🔴 EL CHIP ACTIVO, A LA VISTA (28-08-2026).
+
+   Desde hoy la fila de chips no envuelve en el teléfono: va en una sola línea
+   que se desliza —pedido de Marco, porque envolviendo se llevaba 82 px de alto
+   en la Torre—. El costo de esa decisión es que el chip que manda puede quedar
+   fuera de la pantalla, y ahí la fila deja de decir en qué filtro se está.
+
+   Peor todavía en las barras que NO son filtros y usan el mismo marcado: los
+   cinco pasos de Recepción, los apartados del Taller y las dos pantallas de
+   Bodega. Ahí el activo no es un filtro, es DÓNDE ESTÁS.
+
+   Se centra el activo dentro de su caja después de cada pintada. Si la fila
+   cabe entera no se toca nada. */
+function chipActivoALaVista() {
+  document.querySelectorAll('#contenido .chips').forEach((caja) => {
+    if (caja.scrollWidth <= caja.clientWidth + 2) return;
+    const act = caja.querySelector('.chip.activo');
+    if (!act) return;
+    const centrado = act.offsetLeft - (caja.clientWidth - act.offsetWidth) / 2;
+    caja.scrollLeft = Math.max(0, centrado);
+  });
 }
 
 /* ── «Hay más columnas a la derecha» ───────────────────────────────────
