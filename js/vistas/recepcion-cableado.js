@@ -20,6 +20,22 @@ function pRecepcion() {
 
   /* El menú de cuatro opciones. Cada una lleva a algo que existe; la que el rol
      no puede usar se aprieta igual y dice quién sí puede. */
+  /* Los dos botones del cartel del borrador. `Retomar` entra al formulario en
+     el paso donde quedó —no en el primero: volver a recorrer cuatro pasos para
+     llegar a lo que faltaba es exactamente lo que se vino a evitar—. */
+  const retomar = document.getElementById('rec-retomar');
+  if (retomar) retomar.addEventListener('click', () => { recEntrarAlFormulario(); render(); });
+  const tirar = document.getElementById('rec-tirar');
+  if (tirar) tirar.addEventListener('click', () => {
+    const b = recBorradorEnCurso();
+    if (!confirm('¿Descartar el ingreso a medio llenar' +
+      (b && b.patente ? ' de la patente ' + b.patente : '') + '? ' +
+      (b && b.fotos ? 'Las ' + b.fotos + ' fotos ya subidas se borran. ' : '') +
+      'No se puede deshacer.')) return;
+    limpiarBorrador(); render();
+    avisar({ ok: true, motivo: '' }, 'Borrador descartado.');
+  });
+
   document.querySelectorAll('[data-opcion]').forEach((b) => b.addEventListener('click', () => {
     const op = RECEPCION_OPCIONES.find((x) => x.id === b.dataset.opcion);
     if (!op) return;

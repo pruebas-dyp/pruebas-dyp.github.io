@@ -128,6 +128,20 @@ function guardarBorrador() {
     const r = rec();
     localStorage.setItem(CLAVE_BORRADOR, JSON.stringify({
       paso: r.paso, llave: r.llave, campos: r.campos, bloques: r.bloques,
+      /* 🔴 DÓNDE ESTABA (28-08-2026, Marco: «cuando refrescan pantalla pierden
+         todo el avance»).
+
+         El avance NO se perdía —está todo acá, y las fotos en IndexedDB—: lo que
+         se perdía era el LUGAR. `pantalla` no se guardaba, así que al recargar
+         el módulo abría en su menú de cuatro tarjetas, idéntico a no haber
+         empezado nunca. Con el auto en el mesón, eso ES perder el avance:
+         nadie va a apostar a que el formulario se acuerda.
+
+         Sólo se guarda `nuevo`. Las otras pantallas del módulo —los buscadores
+         de Editar Recepción y Agregar OR, y la ficha de edición— dependen de una
+         orden elegida que no viaja en el borrador: volver ahí tras un F5
+         dejaría un buscador apuntando a nada. */
+      pantalla: r.pantalla === 'nuevo' ? 'nuevo' : 'menu',
       danos: r.danos, textos: r.textos,
       inventario: r.inventario, obsInventario: r.obsInventario,
       fotos: r.fotos,
@@ -162,7 +176,7 @@ function restaurarBorrador() {
     d.campos.vin = normalizarVin(d.campos.vin);
 
     return Object.assign({
-      paso: 'cliente', llave: 'rec-' + Date.now().toString(36),
+      paso: 'cliente', pantalla: 'menu', llave: 'rec-' + Date.now().toString(36),
       textos: {}, danos: [], inventario: {}, obsInventario: {}, fotos: [],
       firmaTrazos: [], marcados: [], firma: null
     }, d);
@@ -331,14 +345,36 @@ const recMarcado = (clave) => rec().marcados.indexOf(clave) >= 0;
 
 /* El menú de cuatro opciones, copiado del original. Cada tarjeta es un botón
    grande: es una pantalla que se usa de pie, en el mesón, muchas veces al día. */
-function vRecepcionMenu() {
-  /* ⛔ ACÁ IBA EL CARTEL «hay un borrador a medio llenar», y se sacó el
-     15-08-2026 junto con la razón de que existiera: ahora **salir del proceso
-     descarta lo llenado a medias**, así que no hay nada que anunciar.
+/* Lo que hay a medio llenar, si hay algo. Devuelve null cuando el borrador
+   está en blanco: un cartel que anuncia un formulario vacío es ruido. */
+function recBorradorEnCurso() {
+  const r = rec();
+  const hay = (r.campos.patente || r.campos.nombre || r.campos.rut ||
+    (r.danos || []).length || (r.fotos || []).length ||
+    Object.keys(r.inventario || {}).length);
+  if (!hay) return null;
+  const i = RECEPCION_PASOS.findIndex((p) => p.id === r.paso);
+  return {
+    patente: r.campos.patente || '',
+    cliente: r.campos.nombre || '',
+    paso: (RECEPCION_PASOS[i] || RECEPCION_PASOS[0]).n,
+    numero: (i < 0 ? 0 : i) + 1,
+    fotos: (r.fotos || []).length,
+    danos: (r.danos || []).length
+  };
+}
 
-     El cartel no decía de qué auto era el ingreso a medias, y sin eso no se
-     puede decidir si retomarlo o tirarlo: había que entrar a mirar. Avisaba de
-     un problema en vez de resolverlo. */
+function vRecepcionMenu() {
+  /* 🔴 VUELVE EL CARTEL DEL BORRADOR, CON LO QUE LE FALTABA (28-08-2026).
+
+     Acá había uno y se sacó el 15-08 con una objeción exacta: «no decía de qué
+     auto era el ingreso a medias, y sin eso no se puede decidir si retomarlo o
+     tirarlo». La objeción era buena; la conclusión —no avisar nada— dejó al
+     recepcionista sin ninguna señal de que su trabajo seguía ahí.
+
+     Este dice la patente, el cliente, en qué paso quedó y cuántas fotos y
+     daños lleva, y trae los dos botones que cierran la decisión sin entrar a
+     mirar. Y no aparece con el borrador en blanco. */
   const tarjeta = (o) => {
     const puede = Modelo.puede(o.permiso);
     /* La opción que el rol no puede usar NO se esconde ni se apaga: se aprieta
@@ -357,6 +393,24 @@ function vRecepcionMenu() {
     <div class="cab"><div><h2>${ico('recepcion', 'g')}Seleccione una opción</h2>
       <div class="desc">Las cuatro del sistema actual, con sus mismos nombres</div></div></div>
     <div class="cuerpo">
+      ${(function () {
+        const b = recBorradorEnCurso();
+        if (!b) return '';
+        const detalle = [
+          b.patente ? 'patente ' + esc(b.patente) : '',
+          b.cliente ? esc(b.cliente) : '',
+          'paso ' + b.numero + ' de ' + RECEPCION_PASOS.length + ' · ' + esc(b.paso),
+          b.fotos ? plural(b.fotos, 'foto', 'fotos') : '',
+          b.danos ? plural(b.danos, 'daño', 'daños') : ''
+        ].filter(Boolean).join(' · ');
+        return '<div class="aviso-borrador">' +
+          '<div class="txt"><strong>Hay un ingreso a medio llenar.</strong> ' +
+          '<span class="cod">' + detalle + '</span></div>' +
+          '<div class="acc">' +
+            '<button class="btn" id="rec-retomar">Retomar</button>' +
+            '<button class="btn secundario" id="rec-tirar">Descartar</button>' +
+          '</div></div>';
+      })()}
       <div class="opciones-rec">${RECEPCION_OPCIONES.map(tarjeta).join('')}</div>
     </div>
   </div>`;
