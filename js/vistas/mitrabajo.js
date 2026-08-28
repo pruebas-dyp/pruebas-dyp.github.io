@@ -175,10 +175,13 @@ function tarjetaTrabajo(x, mia, reparteElJefe) {
 /* Las tarjetas agrupadas por estado del ciclo. El grupo vacio no se dibuja: un
    rotulo sobre nada se lee como que algo fallo. */
 function gruposDeTrabajo(lista, mia, reparteElJefe) {
+  /* 🔴 ERAN DOS GRUPOS (27-08-2026, Marco: «el sistema no tiene validaciones
+     de etapas»). El segundo —«Terminadas, esperando el visto bueno»— agrupaba
+     un estado que ya no existe: terminar una etapa la cierra, y una etapa
+     cerrada no está en Mi trabajo. Quedaba un rótulo que no iba a tener nunca
+     nada debajo. */
   const grupos = [
-    { tit: mia ? 'Por hacer' : '', dice: '', suyas: lista.filter((x) => !x.esperandoValidacion) },
-    { tit: 'Terminadas, esperando el visto bueno', dice: 'El jefe todavía no las acepta',
-      suyas: lista.filter((x) => x.esperandoValidacion) }
+    { tit: mia ? 'Por hacer' : '', dice: '', suyas: lista }
   ];
   return grupos.map((g) => {
     if (!g.suyas.length) return '';
@@ -223,14 +226,11 @@ function vMiTrabajo() {
 
   /* La tira de arriba: lo primero que la persona tiene que saber al abrir el
      telefono es cuanto tiene y cuanto ya entrego. */
-  const esperandoVisto = t.mias.filter((x) => x.esperandoValidacion).length;
-  const porHacer = t.mias.length - esperandoVisto;
+  const porHacer = t.mias.length;
   const resumen = conEtapas ? `
   <div class="tira-agenda">
     <div class="dato ${porHacer ? 'aviso' : ''}">
       <span class="cifra">${porHacer}</span><span class="rot">por hacer</span></div>
-    <div class="dato">
-      <span class="cifra">${esperandoVisto}</span><span class="rot">esperando visto bueno</span></div>
     <div class="dato">
       <span class="cifra">${t.disponibles.length}</span><span class="rot">${reparteElJefe
         ? 'sin asignar' : 'para tomar'}</span></div>
@@ -281,9 +281,9 @@ function vMiTrabajo() {
   ${resumen}
   <div class="panel destacado">
     <div class="cab"><div><h2>${ico('taller', 'g')}Mi trabajo</h2>
-      <div class="desc">Lo que me asignaron. Al terminar, el jefe lo revisa y recién ahí la orden avanza</div></div>
-      <span class="et ${esperandoVisto ? 'azul' : 'verde'}">${esperandoVisto
-        ? esperandoVisto + ' esperando visto bueno' : 'nada pendiente de revisión'}</span></div>
+      <div class="desc">Lo que me asignaron. Al terminar una etapa queda cerrada</div></div>
+      <span class="et ${porHacer ? 'azul' : 'verde'}">${porHacer
+        ? porHacer + (porHacer === 1 ? ' etapa abierta' : ' etapas abiertas') : 'nada pendiente'}</span></div>
     <div class="cuerpo">
       ${t.mias.length
         ? gruposDeTrabajo(t.mias, true, reparteElJefe)

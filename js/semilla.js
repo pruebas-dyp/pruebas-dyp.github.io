@@ -161,7 +161,10 @@ const Semilla = (function () {
   /* 17 → 18 el 27-08-2026: la recepción perdió el campo `firma_media_id` al
      sacarse la firma digital. Una base guardada de hace un rato lo trae, y con
      eso el impreso podría seguir buscando una firma que ya no se estampa. */
-  const FORMA_DATOS = 18;
+  /* 18 → 19 el 27-08-2026: se apagó el visto bueno y cambió el rol de una
+     cuenta. Una base guardada trae etapas «esperando revisión», que es un
+     estado que ya no existe. */
+  const FORMA_DATOS = 19;
   // TEMPARIO_HORA ($10.000, reglas §C.15) se eliminó el 13-08-2026 junto con
   // el tempario entero. La cifra queda medida en `reglas`, no en el sistema.
 
@@ -191,7 +194,19 @@ const Semilla = (function () {
     ['ot.crear',             'Crear órdenes de trabajo'],
     ['ot.editar',            'Editar la recepción de una orden'],
     ['etapa.asignar',        'Asignar etapas a un vehículo'],
-    ['etapa.validar',        'Validar el término de una etapa'],
+    /* 🔴 RESERVADO, O SEA: NO ENTRA EN «ACCESO TOTAL» (27-08-2026, Marco: «el
+       sistema no tiene validaciones de etapas, por lo tanto debes eliminarlo»).
+
+       Sacarlo de la matriz del jefe de taller no alcanzaba: Gerencia,
+       Administración y Arttmize tienen rol TOTAL, y un rol total se lleva el
+       catálogo entero pase lo que pase con las filas. Les aparecía la bandeja
+       «Por validar» a esas tres cuentas y a nadie más — que es peor que no
+       tenerla, porque el proceso no existe para ninguna.
+
+       `reservado` es el mecanismo que ya estaba para esto: acceso total
+       significa todo el sistema MENOS lo reservado, y lo reservado sólo se da
+       con nombre y apellido desde Personal. Hoy no se lo damos a nadie. */
+    ['etapa.validar',        'Validar el término de una etapa', true],
     ['etapa.finalizar',      'Finalizar etapas'],
     ['presupuesto.ver',      'Ver el presupuesto y sus líneas'],
     ['presupuesto.montos',   'Ver los montos de venta del presupuesto'],
@@ -343,8 +358,25 @@ const Semilla = (function () {
     { id: 'pe-t-6', nombre: 'Iván', apellidos: 'Villalobos', rol: 'ro-1', etapas: ['et-8'],
       cargo: 'Recepción', usuario: 'ivan.villalobos',
       modulos: ['torre', 'historico', 'recepcion', 'taller', 'presupuesto'] },
-    { id: 'pe-t-7', nombre: 'Esteban', apellidos: 'Calvo', rol: 'ro-1', etapas: ['et-8'],
-      cargo: 'Recepción', usuario: 'esteban.calvo',
+    /* 🔴 JEFE DE TALLER (27-08-2026, Marco: «hoy día pasa todo por el jefe de
+       taller, Esteban Calvo, que es quien asigna, quien termina una etapa y así
+       sucesivamente»).
+
+       Estaba como Recepción, que es lo que decía la lista de accesos que mandó
+       Andrés por correo. Manda lo que dice el cliente sobre su propia gente.
+
+       ⚠️ NICOLE HERNÁNDEZ Y ANDRÉS GUZMÁN SIGUEN CON EL MISMO ROL. Marco dijo
+       quién ES el jefe de taller, no que los otros dos dejaran de serlo, y
+       quitarle el acceso a alguien por deducción propia es de las cosas que no
+       se hacen sin preguntar. Queda anotado para confirmarlo. */
+    { id: 'pe-t-7', nombre: 'Esteban', apellidos: 'Calvo', rol: 'ro-2', etapas: ['et-8'],
+      cargo: 'Jefe de taller', usuario: 'esteban.calvo',
+      /* ⚠️ LOS MÓDULOS NO CAMBIAN. Cambió su ROL —lo que puede HACER: asignar y
+         cerrar etapas— y no su lista de accesos, que es la que mandó Andrés por
+         correo y la que una prueba compara cuenta por cuenta. Al ponerle los
+         del jefe de taller le aparecieron Personal, Documentos y Bodega, que
+         nadie le dio. Marco dijo quién manda en el taller, no que le abrieran
+         tres módulos más. */
       modulos: ['torre', 'historico', 'recepcion', 'taller', 'presupuesto'] },
     { id: 'pe-t-8', nombre: 'Sheila', apellidos: 'Marín', rol: 'ro-8', etapas: [],
       cargo: 'Administración', usuario: 'sheila.marin',
@@ -855,7 +887,9 @@ const Semilla = (function () {
                     'perdida_total.declarar', 'historico.ver'],
       jefe_taller: ['torre.ver', 'taller.ver', 'repuesto.ver', 'espera.ver', 'ficha.completa',
                     'documento.ver', 'foto.ver', 'foto.cargar',
-                    'etapa.asignar', 'etapa.validar', 'etapa.finalizar', 'presupuesto.ver', 'presupuesto.montos',
+                    /* Sin `etapa.validar`: no hay visto bueno (27-08-2026). El jefe
+                       de taller asigna y cierra, que es lo que hace hoy. */
+                    'etapa.asignar', 'etapa.finalizar', 'presupuesto.ver', 'presupuesto.montos',
                     'presupuesto.crear', 'presupuesto.abrir', 'personal.ver', 'salida.registrar',
                     // Quién decide que un auto se detiene y por qué: el que manda en el taller.
                     'detencion.gestionar'],
@@ -863,6 +897,9 @@ const Semilla = (function () {
       bodega:      ['torre.ver', 'taller.ver', 'repuesto.ver', 'ficha.completa',
                     'documento.ver', 'documento.cargar', 'repuesto.cargar',
                     'repuesto.devolver', 'presupuesto.ver'],
+      /* Administración tiene todo MENOS validar: el visto bueno no existe en el
+         taller, y dárselo sólo a admin haría aparecer el módulo «Por validar»
+         para una cuenta y no para las demás —que es peor que no tenerlo—. */
       admin:       permiso.map((p) => p.codigo),
       dueno:       permiso.map((p) => p.codigo),
       aseguradora: ['torre.ver', 'ficha.completa', 'presupuesto.ver', 'presupuesto.montos',
@@ -1039,7 +1076,20 @@ const Semilla = (function () {
          mira, la orden no avanza. Va como parametro porque hay etapas y
          talleres donde revisar cada cierre es de mas -y porque apagarlo tiene
          que ser una decision consciente, no un olvido-. */
-      { clave: 'validar_termino', nombre: 'Validar el término de cada etapa', valor: 'si', tipo: 'opcion',
+      /* 🔴 APAGADO (27-08-2026, Marco: «a día de hoy el sistema no tiene
+         validaciones de etapas, por lo tanto debes eliminarlo. Hoy día pasa
+         todo por el jefe de taller, que es quien asigna, quien termina una
+         etapa y así sucesivamente»).
+
+         El parámetro y su motor se quedan —son C-43, desarrollo nuevo y
+         cotizado aparte, y Marco dijo «de momento»—, pero nace en `no` y NADIE
+         tiene el permiso de validar. Con eso terminar una etapa la cierra, que
+         es lo que hace su sistema hoy.
+
+         ⚠️ Apagarlo tiene que ser una decisión consciente y no un olvido: por
+         eso queda escrito acá y no borrado a escondidas. Encenderlo es cambiar
+         este valor y devolverle `etapa.validar` a un rol. */
+      { clave: 'validar_termino', nombre: 'Validar el término de cada etapa', valor: 'no', tipo: 'opcion',
         opciones: [
           { valor: 'si', nombre: 'Sí — el encargado declara terminado y el jefe lo acepta' },
           { valor: 'no', nombre: 'No — al declarar terminado la etapa se cierra sola' }
@@ -1518,13 +1568,19 @@ const Semilla = (function () {
              ellas la bandeja del jefe sale vacia y no hay nada que mostrar en
              la demostracion — y peor: no se ve el caso que justifica todo el
              mecanismo, que es un auto listo hace dias que nadie reviso. */
-          const esperandoVisto = !cerrada && !suelta && idx % 4 === 1;
+          /* 🔴 SIN ETAPAS ESPERANDO VISTO BUENO (27-08-2026). Una de cada
+             cuatro etapas abiertas se sembraba «terminada, esperando que el
+             jefe la acepte». Ese estado ya no existe: una etapa está abierta o
+             cerrada. Sembrarlo dejaría 250 etapas en un limbo que ninguna
+             pantalla sabe resolver. */
+          const esperandoVisto = false;
           /* 🔶 Y ALGUNAS FUERON DEVUELTAS. Es el otro lado del visto
              bueno y el que hace que el mecanismo se entienda: el jefe puede
              rechazar, y el encargado tiene que enterarse de por que. Sin una
              sembrada, la tarjeta roja con el motivo no se ve nunca en la
              demostracion y el caso queda contado solo de palabra. */
-          const devuelta = !cerrada && !suelta && !esperandoVisto && idx % 9 === 4;
+          // Y sin devoluciones: devolver es la otra mitad del visto bueno.
+          const devuelta = false;
           /* 🔴 Y LAS CERRADAS TAMBIEN SE DEVOLVIERON EN SU MOMENTO, o el
              indicador de calidad de la Reporteria sale en cero para todos.
 
@@ -1535,8 +1591,12 @@ const Semilla = (function () {
              y de la etapa: pintura y desabolladura se devuelven mas que un
              desarme, y hay gente a la que le devuelven mas que a otra. */
           const rechazo = resp ? (RECHAZO_PERSONA[resp] || 7) : 0;
-          const devueltaVieja = cerrada && resp &&
-            ((idx * 7 + e.orden * 3) % 100) < rechazo * (e.orden === 2 || e.orden === 4 ? 2 : 1);
+          /* 🔴 Y TAMPOCO SE SIEMBRAN DEVOLUCIONES VIEJAS (27-08-2026). Devolver
+             es la otra mitad del visto bueno: si nadie acepta, nadie rechaza.
+             Quedaban 89 etapas con una devolución en el historial de un proceso
+             que no existe. El reparto por persona y por etapa se queda escrito
+             arriba: es lo que hay que volver a encender junto con C-43. */
+          const devueltaVieja = false;
           /* 🔶 QUIEN ASIGNO, CUANDO, QUIEN TERMINO Y QUIEN VALIDO (22-08-2026).
 
              NO hay fecha comprometida ni horario: Marco lo corrigio explicito
@@ -1573,12 +1633,16 @@ const Semilla = (function () {
                que el jefe firma el mismo dia y otras que se quedan tres dias
                esperando, que es lo que pasa de verdad cuando esta en el piso.
                Nunca antes de la asignacion: `Math.min` contra `t.desde`. */
-            terminada_at: cerrada
-              ? fechaTramo(Math.min(t.desde, t.hasta + ESPERA_VISTO[(idx * 3 + e.orden) % ESPERA_VISTO.length]))
-              : (esperandoVisto ? fechaTramo(Math.max(0, fin / 2)) : null),
-            terminada_por: cerrada ? resp : (esperandoVisto ? resp : null),
+            /* 🔴 TERMINAR ES CERRAR (27-08-2026). Antes eran dos actos con dos
+               fechas y dos nombres —el operario terminaba, el jefe valía— y acá
+               se sembraba la espera entre uno y otro. Ahora es uno solo: quien
+               la cierra la termina, y las dos fechas son la misma. Se guardan
+               igual porque el motor de C-43 las lee, y así el día que se
+               encienda el visto bueno no hay que migrar nada. */
+            terminada_at: cerrada ? cuando : null,
+            terminada_por: cerrada ? resp : null,
             validada_at: cerrada ? cuando : null,
-            validada_por: cerrada ? JEFA_TALLER : null,
+            validada_por: cerrada ? resp : null,
             devuelta_at: devuelta ? fechaTramo(Math.max(0, fin / 2))
               : (devueltaVieja ? fechaTramo(Math.max(0, (t.desde + t.hasta) / 2)) : null),
             devuelta_por: (devuelta || devueltaVieja) ? JEFA_TALLER : null,

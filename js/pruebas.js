@@ -1913,24 +1913,38 @@ const Pruebas = (function () {
         Modelo.fijar_persona_actual(oper.id);
         const rTerm = Modelo.finalizar_etapa(o.id, 'desarme', oper.id);
         const fila = db.ot_etapa.find((x) => x.id === 'oe-val');
-        const quedoAbierta = !!fila && !fila.salio_at && !!fila.terminada_at;
 
-        // El jefe la acepta: recien ahi se cierra.
+
+        /* 🔴 TERMINAR ES CERRAR (27-08-2026, Marco: «a día de hoy el sistema no
+           tiene validaciones de etapas, por lo tanto debes eliminarlo. Hoy día
+           pasa todo por el jefe de taller»).
+
+           Esta prueba ataba lo contrario: que terminar dejara la etapa
+           esperando y que sólo el visto bueno la cerrara. Era cierto y ya no lo
+           es. Se invierte, y de paso ata las dos mitades que importan: que
+           cierre, y que NADIE quede con el permiso de validar —si alguien lo
+           tuviera, volvería a aparecer el módulo «Por validar» para una cuenta
+           sí y para las demás no. */
+        const cerroAlTerminar = !!fila && !!fila.salio_at;
         Modelo.fijar_persona_actual(null);
-        Modelo.fijar_rol_actual('ro-6');
-        const rVal = Modelo.validar_etapa(o.id, 'desarme');
-        const cerroAlValidar = !!fila.salio_at && !!fila.validada_at;
+        const nadieValida = !db.persona.filter((x) => x.usuario).some((x) => {
+          Modelo.fijar_persona_actual(x.id);
+          const puede = Modelo.puede('etapa.validar');
+          Modelo.fijar_persona_actual(null);
+          return puede;
+        });
 
         push({
-          nombre: '🔴 Terminar una etapa no la cierra: la cierra quien la valida',
-          intento: 'Un operario declara terminada su etapa y despues el jefe la acepta',
-          esperado: 'Al terminar queda esperando revision; recien al aceptarla se cierra',
-          paso: rTerm.ok && quedoAbierta && rVal.ok && cerroAlValidar,
+          nombre: '🔴 Terminar una etapa la CIERRA: no hay visto bueno',
+          intento: 'Declarar terminada una etapa asignada, y preguntarle a cada cuenta si puede validar',
+          esperado: 'Queda cerrada en el acto, y ninguna cuenta tiene el permiso de validar',
+          paso: rTerm.ok && cerroAlTerminar && nadieValida,
           detalle: !rTerm.ok ? 'No dejo declarar terminada: ' + rTerm.motivo
-            : (!quedoAbierta ? 'Se CERRO al declarar terminada: el visto bueno del jefe no existe'
-              : (!rVal.ok ? 'No dejo validar: ' + rVal.motivo
-                : (!cerroAlValidar ? 'Al validar no quedo cerrada'
-                  : 'Terminada queda esperando; validada cierra y registra quien acepto')))
+            : (!cerroAlTerminar
+              ? 'Quedó esperando revisión: el visto bueno se apagó pero la etapa no cierra'
+              : (!nadieValida
+                ? 'Hay una cuenta que todavía puede validar: le va a aparecer «Por validar» a ella sola'
+                : 'Cierra al terminar, y nadie valida'))
         });
       })();
 
@@ -2052,32 +2066,35 @@ const Pruebas = (function () {
          los diez modulos escritos—. Y pregunta por el MENU, no por el
          permiso: el permiso ya daba que si mientras la puerta no existia. */
       (function () {
+        /* 🔴 LA BANDEJA «POR VALIDAR» NO LE APARECE A NADIE (27-08-2026).
+
+           Esta prueba comprobaba lo contrario —que el que valida tuviera la
+           puerta en el menú— y era la correcta mientras el visto bueno
+           existía. Ahora el riesgo es el inverso: que a alguien le quede el
+           permiso y le aparezca una bandeja que en el taller no se usa.
+
+           Se pregunta por el MENÚ y no por el permiso, igual que antes: el
+           permiso podía dar que sí mientras la puerta no existía, y ahora puede
+           dar que no mientras la puerta sigue dibujada. */
         const donde = (typeof window !== 'undefined') ? window : globalThis;
         const hayMenu = typeof donde.modulosDelMenu === 'function';
-        const cuentas = [
-          ['Nicole Hernandez', db.persona.find((p) => p.usuario === 'nicole.hernandez@dyp.cl')],
-          ['Gabriel Diaz',     db.persona.find((p) => p.usuario === 'gabriel.diaz@dyp.cl')]
-        ];
-        const sinPuerta = [];
-        let revisadas = 0;
-        cuentas.forEach(([rotulo, p]) => {
-          if (!p || !hayMenu) return;
+        const conBandeja = [];
+        db.persona.filter((x) => x.usuario).forEach((p) => {
+          if (!hayMenu) return;
           Modelo.fijar_persona_actual(p.id);
-          if (!Modelo.puede('etapa.validar')) return;
-          revisadas++;
-          if (donde.modulosDelMenu().indexOf('porvalidar') < 0) {
-            sinPuerta.push(rotulo + (Modelo.modulosDe(p.id) ? ' (su lista heredada la tapa)' : ''));
-          }
+          if (donde.modulosDelMenu().indexOf('porvalidar') >= 0) conBandeja.push([p.nombres, p.apellidos].filter(Boolean).join(' '));
         });
+        Modelo.fijar_persona_actual(null);
+
         push({
-          nombre: '🔴 El que valida tiene en el menu la bandeja donde valida',
-          intento: 'Entrar con el jefe de taller y con el administrador y mirar que modulos ofrece el menu',
-          esperado: 'Los dos ven «Por validar»: uno sin lista de modulos y el otro con la lista del cliente',
-          paso: hayMenu && revisadas === 2 && !sinPuerta.length,
-          detalle: !hayMenu ? 'No existe modulosDelMenu(): app.js no cargo'
-            : (revisadas !== 2 ? 'Se esperaban 2 cuentas que validan y se encontraron ' + revisadas
-              : (sinPuerta.length ? 'Pueden validar y el menu no se la ofrece: ' + sinPuerta.join(', ')
-                : 'Las dos cuentas que validan tienen la puerta en el menu'))
+          nombre: '🔴 Nadie tiene la bandeja «Por validar» en el menú',
+          intento: 'Recorrer las cuentas y mirar su menú',
+          esperado: 'Ninguna la tiene: en el taller el que cierra la etapa es el mismo que la hace',
+          paso: hayMenu && !conBandeja.length,
+          detalle: !hayMenu ? 'El menú no está cargado: no se pudo probar'
+            : (conBandeja.length
+              ? 'Le aparece a ' + conBandeja.join(', ') + ': el visto bueno no existe en este taller'
+              : 'A ninguna de las ' + db.persona.filter((x) => x.usuario).length + ' cuentas')
         });
       })();
 
@@ -3852,40 +3869,20 @@ const Pruebas = (function () {
         db.etapa.filter((e) =>
           !db.persona_etapa.some((h) => h.etapa_id === e.id)).length, 1],
 
-      /* 🔴 QUE LA TASA DE DEVOLUCIONES NO SALGA PLANA. Es la cuarta vez
-         que aparece la misma trampa: un dato sembrado repartido con un `%`
-         parejo da una distribución perfectamente uniforme, y una distribución
-         uniforme se ve INVENTADA — que es peor que no tener el gráfico. Pasó
-         con las duraciones de etapa, con el ranking de marcas y con los
-         nombres de clientes. Acá se mide: entre el que más y el que menos le
-         devuelven tiene que haber al menos cinco puntos de diferencia. */
-      /* 🔴 EL TRAMO DE REVISION NO PUEDE SER CERO EN TODAS. Estaban
-         `terminada_at` y `validada_at` puestos en el mismo instante, asi que
-         «del termino al visto bueno» —el numero que mide al que revisa— daba
-         0 d exacto en las mil y pico etapas cerradas, y el panel lo mostraba
-         como si fuera una medicion. Un cero perfecto es la marca de que nadie
-         midio nada. */
-      ['Etapas cerradas donde el visto bueno llegó despues del término',
-        (function () {
-          const cerradas = db.ot_etapa.filter((x) => x.salio_at && x.terminada_at && x.validada_at);
-          if (!cerradas.length) return 'sin etapas cerradas';
-          const conEspera = cerradas.filter((x) =>
-            new Date(x.validada_at) - new Date(x.terminada_at) > 0).length;
-          return conEspera > cerradas.length * 0.3 ? 'la mayoria espera' : 'todas en el mismo segundo';
-        })(), 'la mayoria espera'],
+      /* 🔴 ACÁ SE VIGILABA QUE LA TASA DE DEVOLUCIONES NO SALIERA PLANA
+         (27-08-2026). Era la cuarta aparición de la misma trampa: un dato
+         sembrado con un porcentaje parejo da una distribución uniforme, y una
+         distribución uniforme se ve INVENTADA.
 
-      ['Puntos de diferencia entre el que más y el que menos le devuelven',
-        (function () {
-          const m = new Map();
-          db.ot_etapa.forEach((x) => {
-            if (!x.terminada_por) return;
-            const c = m.get(x.terminada_por) || { n: 0, dev: 0 };
-            c.n++; c.dev += (x.devoluciones || 0); m.set(x.terminada_por, c);
-          });
-          const tasas = [...m.values()].filter((c) => c.n >= 3).map((c) => (c.dev * 100) / c.n);
-          if (tasas.length < 2) return 0;
-          return Math.round(Math.max.apply(null, tasas) - Math.min.apply(null, tasas)) >= 5 ? 'con relieve' : 'plana';
-        })(), 'con relieve'],
+         Ya no hay devoluciones que repartir: devolver es la otra mitad del
+         visto bueno, y el visto bueno no existe en este taller. La cifra daría
+         «plana» siempre, y para que diera verde habría que sembrar
+         devoluciones de un proceso que nadie hace — al revés de para lo que
+         existía. Vuelve cuando vuelva C-43.
+
+         Lo que sí queda vigilado es que no aparezcan por su cuenta. */
+      ['Etapas con devoluciones registradas',
+        db.ot_etapa.filter((x) => (x.devoluciones || 0) > 0).length, 0],
 
       ['Repuestos nacidos de una línea que no es «cambio»',
         (function () {

@@ -138,7 +138,8 @@ function vEtapasTabla(o) {
       ? '<span style="color:var(--gris-2)">—</span>'
       : '<span class="et gris">No aplica todavía</span>';
     else if (a.finalizada) estado = '<span class="et verde">Completado</span>';
-    else if (a.esperandoValidacion) estado = '<span class="et ambar">esperando visto bueno</span>';
+    /* Sin "esperando visto bueno": ese estado se fue el 27-08-2026 con la
+       validación. Una etapa está abierta o cerrada. */
     else estado = '<span class="et azul">En curso</span>';
 
     return '<tr' + (a ? ' class="ya"' : '') + '>' +
