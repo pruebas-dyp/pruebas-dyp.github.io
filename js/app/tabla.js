@@ -28,6 +28,18 @@
    mejor que ordenar lo pintado. Ahí sólo se agrega el ensanchado. */
 const ordenPorTabla = {};
 const anchoPorTabla = {};
+/* 🔴 DÓNDE ESTABA CORRIDA LA TABLA (28-08-2026).
+
+   Cada `render()` vuelve a escribir el HTML entero, y una caja recién creada
+   nace en `scrollLeft: 0`. En el escritorio casi no se nota; en un teléfono,
+   donde la torre son 21 columnas y hay que deslizar 878 px para llegar a
+   «Encargado», se nota en cada tecla: se desliza hasta la columna que se quiere
+   mirar, se escribe UNA letra en el buscador y la tabla vuelve sola a la
+   columna 1.
+
+   Medido: `scrollLeft` 400 antes de teclear, 0 después. Se guarda por tabla —la
+   misma llave que usan el orden y los anchos— y se repone al repintar. */
+const ladoPorTabla = {};
 
 function llaveTabla(tabla, i) { return ui.vista + '#' + i; }
 
@@ -94,6 +106,16 @@ function mejorarTablas() {
     /* Después de ordenar, no antes: la página 1 son las primeras filas del
        orden que quedó, no las del orden con el que vinieron. */
     if (!paginaSola(tabla)) paginarTabla(tabla, cuerpo, llave);
+
+    /* La caja que se desliza vuelve a donde estaba. Se repone DESPUÉS de
+       ordenar y paginar, que son los dos que cambian el ancho del contenido: si
+       se repusiera antes, el navegador lo recortaría al ancho viejo. */
+    const caja = cajaDe(tabla);
+    if (caja && caja.classList.contains('grid-envoltorio')) {
+      const guardado = ladoPorTabla[llave];
+      if (guardado) caja.scrollLeft = guardado;
+      caja.addEventListener('scroll', () => { ladoPorTabla[llave] = caja.scrollLeft; }, { passive: true });
+    }
   });
 
   avisarQueHayMasColumnas();
@@ -264,7 +286,27 @@ const cajaDe = (tabla) => tabla.closest('.grid-envoltorio') || tabla;
 function piesDe(tabla) {
   const pies = [];
   let n = cajaDe(tabla).nextElementSibling;
-  while (n && n.classList.contains('pie-grid')) { pies.push(n); n = n.nextElementSibling; }
+  /* 🔴 LA PISTA «DESLIZA LA TABLA» SE METE EN EL MEDIO, Y ESTE RECORRIDO SE
+     DETENÍA AHÍ (28-08-2026).
+
+     `avisarQueHayMasColumnas` inserta la pista JUSTO DESPUÉS de la caja de la
+     tabla. Este bucle avanzaba «mientras la clase sea `pie-grid`», así que con
+     la pista al medio se cortaba en el primer paso y devolvía una lista vacía.
+     `piePaginasDe` daba `null`, `pintarPiePaginas` creía un pie NUEVO, y al
+     repintar volvía a crear otro.
+
+     Medido en Documentos a 390 px: un toque en «Siguiente» dejaba DOS pies de
+     paginado, uno debajo del otro, cada uno diciendo una página distinta. Y
+     sólo pasa en el teléfono, porque en el escritorio la tabla cabe y la pista
+     no se pinta.
+
+     Ahora la pista se salta y el recorrido sigue. No se la trata como pie —no
+     entra a la lista—: sólo se la deja pasar. */
+  while (n && n.classList &&
+    (n.classList.contains('pie-grid') || n.classList.contains('pista-desliza'))) {
+    if (n.classList.contains('pie-grid')) pies.push(n);
+    n = n.nextElementSibling;
+  }
   return pies;
 }
 

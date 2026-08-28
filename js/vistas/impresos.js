@@ -81,6 +81,38 @@ const CSS_IMPRESO = `
   border:1px solid #292D78;background:#292D78;color:#fff;font-weight:600}
 .barra-impreso button.sec{background:#fff;color:#292D78}
 
+/* 🔴 EN EL TELEFONO, "CERRAR" SE IBA DE LA PANTALLA Y NO HABIA SALIDA
+   (28-08-2026, de la auditoria de celular).
+
+   OJO: en este bloque no se escribe ningun acento grave. Es un template literal
+   de JavaScript y uno solo lo termina, dejando el archivo entero sin cargar.
+   Me pase esta misma advertencia por alto al escribir este comentario.
+
+   La hoja es A4: 210 mm, o sea 794 px. En un telefono de 390 sobran 444 px y
+   hay que deslizar de lado para leerla. La barra estaba pegada SOLO en vertical
+   -sticky con top y nada mas-, asi que al deslizar se iba con la hoja: medido,
+   quedaba en x = -424, fuera de la pantalla. Y como es la unica salida del
+   impreso, el que abria un presupuesto en el telefono se quedaba adentro:
+   habia que recargar la pagina entera.
+
+   Pegarla tambien en horizontal, con el ancho atado a la ventana, la deja
+   completa a la vista sin importar cuanto se haya deslizado la hoja. Se le pone
+   fondo propio porque queda encima del documento blanco.
+
+   La hoja NO se achica a la fuerza: es un A4 y achicarlo lo vuelve ilegible. Se
+   desliza, como cualquier PDF en un telefono, y ahora se puede salir. */
+@media screen and (max-width: 860px){
+  .velo-impreso{padding:10px}
+  .barra-impreso{
+    position:sticky; top:0; left:0; z-index:9100;
+    width:calc(100vw - 20px); box-sizing:border-box;
+    justify-content:flex-start; flex-wrap:wrap; gap:6px;
+    padding:8px; margin-bottom:8px; border-radius:4px;
+    background:rgba(20,24,30,.92);
+  }
+  .barra-impreso button{min-height:34px; font-size:13px}
+}
+
 /* ── El presupuesto, que es el documento que sale del taller ──────────────
    Se lee como planilla: columnas fijas, números tabulares y alineados a la
    derecha, bandas por bloque. Todo lo comparable queda en la misma columna. */

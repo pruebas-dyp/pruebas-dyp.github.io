@@ -388,9 +388,18 @@ function dialogoMiClave() {
   const velo = document.createElement('div');
   velo.className = 'velo';
   velo.innerHTML =
-    '<div class="dialogo" style="max-width:420px">' +
-      '<div class="cab"><h2>' + ico('candado', 'g') + 'Cambiar mi clave</h2></div>' +
-      '<div class="cuerpo">' +
+    /* 🔴 USABA CLASES QUE NO EXISTEN (28-08-2026, de la auditoría de celular).
+
+       Decía `dialogo`, `cab`, `cuerpo` y `pie`. De las cuatro, `dialogo` NO ESTÁ
+       escrita en ninguna parte del CSS —y es la que trae el fondo, el marco y la
+       sombra—, así que este cuadro salía transparente sobre el velo oscuro, con
+       el texto flotando y sin borde. Es el único lugar del sistema que las
+       usaba: los otros seis diálogos van con `modal` / `modal-cab` /
+       `modal-cuerpo` / `modal-pie`. Se alinea con ellos. */
+    '<div class="modal" role="dialog" aria-modal="true" style="max-width:420px">' +
+      '<div class="modal-cab"><h2>Cambiar mi clave</h2>' +
+        '<button class="cerrar" id="mc-cerrar" aria-label="Cerrar">&times;</button></div>' +
+      '<div class="modal-cuerpo">' +
         '<div class="dato"><span class="k">Cuenta</span><span class="v"><span class="cod">' +
           esc(yo.usuario || '—') + '</span></span></div>' +
         '<div class="dato"><span class="k">También sirve</span><span class="v">la ficha ' +
@@ -406,7 +415,7 @@ function dialogoMiClave() {
             '<span class="ayuda">Mínimo 6 caracteres</span></div>' +
         '</div>' +
       '</div>' +
-      '<div class="pie">' +
+      '<div class="modal-pie">' +
         '<button class="btn secundario" id="mc-cancelar">Cancelar</button>' +
         '<button class="btn" id="mc-guardar">Cambiar la clave</button>' +
       '</div>' +
@@ -416,6 +425,7 @@ function dialogoMiClave() {
   const cerrar = () => velo.remove();
   velo.addEventListener('click', (ev) => { if (ev.target === velo) cerrar(); });
   document.getElementById('mc-cancelar').addEventListener('click', cerrar);
+  document.getElementById('mc-cerrar').addEventListener('click', cerrar);
   const campo = document.getElementById('mc-actual');
   campo.focus();
 

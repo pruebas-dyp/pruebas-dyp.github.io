@@ -124,7 +124,34 @@ svg.ico.g { width: 16px; height: 16px; flex-basis: 16px; }
 
 /* ───────── Estructura general ───────── */
 
-.app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+/* 🔴 `100vh` MIENTE EN SAFARI DE IPHONE (28-08-2026).
+
+   `vh` se resuelve contra el viewport GRANDE —el de las barras retraídas—, así
+   que con la barra de Safari puesta `.app` mide entre 50 y 90 px MÁS que lo que
+   se ve. Y como `.app` es `overflow: hidden`, ese tramo de más no aparece con
+   barra: se corta. En la práctica, el último trozo de TODA pantalla —la barra
+   de estado, el botón Siguiente de un formulario— queda debajo de la barra del
+   navegador y no se alcanza.
+
+   `dvh` es el alto DINÁMICO: mide lo que de verdad se ve y se ajusta cuando la
+   barra entra y sale. Va con `100vh` antes como respaldo, para el navegador que
+   no lo entienda —que ya no queda ninguno de los que usa el taller, pero una
+   pantalla en blanco por una unidad no soportada no es un riesgo que valga—.
+
+   Y `padding-bottom: env(safe-area-inset-bottom)` porque el index declara
+   `viewport-fit=cover` desde el principio y nunca se compensó: en un iPhone con
+   muesca, la última franja quedaba debajo del indicador de inicio. */
+.app {
+  display: flex; flex-direction: column; overflow: hidden;
+  height: 100vh; height: 100dvh;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  box-sizing: border-box;
+}
+
+/* Safari infla la letra por su cuenta al acostar el teléfono —«text
+   autosizing»— y después no la devuelve: el mismo panel se ve con dos tamaños
+   según cómo se tomó el aparato. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
 /* Barra de menú superior */
 /* El alto va en una variable porque NO es sólo el alto de la barra: es dónde
@@ -391,14 +418,28 @@ div.desplegable button:hover .ico { color: var(--acento); }
 @media (max-width: 1000px) { .etapas-con-historial { grid-template-columns: minmax(0, 1fr); } }
 
 /* Diálogo */
+/* 🔴 EL VELO SE DESPLAZA, Y EL CUADRO NO SE CENTRA A LA FUERZA (28-08-2026).
+
+   Estaba `align-items: center` sin desplazamiento. Cuando el teclado del
+   teléfono se abre, la ventana visible se reduce a la mitad: el cuadro sigue
+   centrado sobre la ventana COMPLETA, así que su cabecera —con la X— queda
+   arriba de la vista y su pie —con Guardar— debajo del teclado, y no hay forma
+   de llegar a ninguno de los dos porque el velo no desplaza.
+
+   Con `overflow: auto` y `align-items: flex-start` el cuadro arranca arriba y
+   se puede recorrer entero. El centrado se conserva cuando sobra alto, que es
+   el caso del escritorio, con `margin: auto` sobre el cuadro. */
 .velo {
   position: fixed; inset: 0; z-index: 950; background: rgba(0,0,0,.55);
-  display: flex; align-items: center; justify-content: center; padding: 24px;
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 24px; overflow: auto; overscroll-behavior: contain;
 }
+.velo > * { margin: auto; }
 .modal {
   background: var(--superficie); border: 1px solid var(--borde-fuerte);
   border-radius: 4px; box-shadow: 0 10px 40px rgba(0,0,0,.45);
-  max-width: 1100px; width: 100%; max-height: 86vh; display: flex; flex-direction: column;
+  max-width: 1100px; width: 100%; max-height: 86vh; max-height: 86dvh;
+  display: flex; flex-direction: column;
 }
 .modal-cab {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -411,6 +452,13 @@ div.desplegable button:hover .ico { color: var(--acento); }
 }
 .modal-cab .cerrar:hover { color: var(--rojo); }
 .modal-cuerpo { padding: 13px; overflow: auto; }
+/* El pie del cuadro: los botones que deciden. No se desplaza con el cuerpo —se
+   queda abajo— para que «Guardar» no haya que ir a buscarlo. Faltaba: el cuadro
+   de «Cambiar mi clave» lo pintaba con una clase que no existía. */
+.modal-pie {
+  display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap;
+  padding: 11px 13px; border-top: 1px solid var(--borde); background: var(--superficie-2);
+}
 .barra-menu .der { margin-left: auto; display: flex; align-items: center; gap: 12px; font-size: 11.5px; }
 .barra-menu .der .usr { display: flex; align-items: center; gap: 6px; }
 .barra-menu .der button {
@@ -595,7 +643,11 @@ body.lateral-plegado .sidebar .tirador { display: none; }
 /* Área de trabajo */
 /* `min-height: 0` por lo mismo que `.principal`: es ítem de una columna, y sin
    esto su `overflow-y` no tiene nada que desplazar. Ver el comentario largo. */
-.contenido { flex: 1; min-height: 0; overflow-y: auto; padding: 10px 14px 18px; }
+/* `overscroll-behavior: contain`: al llegar al tope, el arrastre NO se contagia
+   al documento de atrás —que en Safari rebota y da la sensación de que la
+   pantalla se soltó—. Se queda donde está, que es lo que el usuario espera. */
+.contenido { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: 10px 14px 18px; }
 
 /* El cartel del ingreso a medio llenar, arriba de las cuatro opciones de
    Recepción. Ámbar y no rojo: no es un error, es trabajo esperando. */
@@ -993,6 +1045,30 @@ tr.detalle > td { background: var(--superficie-3); padding: 0; border-bottom: 2p
    que se desplaza: la tabla se corre a lo ancho y el desplegable se queda
    quieto y entero. El ancho se ata a la VENTANA —no a la tabla— y por eso va
    en `100vw` menos el respiro de los costados. */
+/* ⚠️ LA CABECERA DE LA TABLA NO SE PEGA, Y QUEDA ANOTADO (28-08-2026).
+
+   `table.grid th` pide `position: sticky; top: 0` desde siempre y NO funciona
+   en ninguna parte, ni en el teléfono ni en el escritorio. `sticky` se ancla al
+   ancestro QUE DESPLAZA, y ese es `.grid-envoltorio` —basta con que un eje no
+   sea `visible` para que la caja sea contenedor de desplazamiento—. Y el
+   envoltorio no tiene alto acotado: crece con la tabla, o sea que su sobrante
+   vertical es CERO y no hay contra qué pegarse. Medido en la Torre a 390 px:
+   bajando 4.000 px la cabecera queda en y = −3.795.
+
+   Se probó el arreglo —quitarle el desplazamiento al envoltorio para que el
+   `th` se ancle a `#contenido`— y SÍ funciona: la cabecera se pega en y = 10.
+   Pero mueve el desplazamiento lateral a la PÁGINA, y entonces la fila de
+   filtros se va de lado con ella. Se cambia un problema por otro.
+
+   La salida buena no es de CSS: es no mostrar veintiuna columnas en un
+   teléfono. Con las cinco que importan —OT, patente, cliente, etapa, días— la
+   tabla entra, no hay desplazamiento lateral, la cabecera se pega sola y el
+   resto de los datos ya vive en el desplegable de la fila, que desde hoy se lee
+   entero. Eso es una decisión de qué columnas, y esa la toma el taller.
+
+   Hasta entonces el envoltorio sigue desplazando de lado, que es lo que había,
+   y la página no se mueve en horizontal. */
+
 @media (max-width: 860px) {
   tr.detalle > td > * {
     position: sticky; left: 0;
@@ -2466,3 +2542,68 @@ table.grid td.abre-ot:hover { text-decoration: underline; }
 .permiso-grupo .inv-item input { margin-top: 2px; }
 .permiso-grupo .inv-item .cod { font-size: 10px; opacity: .75; }
 .permiso-grupo .inv-item input:disabled + span { opacity: .6; }
+
+
+/* ══════════ LO QUE VALE SÓLO PARA EL DEDO ═══════════════════════════
+   28-08-2026. Va AL FINAL del archivo a propósito: en CSS gana la última regla
+   de igual especificidad, y un `@media` no agrega especificidad ninguna. Es la
+   trampa que ya costó dos correcciones esta semana —una regla de teléfono
+   escrita antes de la regla general no se aplica nunca—. Acá abajo, se aplica.
+
+   Las DOS condiciones, igual que la capa que ya existía más arriba:
+
+     · `pointer: coarse` porque el iPad acostado mide 1.024 px y se maneja con el
+       dedo igual que el teléfono —el ancho solo no lo alcanzaría—.
+     · `max-width: 860px` porque el ancho solo tampoco alcanza al revés: una
+       ventana angosta en un computador tiene el mismo problema de espacio, y
+       porque no todo navegador declara el puntero —medido: el panel de pruebas
+       a 768 px decía `fine` y dejaba cuatro pantallas con los desplegables en
+       13,5 px—. */
+@media (max-width: 860px), (pointer: coarse) {
+
+  /* 🔴 iOS HACE ZOOM SOBRE CUALQUIER CAMPO DE ESCRITURA CON LETRA MENOR A
+     16 px, y no vuelve solo: la pantalla queda corrida y hay que pellizcar.
+
+     Va con `!important` —y es la única vez— porque el tamaño de letra de los
+     campos está escrito en catorce lugares distintos, varios por ID, y un
+     selector normal pierde contra ellos. Esto no es una decisión de diseño que
+     se pueda discutir por pantalla: es una condición del aparato. */
+  input:not([type=checkbox]):not([type=radio]):not([type=range]),
+  select, textarea { font-size: 16px !important; }
+
+  /* Un control que se aprieta con el dedo necesita alto. Apple pide 44; acá se
+     usa 34 como mínimo duro porque las tablas tienen filas de 40 y subírselo a
+     44 a todo empujaría la torre a la mitad de las filas por pantalla. */
+  .btn, button.btn, .chip, select, input:not([type=checkbox]):not([type=radio]) {
+    min-height: 34px;
+  }
+  /* Las casillas del inventario y de las etapas, que son la acción de esas
+     pantallas, quedaban en 13 px de lado. */
+  input[type=checkbox], input[type=radio] { width: 20px; height: 20px; }
+
+  /* 🔴 EL `:hover` SE QUEDA PEGADO EN TÁCTIL. En iOS, el primer toque aplica
+     el hover y ahí se queda hasta que se toca otra cosa: filas y botones
+     quedan marcados como si el dedo siguiera encima, y en una tabla eso hace
+     dudar de cuál fila está elegida. Se apagan los tres que se notan. */
+  tr.fila:hover td { background: inherit; }
+  .chip:hover { background: var(--superficie-2); }
+  .btn:hover { background: var(--acento-solido); border-color: var(--acento-solido); }
+  .btn.secundario:hover { background: var(--superficie); border-color: var(--borde); }
+
+  /* El tirador de ensanchar columnas son 7 px invisibles al borde de cada
+     encabezado. Con el mouse es cómodo; con el dedo se traga el toque que
+     quería ordenar por esa columna, y ensanchar a mano no se usa en un
+     teléfono. */
+  .tirador-col { display: none; }
+}
+
+/* 🔴 EL BUSCADOR DE LA TORRE, EN EL TELÉFONO (28-08-2026).
+
+   ⚠️ Esta regla corrige un `#q-torre { min-width: 340px }` que NO escribí yo
+   —vino con el trabajo del buscador ancho—. A 360 px de pantalla, 340 px de
+   mínimo más el relleno no caben, y el buscador empujaba el panel entero. Como
+   aquella regla gana por ID, la corrección tiene que ganar por ID también, y
+   por eso va acá abajo y no dentro del bloque de arriba. */
+@media (max-width: 620px) {
+  #q-torre { min-width: 0; flex: 1 1 100%; max-width: none; }
+}
