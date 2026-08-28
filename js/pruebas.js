@@ -253,34 +253,55 @@ const Pruebas = (function () {
         });
       })();
 
-      /* ── 12 · Un presupuesto enviado no se edita encima ───────────────
-         Se versiona. Es lo que hace auditable la discusión con la compañía. */
+      /* ── 12 · Un presupuesto enviado SE SIGUE EDITANDO ────────────────
+         🔴 27-08-2026, Marco: «lo mismo con el presupuesto, no pasa por
+         aprobación de nadie. La cuestión se envía pero de que se puede editar,
+         se puede editar».
+
+         Esta prueba ataba lo contrario —enviar congelaba y había que versionar—
+         y era correcta mientras esa política existía. Se invierte, y de paso
+         ata el límite que SÍ queda: la orden cerrada. Sin esa segunda mitad, la
+         prueba diría «se puede editar siempre», que no es lo que se construyó.
+
+         ⚠️ Y ata que «Crear versión nueva» siga existiendo. Ya no es
+         obligatorio, pero es lo único que deja una foto de lo que se mandó: si
+         alguien lo saca por creerlo inútil, esto se pone rojo. */
       (function () {
         const o = abiertaCualquiera();
         const cr = Modelo.crear_presupuesto(o.id, { lineas: [] });
         Modelo.agregar_linea_presupuesto(cr.presupuesto_id,
           { proceso: 'reparar', descripcion: 'Desabolladura', horas_rep: 4 });
         const env = Modelo.cambiar_estado_presupuesto(cr.presupuesto_id, 'enviado');
-        const r = Modelo.agregar_linea_presupuesto(cr.presupuesto_id,
+        const trasEnviar = Modelo.agregar_linea_presupuesto(cr.presupuesto_id,
           { proceso: 'reparar', descripcion: 'Otra cosa', horas_rep: 1 });
+        // Y aprobado tampoco congela: el estado es lo que contestó la compañía.
+        Modelo.cambiar_estado_presupuesto(cr.presupuesto_id, 'aprobado');
+        const trasAprobar = Modelo.actualizar_linea_presupuesto(
+          (db.presupuesto_linea.filter((l) => l.presupuesto_id === cr.presupuesto_id).pop() || {}).id,
+          { horas_rep: 2 });
         const v2 = Modelo.nueva_version_presupuesto(cr.presupuesto_id);
-        /* Hasta el 15-08-2026 esta prueba exigía que la versión nueva tuviera
-           una OR DISTINTA: con el correlativo, la v1 era `-001` y la v2 `-002`.
-           Sacado el correlativo a pedido del cliente, la regla se da vuelta y
-           lo correcto es que la OR sea LA MISMA —es el mismo trabajo, discutido
-           otra vez con la compañía— y que lo que cambie sea la versión. */
-        const p1 = Modelo.base().presupuesto.find((x) => x.id === cr.presupuesto_id) || {};
-        const p2 = Modelo.base().presupuesto.find((x) => x.numero_or === v2.numero_or &&
-                     x.version > (p1.version || 0)) || {};
+
+        /* El límite que queda: con la orden cerrada no se toca nada. Se cierra
+           una orden de verdad y se intenta escribir en su presupuesto. */
+        const cerrada = db.orden_trabajo.find((x) => Reglas.esFinal(db, x.estado) &&
+          db.presupuesto.some((y) => y.ot_id === x.id));
+        const suPresu = cerrada && db.presupuesto.find((y) => y.ot_id === cerrada.id);
+        const enCerrada = suPresu
+          ? Modelo.agregar_linea_presupuesto(suPresu.id, { proceso: 'reparar', descripcion: 'No debería' })
+          : { ok: false, motivo: '(no había ninguna orden cerrada con presupuesto)' };
+
         push({
-          nombre: 'Un presupuesto enviado no se edita: se versiona',
-          intento: 'Agregar una línea al presupuesto ' + cr.numero_or + ' después de enviarlo',
-          esperado: 'Rechazo. La versión nueva se crea, conserva la OR y sube la versión',
-          paso: env.ok && !r.ok && v2.ok &&
-                v2.numero_or === cr.numero_or && (p2.version || 0) > (p1.version || 0),
-          detalle: (r.motivo || 'Dejó editarlo: NO debería.') +
-                   (v2.ok ? '  ·  Versión nueva: ' + v2.numero_or +
-                     ' (v' + (p1.version || '?') + ' → v' + (p2.version || '?') + ')' : '')
+          nombre: '🔴 Un presupuesto enviado SE SIGUE EDITANDO; uno de orden cerrada, no',
+          intento: 'Agregar una línea después de enviarlo, corregir horas después de aprobarlo, ' +
+                   'y escribir en el presupuesto de una orden ya cerrada',
+          esperado: 'Enviado y aprobado dejan editar · la orden cerrada rechaza · la versión nueva sigue existiendo',
+          paso: env.ok && trasEnviar.ok && trasAprobar.ok && !enCerrada.ok &&
+                v2.ok && v2.numero_or === cr.numero_or,
+          detalle: !trasEnviar.ok ? 'Enviado NO dejó editar: ' + trasEnviar.motivo
+            : (!trasAprobar.ok ? 'Aprobado NO dejó editar: ' + trasAprobar.motivo
+              : (enCerrada.ok ? 'Dejó escribir en una orden CERRADA: el vehículo ya se fue'
+                : (!v2.ok ? 'Se perdió «Crear versión nueva»: ya no hay forma de guardar lo que se mandó'
+                  : 'Se edita enviado y aprobado; con la orden cerrada se planta')))
         });
       })();
 

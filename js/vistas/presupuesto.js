@@ -66,10 +66,13 @@ function listaPresupuestos(o) {
     const b = [];
     if (veMontos) b.push('<button class="btn secundario chico" data-pr-pdf="' + esc(pr.id) +
       '" data-pr-ot="' + esc(o.id) + '">' + ico('imprimir') + 'Ver PDF</button>');
-    if (pr.estado === 'borrador') {
+    /* Editar no depende del estado: depende de que la orden esté abierta. Y
+       Enviar sólo tiene sentido mientras no se haya mandado. */
+    if (!o.esFinal) {
       b.push('<button class="btn secundario chico" data-pr-editar="' + esc(pr.id) +
         '" data-pr-ot="' + esc(o.id) + '">' + ico('editar') + 'Editar Presupuesto</button>');
-      b.push('<button class="btn secundario chico" data-pr-enviar="' + esc(pr.id) + '">Enviar</button>');
+      if (pr.estado === 'borrador')
+        b.push('<button class="btn secundario chico" data-pr-enviar="' + esc(pr.id) + '">Enviar</button>');
     }
     if (pr.estado !== 'anulado' && pr.estado !== 'aprobado' && pr.estado !== 'rechazado')
       b.push('<button class="btn secundario chico" data-pr-anular="' + esc(pr.id) + '">Anular</button>');
@@ -312,7 +315,7 @@ function vPresupuestoOT(o) {
           '<button class="chip" data-presu-ver="' + esc(x.id) + '">OR ' + esc(x.numeroOR) +
             (o.presupuestos.filter((y) => y.numeroOR === x.numeroOR).length > 1
               ? ' · v' + x.version : '') + '</button>' +
-          (Modelo.puede('presupuesto.crear') && x.estado === 'borrador'
+          (Modelo.puede('presupuesto.crear') && !o.esFinal
             ? '<button class="quitar-or" data-presu-borrar="' + esc(x.id) +
               '" title="Eliminar el presupuesto de la OR ' + esc(x.numeroOR) +
               '. La OR no se borra.">&times;</button>' : '') +
@@ -813,7 +816,13 @@ function grillaPresupuesto(o, pr, editable, $) {
 
 function vPresupuestoDetalle(o, pr) {
   const p = presuEstado();
-  const editable = pr.estado === 'borrador';
+  /* 🔴 SE EDITA MIENTRAS LA ORDEN ESTÉ ABIERTA (27-08-2026, Marco: «la cuestión
+     se envía pero de que se puede editar, se puede editar»). Decía «sólo en
+     borrador»: enviarlo lo congelaba y había que crear una versión nueva para
+     corregir una coma. Se pregunta al MOTOR y no se repite la condición acá:
+     dos lugares decidiendo lo mismo se despegan, y el que pierde siempre es la
+     pantalla —que deja apretar y después el motor rechaza. */
+  const editable = Reglas.presupuestoEditable(Modelo.base(), { ot_id: o.id, id: pr.id }).ok;
 
   /* Dos niveles de permiso: ve las líneas / ve los montos.
      "Tiene el presupuesto y no puede ver los valores."
@@ -878,9 +887,13 @@ function vPresupuestoDetalle(o, pr) {
 
   ${grillaPresupuesto(o, pr, editable, $)}
 
+  ${/* 🔴 ACÁ IBA «este presupuesto está enviado y no se edita» (27-08-2026).
+       Ya no es cierto: se edita mientras la orden esté abierta. Lo único que
+       corta es que el vehículo se haya ido, y eso lo dice el motor con su
+       propio mensaje cuando alguien lo intenta. */''}
   ${editable ? '' : `
-  <div class="nota">Este presupuesto está <strong>${esc(pr.estado)}</strong> y no se edita.
-  Para cambiarlo se crea una versión nueva: así queda auditable qué se le mandó a la compañía y cuándo.</div>`}
+  <div class="nota">La orden ya está cerrada: el vehículo salió del taller y su
+  presupuesto no se toca.</div>`}
 
   <div class="panel" style="margin-top:11px"><div class="cuerpo">
     <div class="ficha-rejilla">

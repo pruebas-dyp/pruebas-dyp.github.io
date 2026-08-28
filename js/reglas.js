@@ -292,6 +292,36 @@ const Reglas = (function () {
      el vehículo está en casa del cliente esperando la pieza es justamente
      cuando más se reciben repuestos. */
 
+  /* 🔴 ¿SE EDITA ESTE PRESUPUESTO? (27-08-2026, Marco: «lo mismo con el
+     presupuesto, no pasa por aprobación de nadie. La cuestión se envía pero de
+     que se puede editar, se puede editar»).
+
+     Había SEIS candados repartidos por el motor —uno en cada función que
+     escribe— y los seis decían lo mismo: «está enviado y no se edita, hay que
+     crear una versión nueva». Eso es una política de aprobación, y en este
+     taller no existe: se manda el presupuesto por correo, la compañía contesta
+     por teléfono, y se corrige el mismo documento.
+
+     La regla que SÍ manda es la de siempre y no es de aprobación: mientras la
+     ORDEN esté abierta se edita; cerrada la orden —entregada o rechazada— no se
+     toca nada, igual que todo lo demás del sistema.
+
+     ⚠️ LO QUE SE PIERDE, y queda dicho: hasta hoy el sistema podía mostrar
+     EXACTAMENTE lo que se le mandó a la compañía —quedaba congelado y los
+     cambios iban a una versión nueva—. Desde ahora, si alguien corrige un
+     presupuesto ya enviado, el documento cambia y no queda copia de lo
+     anterior. «Crear versión nueva» sigue estando para quien quiera esa foto;
+     ya no es obligatorio. */
+  function presupuestoEditable(db, presupuesto) {
+    if (!presupuesto) return { ok: false, motivo: 'El presupuesto no existe.' };
+    const o = db.orden_trabajo.find((x) => x.id === presupuesto.ot_id);
+    if (!o) return { ok: false, motivo: 'La orden de este presupuesto no existe.' };
+    if (esTerminal(db, o.estado))
+      return { ok: false, motivo: 'La orden ' + o.numero_ot + ' está cerrada: el vehículo ya salió ' +
+        'del taller y su presupuesto no se toca.' };
+    return { ok: true, motivo: '' };
+  }
+
   function puedeCargarRepuesto(db, { ot_id }) {
     const orden = otPorId(db, ot_id);
     if (!orden) return no('La orden de trabajo no existe.');
@@ -756,7 +786,7 @@ const Reglas = (function () {
     etapasAsignadas, etapaAsignada, repuestosPendientes, estadiaAbierta, detencionAbierta,
     tieneRepuestoPendiente, estaFueraDeTaller, alertasDe,
     // reglas
-    puedeCrearOT,
+    puedeCrearOT, presupuestoEditable,
     puedeAsignarEtapa, puedeFinalizarEtapa,
     calcularRelojes,
     puedeRegistrarSalida, puedeRegistrarReingreso,

@@ -2450,8 +2450,8 @@ const Modelo = (function () {
   function fijar_observacion_presupuesto(pid, texto) {
     const p = db.presupuesto.find((x) => x.id === pid);
     if (!p) return { ok: false, motivo: 'El presupuesto no existe.' };
-    if (p.estado !== 'borrador')
-      return { ok: false, motivo: 'El presupuesto ' + p.numero_or + ' está ' + p.estado + ' y no se edita.' };
+    const abierto = Reglas.presupuestoEditable(db, p);
+    if (!abierto.ok) return abierto;
     p.observacion = String(texto == null ? '' : texto);
     tocado();
     return { ok: true, motivo: '' };
@@ -2466,9 +2466,8 @@ const Modelo = (function () {
     if (!l) return { ok: false, motivo: 'La línea no existe.' };
     const p = db.presupuesto.find((x) => x.id === l.presupuesto_id);
     if (!p) return { ok: false, motivo: 'El presupuesto no existe.' };
-    if (p.estado !== 'borrador')
-      return { ok: false, motivo: 'El presupuesto ' + p.numero_or + ' está ' + p.estado +
-        ' y no se edita. Para cambiarlo hay que crear una versión nueva.' };
+    const abierto = Reglas.presupuestoEditable(db, p);
+    if (!abierto.ok) return abierto;
 
     /* Las horas llegan como TEXTO y con COMA: «1,20» es como se escribe una
        hora en Chile y como viene en el documento real. `Number("1,20")` da
@@ -2571,10 +2570,8 @@ const Modelo = (function () {
   function agregar_linea_presupuesto(pid, linea) {
     const p = db.presupuesto.find((x) => x.id === pid);
     if (!p) return { ok: false, motivo: 'El presupuesto no existe.' };
-    if (p.estado !== 'borrador')
-      return { ok: false, motivo: 'El presupuesto ' + p.numero_or + ' está ' + p.estado +
-        ' y no se edita. Para cambiarlo hay que crear una versión nueva — así queda auditable ' +
-        'la discusión con la compañía.' };
+    const abierto = Reglas.presupuestoEditable(db, p);
+    if (!abierto.ok) return abierto;
     if (!linea.descripcion || !String(linea.descripcion).trim())
       return { ok: false, motivo: 'La línea necesita descripción.' };
     if (!['cambio', 'reparar', 'externo'].includes(linea.proceso))
@@ -2644,10 +2641,8 @@ const Modelo = (function () {
   function agregar_fila_presupuesto(pid, bloque, fila = {}) {
     const p = db.presupuesto.find((x) => x.id === pid);
     if (!p) return { ok: false, motivo: 'El presupuesto no existe.' };
-    if (p.estado !== 'borrador')
-      return { ok: false, motivo: 'El presupuesto ' + p.numero_or + ' está ' + p.estado +
-        ' y no se edita. Para cambiarlo hay que crear una versión nueva — así queda auditable ' +
-        'la discusión con la compañía.' };
+    const abierto = Reglas.presupuestoEditable(db, p);
+    if (!abierto.ok) return abierto;
     if (bloque !== 'repuesto' && bloque !== 'externo')
       return { ok: false, motivo: 'Ese bloque no existe: es repuesto o externo.' };
 
@@ -2779,8 +2774,8 @@ const Modelo = (function () {
       db.presupuesto_linea = db.presupuesto_linea.filter((x) => x.id !== gemela.id);
     }
     const p = db.presupuesto.find((x) => x.id === l.presupuesto_id);
-    if (p && p.estado !== 'borrador')
-      return { ok: false, motivo: 'El presupuesto ya no está en borrador: no se edita.' };
+    const abierto = Reglas.presupuestoEditable(db, p);
+    if (!abierto.ok) return abierto;
 
     /* La pieza se va con su línea. Pero si YA LLEGÓ a bodega, no: está en el
        taller, alguien la recibió y la firmó. Borrar la línea la haría
@@ -2806,9 +2801,8 @@ const Modelo = (function () {
   function eliminar_presupuesto(pid) {
     const p = db.presupuesto.find((x) => x.id === pid);
     if (!p) return { ok: false, motivo: 'El presupuesto no existe.' };
-    if (p.estado !== 'borrador')
-      return { ok: false, motivo: 'La OR ' + p.numero_or + ' está ' + p.estado +
-        '. Un presupuesto que ya salió del taller no se borra: se anula o se versiona.' };
+    const abierto = Reglas.presupuestoEditable(db, p);
+    if (!abierto.ok) return abierto;
     /* 🔴 ESTO MIRABA `r.presupuesto_id` Y ESE CAMPO NO EXISTE EN `repuesto`
        (27-08-2026). La tabla guarda `presupuesto_linea_id`, no el presupuesto:
        la comprobación daba `false` siempre y el guardia no guardaba nada. Se
@@ -2831,11 +2825,22 @@ const Modelo = (function () {
     const p = db.presupuesto.find((x) => x.id === pid);
     if (!p) return { ok: false, motivo: 'El presupuesto no existe.' };
     if (!ESTADOS_PRESU.includes(estado)) return { ok: false, motivo: 'Ese estado no existe.' };
-    if (p.estado === estado)
+    /* 🔴 REENVIAR SÍ SE PUEDE (27-08-2026). Desde que un presupuesto enviado
+       se sigue editando, el camino normal es: se manda, la compañía objeta, se
+       corrige y SE VUELVE A MANDAR. Con este candado el botón «Enviar a la
+       compañía» quedaba a la vista y contestaba «ya está enviado» — un botón
+       que no puede hacer lo que dice. Se vuelve a estampar la fecha y se
+       vuelve a avisar, que es lo que de verdad pasó. */
+    if (p.estado === estado && estado !== 'enviado')
       return { ok: false, motivo: 'El presupuesto ' + p.numero_or + ' ya está ' + estado + '.' };
-    if (['aprobado', 'rechazado'].includes(p.estado))
-      return { ok: false, motivo: 'El presupuesto ' + p.numero_or + ' ya está ' + p.estado +
-        '. Para cambiarlo se crea una versión nueva.' };
+    /* 🔴 UN ESTADO YA PUESTO SE PUEDE CORREGIR (27-08-2026). Acá se
+       bloqueaba pasar de aprobado o rechazado a cualquier otra cosa: «para
+       cambiarlo se crea una versión nueva». Es la misma política de aprobación
+       que Marco sacó: el estado es lo que contestó la compañía, y una
+       contestación se anota mal y se corrige. Lo que SÍ sigue mandando es que
+       la orden esté abierta. */
+    const abiertoEst = Reglas.presupuestoEditable(db, p);
+    if (!abiertoEst.ok) return abiertoEst;
     if (estado === 'enviado' && !db.presupuesto_linea.some((l) => l.presupuesto_id === pid))
       return { ok: false, motivo: 'No se envía un presupuesto sin líneas.' };
     p.estado = estado;
