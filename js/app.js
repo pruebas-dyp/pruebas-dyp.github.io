@@ -808,35 +808,94 @@ montarLateral();
   const vv = typeof window !== 'undefined' ? window.visualViewport : null;
   if (!vv || !document.documentElement) return;
   const raiz = document.documentElement;
-  let ultimo = 0;
+
+  /* 🔴 `window.innerHeight` NO SIRVE DE REFERENCIA (28-08-2026).
+
+     Acá decía `alto < window.innerHeight - 120`, dando por hecho que la ventana
+     se queda del alto completo y sólo el viewport visual se encoge. En el
+     Safari de iPhone de hoy **`innerHeight` TAMBIÉN se encoge con el teclado**:
+     la resta daba casi cero, la condición nunca se cumplía y `con-teclado` no
+     se ponía nunca.
+
+     Recepción parecía sana y las demás no, y eso despistó: el CSS de
+     `con-teclado` es global, no es de Recepción. Lo que pasa es que Recepción
+     lleva menos cosas encima —no tiene barra de herramientas— y le alcanzaba
+     igual. Presupuesto, Taller e Histórico no.
+
+     Ahora la referencia es el alto medido CON EL TECLADO ABAJO, que es lo único
+     que no depende de lo que el navegador decida informar. */
+  let base = 0;
+  let hayFoco = false;
+
+  const esCampo = (el) => !!el && !!el.tagName && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName);
+  /* El foco solo cuenta como «hay teclado» donde se escribe con el dedo. En un
+     computador uno hace clic en un campo y NO aparece ningún teclado: esconder
+     el menú ahí sería un salto sin motivo. Misma prueba que usa Recepción. */
+  const tactil = () => {
+    try { return window.matchMedia('(pointer: coarse)').matches; } catch (e) { return false; }
+  };
 
   const medir = () => {
     const alto = Math.round(vv.height);
-    if (alto === ultimo) return;
-    ultimo = alto;
+
+    /* 🔴 UNA MEDIDA ABSURDA COLAPSA LA PANTALLA ENTERA (28-08-2026).
+
+       `--alto-visible` manda sobre `100dvh` en `.app`. Así que si acá se
+       escribe un cero, `.app` mide CERO y la pantalla queda en blanco. Y
+       `visualViewport.height` SÍ devuelve cero o casi: mientras el teclado se
+       anima, cuando la pestaña pasa a segundo plano, y al rotar el aparato.
+
+       Medido en el navegador con la pantalla emulada a 375 px: la variable
+       quedaba en `0px` y `.app` en 0 px de alto, con la ventana en 812. Es el
+       hueco gris que aparecía debajo del formulario en el iPhone.
+
+       Una medida menor a 200 px no es un teclado: es el navegador contestando
+       cualquier cosa. Se descarta y queda la anterior, que es la buena. */
+    if (alto < 200) return;
+
     raiz.style.setProperty('--alto-visible', alto + 'px');
-    /* «Hay teclado» es que la ventana visible se encogió de golpe. El margen de
-       120 px deja fuera la barra del navegador, que aparece y desaparece sola
-       al desplazar y no es un teclado. */
-    raiz.classList.toggle('con-teclado', alto < window.innerHeight - 120);
+    // Sin foco en un campo, lo que se ve es el alto de reposo: sirve de patrón.
+    // Se guarda el mayor porque la barra del navegador entra y sale sola.
+    if (!hayFoco) base = Math.max(base, alto);
+    const encogio = base > 0 && alto < base - 120;
+    /* Dos señales, y basta una. La medida sola falla cuando el navegador miente
+       sobre el alto; el foco solo falla con un teclado externo conectado. Juntas
+       cubren las dos. */
+    raiz.classList.toggle('con-teclado', encogio || (hayFoco && tactil()));
   };
 
   vv.addEventListener('resize', medir);
   vv.addEventListener('scroll', medir);
+  /* Al volver de otra pestaña o de bloquear el teléfono hay que remedir: es
+     justo cuando el navegador venía contestando cualquier cosa y la medida
+     guardada puede haber quedado vieja. */
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) medir(); });
+  window.addEventListener('orientationchange', () => setTimeout(medir, 300));
   medir();
 
   document.addEventListener('focusin', (ev) => {
+    if (!esCampo(ev.target)) return;
+    hayFoco = true;
+    medir();
     const el = ev.target;
-    if (!el || !el.tagName) return;
-    if (!/^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName)) return;
     setTimeout(() => {
-      // Si el teclado no subió —computador, o un desplegable nativo— no se mueve
-      // nada: correr la pantalla sin motivo es peor que no hacerlo.
       if (!raiz.classList.contains('con-teclado')) return;
       if (typeof el.scrollIntoView === 'function') {
         el.scrollIntoView({ block: 'center', behavior: 'smooth' });
       }
     }, 300);
+  });
+
+  /* Al salir de un campo se espera un latido antes de dar por cerrado el
+     teclado: pasar de un campo al siguiente dispara `focusout` y `focusin`
+     pegados, y sin la espera el menú aparecería y desaparecería en cada salto. */
+  document.addEventListener('focusout', (ev) => {
+    if (!esCampo(ev.target)) return;
+    setTimeout(() => {
+      if (esCampo(document.activeElement)) return;   // se fue a otro campo
+      hayFoco = false;
+      medir();
+    }, 150);
   });
 })();
 

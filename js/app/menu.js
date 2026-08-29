@@ -367,7 +367,19 @@ function pintarShell() {
     '<button class="hbtn der" type="button" data-hacc="demostracion" ' +
     'title="Las herramientas de la demostración: la guía, las pruebas y el calendario">' +
     ico('base') + 'Datos de demostración</button>';
-  h.style.display = 'flex';
+
+  /* 🔴 ACÁ HABÍA UN `h.style.display = 'flex'` (28-08-2026, quitado).
+
+     Era redundante —el elemento nace limpio en el index y `.herramientas` ya
+     es `display: flex` en el CSS— y además hacía daño: un estilo EN LÍNEA le
+     gana a cualquier regla de hoja, así que la regla que esconde la barra con
+     el teclado arriba (`:root.con-teclado .herramientas`) no tenía efecto.
+
+     Marco, con una foto de su iPhone en Presupuesto: se escondían el menú y la
+     barra de estado, pero la barra de herramientas seguía ahí comiéndose
+     49 px justo cuando quedaban 101 para escribir. Nada la volvía a mostrar por
+     JavaScript, así que sacarla no apaga nada: la barra sigue apareciendo por
+     CSS como siempre. */
 
   h.querySelectorAll('[data-hacc]').forEach((b) =>
     b.addEventListener('click', () => accionModulo(b.dataset.hacc)));
