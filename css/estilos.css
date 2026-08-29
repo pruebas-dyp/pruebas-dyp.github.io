@@ -156,6 +156,40 @@ svg.ico.g { width: 16px; height: 16px; flex-basis: 16px; }
    reservarla ahí son 34 px de pantalla regalados justo cuando menos sobra. */
 :root.con-teclado .app { padding-bottom: 0; }
 
+/* 🔴 CON EL TECLADO ARRIBA, LA PANTALLA ES PARA EL FORMULARIO (28-08-2026).
+
+   Marco, con dos fotos de su iPhone: «aprieto un campo donde voy a escribir y
+   me desaparece lo que tengo que ir escribiendo... me aparece solamente el
+   teclado y no me permite saber dónde estoy escribiendo o qué estoy
+   escribiendo».
+
+   Medido a 390 px con el teclado abierto —340 px de ventana visible—:
+
+     barra superior      52 px
+     tira de módulos     63
+     cabecera del módulo 51
+     herramientas        49
+     barra de estado     24
+     ────────────────────────
+     decoración         239 px  →  quedaban 101 px de formulario
+
+   Ciento un píxeles: un campo, sin su rótulo, sin el de arriba y sin el de
+   abajo. Escribir a ciegas.
+
+   Mientras se escribe, NADA de eso hace falta: no se navega a otro módulo, no
+   se mira la ruta y no se aprieta la barra de herramientas. Se esconden los
+   cinco y los 340 px van enteros al formulario. Vuelven solos al cerrar el
+   teclado, porque la clase se quita sola.
+
+   ⚠️ Es un escondite TEMPORAL y por eso no rompe la regla de la casa de «ningún
+   botón muerto»: no se apaga nada ni se quita ninguna función —basta cerrar el
+   teclado, que es lo que uno hace igual antes de apretar Siguiente—. */
+:root.con-teclado .barra-menu,
+:root.con-teclado .sidebar,
+:root.con-teclado .cab-modulo,
+:root.con-teclado .herramientas,
+:root.con-teclado .barra-estado { display: none; }
+
 /* Safari infla la letra por su cuenta al acostar el teléfono —«text
    autosizing»— y después no la devuelve: el mismo panel se ve con dos tamaños
    según cómo se tomó el aparato. */
@@ -2749,3 +2783,56 @@ table.grid td.abre-ot:hover { text-decoration: underline; }
      pasar de largo. */
   .chips > .chip { flex: 0 0 auto; white-space: nowrap; }
 }
+
+
+/* ═════ LA PANTALLA DEL TELÉFONO, MÁS APRETADA (28-08-2026) ════════════════
+   Marco: «la visual dentro del celular es muy grande, por lo tanto ellos tienen
+   que estar arrastrándose continuamente... la idea es que fuera un poco más
+   simple, quizás un poco más chico».
+
+   Medido a 390 px en el editor de la OR: 2.765 px de alto para una pantalla de
+   605. Los que más pesaban:
+
+     la tira del tempario   252 px   (tres tarjetas, una debajo de otra)
+     cada bloque del ppto   ~270
+     agregar línea          161
+     la cabecera del panel    98
+     cada campo               82     (rótulo 15 + casilla 40 + ayuda 15 + 8 de aire)
+
+   Lo que NO se toca: el alto de las casillas y los desplegables —siguen en 40 px
+   y 16 de letra—, porque ahí va el dedo y ahí iOS hace zoom. Lo que se aprieta
+   es el AIRE alrededor, que es lo que sobra. Va al final del archivo por lo de
+   siempre: gana la última de igual especificidad. */
+@media (max-width: 620px) {
+  /* La tira del tempario en dos columnas: son tres datos cortos, no tres
+     párrafos. De 252 px a la mitad. */
+  .tira-tempario { grid-template-columns: 1fr 1fr; }
+  .tira-tempario .celda { padding: 8px 11px; }
+  .tira-tempario .val { font-size: 15px; }
+  /* La primera celda —el tempario— se queda con la fila entera: es el número
+     del que salen los otros dos. */
+  .tira-tempario .celda:first-child { grid-column: 1 / -1; }
+
+  /* El aire entre campos y el de los bloques. */
+  .rejilla-campos { gap: 6px; }
+  .campo .ayuda { font-size: 10px; line-height: 1.25; }
+  fieldset.bloque { padding: 8px 10px 10px; margin-bottom: 10px; }
+  .bloque-presu { margin-bottom: 10px; }
+
+  /* La cabecera del panel: el título se queda, la explicación de abajo no. En
+     una pantalla de 390 px esa línea cuesta lo mismo que un campo entero, y lo
+     que dice —«Las 17 columnas del sistema actual»— no se necesita para
+     trabajar. En el computador sigue estando. */
+  .panel > .cab .desc { display: none; }
+  .panel > .cab { padding: 7px 11px; }
+  .panel > .cab h2 { font-size: 12px; }
+}
+
+/* Y con el TECLADO arriba se aprieta un paso más: ahí cada píxel es una línea
+   del formulario que se ve o no se ve. Se va también el título del panel —en
+   medio de escribir, «NUEVO INGRESO» no aporta— y se quedan los chips, que
+   dicen en qué paso se está. */
+:root.con-teclado .panel > .cab h2,
+:root.con-teclado .panel > .cab .desc { display: none; }
+:root.con-teclado .panel > .cab { padding: 0; border: none; }
+:root.con-teclado .contenido { padding-top: 6px; }

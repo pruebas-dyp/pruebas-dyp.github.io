@@ -172,8 +172,9 @@ function recOrdenes() {
         '<input type="number" data-blq="' + i + '" data-campo="deducible" value="' + esc(b.deducible) + '">') : '';
 
     const deEmpresa = t.exige_or
-      ? texto(i, b, 'numero_or', 'N° de OR',
-          'El que trae el cliente corporativo — pregunta abierta 2', true)
+      ? texto(i, b, 'numero_or', 'N° de OR de la empresa',
+          'El número del cliente corporativo, para SU trazabilidad. La OR del ' +
+          'taller la genera el sistema sola al ingresar el vehículo.', true)
       : '';
 
     return `
@@ -476,7 +477,7 @@ function recVerificar() {
           ${t && t.exige_compania ? d('Compañía', nom('compania', b.compania_id)) : ''}
           ${t && t.exige_compania ? d('N° de siniestro', v(b.siniestro)) : ''}
           ${t && t.exige_compania ? d('Deducible neto', String(b.deducible).trim() ? fMonto(Number(b.deducible)) : nada) : ''}
-          ${t && t.exige_or ? d('N° de OR', v(b.numero_or)) : ''}
+          ${t && t.exige_or ? d('N° de OR de la empresa', v(b.numero_or)) : ''}
         </div>
         <div>
           ${d('Prioridad', nom('prioridad', b.prioridad_id))}

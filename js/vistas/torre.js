@@ -311,7 +311,11 @@ function filaTorre(o) {
 function detalleOT(o) {
   const e = o.etapa ? etapaPorCodigo(o.etapa) : null;
   const pend = o.repuestos.filter((r) => !r.fechaBodega);
-  const dato = (k, v) => '<div class="dato"><span class="k">' + esc(k) + '</span><span class="v">' + v + '</span></div>';
+  /* La ayuda va como `title` sobre el rótulo, igual que en la ficha: el globo
+     explica QUÉ mide el campo sin gastarle una línea a la pantalla. */
+  const dato = (k, v, ayuda) => '<div class="dato"><span class="k"' +
+    (ayuda ? ' title="' + esc(ayuda) + '"' : '') + '>' + esc(k) + '</span>' +
+    '<span class="v">' + v + '</span></div>';
   const fuera = o.fueraDeTaller;
 
   const hitos = ETAPAS.map((et) => {
@@ -350,11 +354,23 @@ function detalleOT(o) {
         : '<span class="et verde">En taller</span>') +
       (e ? dato('Etapa actual', '<i class="punto" style="background:' + e.color + '"></i>' + esc(e.nombre))
          : dato('Etapa actual', '<span class="et gris">Sin asignar</span>')) +
-      dato('Días desde el ingreso', '<strong>' + o.diasTotales + '</strong> · nunca se reinicia') +
-      dato('Reparación acumulada', o.diasReparacion + ' · se reanuda al reingresar') +
+      /* 🔴 DÍAS, NO UNA EXPLICACIÓN (28-08-2026, Marco: «los campos de tres
+         relojes, eso que dice nunca se reinicia, se reanuda al reingresar...
+         debiésemos transformarlo a días, como lo hicimos en la ficha de la OT.
+         No quiero que el sistema se vea como que le habla a la persona, sino
+         que sea dato»).
+
+         Es el mismo cambio que ya se hizo en la ficha: al lado de un número va
+         su unidad, no una frase que explica cómo funciona el contador. Lo que
+         cada reloj significa se distingue por su RÓTULO —«desde el ingreso»,
+         «acumulada», «actual»—, que es donde corresponde decirlo. */
+      dato('Días desde el ingreso', '<strong>' + dias(o.diasTotales) + '</strong>',
+        'Desde que entró el vehículo. No se reinicia nunca.') +
+      dato('Reparación acumulada', dias(o.diasReparacion),
+        'Suma de los tramos en taller. Se reanuda si el vehículo reingresa.') +
       dato('Estadía actual', fuera
         ? '<span style="color:var(--gris)">0 · detenido</span>'
-        : o.diasEstadiaActual + ' · vuelve a cero al reingresar') +
+        : dias(o.diasEstadiaActual), 'El tramo en curso. Vuelve a cero si el vehículo reingresa.') +
       dato('Contra la meta', o.sobreMeta
         ? '<span style="color:var(--ambar)">' + o.diasKpi + ' de ' + META_DIAS_REPARACION + ' · sobre la meta</span>'
         : o.diasKpi + ' de ' + META_DIAS_REPARACION) +

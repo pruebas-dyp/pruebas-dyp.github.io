@@ -1185,13 +1185,21 @@ const Modelo = (function () {
              comparten la silueta pero no la descripción del daño. */
           descripcion_danos: b.descripcion_danos || '',
           descripcion_estado: b.descripcion_estado || '',
-          /* ⚠️ LA OR EXTERNA DE LAS ÓRDENES DE EMPRESA. Va en su propia columna
-             y NO alimenta `presupuesto.numero_or`, que es la OR compuesta
-             `<OT>-<reparación>-<NNN>` que genera el presupuesto. Es una
-             pregunta abierta: si resulta que la OR de empresa es un número del
-             cliente corporativo, esta columna es la respuesta; si resulta que
-             es la misma OR del taller, hay que rehacer el modelo, y para eso
-             primero hay que preguntar. */
+          /* 🟢 LA OR EXTERNA DE LAS ÓRDENES DE EMPRESA — PREGUNTA CONTESTADA
+             (28-08-2026, Marco): «cuando ellos ingresan la OR, esa no es la OR
+             que debe quedar. La OR igual debe quedar por nosotros; esa es
+             solamente la OR de trazabilidad de la empresa, que es la
+             contraparte».
+
+             O sea: es un número del cliente corporativo y vive en su propia
+             columna, como estaba. El modelo era el correcto; lo que estaba mal
+             era el RÓTULO del campo, que decía «N° de OR» a secas y hacía
+             pensar que reemplazaba a la nuestra. Ahora dice «N° de OR de la
+             empresa» y lo explica.
+
+             La OR del taller la genera `Reglas.siguienteNumeroOR` unas líneas
+             más arriba, al crear la orden, y no depende de lo que se escriba
+             acá. */
           or_externa: b.numero_or || null,
           observaciones_ingreso: b.observaciones || '', demo: !!ficha.demo
         });

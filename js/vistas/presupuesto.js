@@ -630,7 +630,7 @@ function grillaPresupuesto(o, pr, editable, $) {
     <div class="rot"><span class="desc">Descripción</span><span class="op">OP</span><span></span></div>
     <div class="fila">
       <input id="l-desc" value="${esc(p.linea.descripcion)}"
-        placeholder="Tal como se escribe: «neumatico sailun terramax sv301 235/55R19 delantero derecho»">
+        placeholder="Qué se hace y sobre qué pieza: «cambio parachoques delantero», «reparar puerta trasera izquierda», «pintura capó»">
       <select id="l-op">
         <option value="">Seleccione</option>
         ${PROCESOS.map((x) => '<option value="' + x.codigo + '"' +

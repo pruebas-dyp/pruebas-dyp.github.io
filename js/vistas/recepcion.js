@@ -248,7 +248,7 @@ function recFaltantesBloque(b, i) {
   if (t.exige_compania && !String(b.siniestro || '').trim())
     faltan.push({ rot: 'El N° de siniestro' + n, paso: 'ordenes', campo: marca('siniestro') });
   if (t.exige_or && !String(b.numero_or || '').trim())
-    faltan.push({ rot: 'El N° de OR' + n, paso: 'ordenes', campo: marca('numero_or') });
+    faltan.push({ rot: 'El N° de OR de la empresa' + n, paso: 'ordenes', campo: marca('numero_or') });
   return faltan;
 }
 
