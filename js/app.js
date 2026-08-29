@@ -824,8 +824,14 @@ montarLateral();
 
      Ahora la referencia es el alto medido CON EL TECLADO ABAJO, que es lo único
      que no depende de lo que el navegador decida informar. */
-  let base = 0;
+  /* La referencia arranca con el alto de la ventana al cargar, cuando todavía
+     no hay teclado posible. Si empezara en cero y las primeras medidas fueran
+     basura —pasa: pestaña en segundo plano, pantalla que aún no compone—, la
+     referencia no se establecería NUNCA y el escondite quedaría muerto para
+     siempre. Comprobado en el sitio publicado. */
+  let base = Math.round(window.innerHeight) || 0;
   let hayFoco = false;
+  let encogio = false;   // el último veredicto de la medida, que se recuerda
 
   const esCampo = (el) => !!el && !!el.tagName && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName);
   /* El foco solo cuenta como «hay teclado» donde se escribe con el dedo. En un
@@ -850,14 +856,23 @@ montarLateral();
        hueco gris que aparecía debajo del formulario en el iPhone.
 
        Una medida menor a 200 px no es un teclado: es el navegador contestando
-       cualquier cosa. Se descarta y queda la anterior, que es la buena. */
-    if (alto < 200) return;
+       cualquier cosa. No se escribe y queda la anterior, que es la buena.
 
-    raiz.style.setProperty('--alto-visible', alto + 'px');
-    // Sin foco en un campo, lo que se ve es el alto de reposo: sirve de patrón.
-    // Se guarda el mayor porque la barra del navegador entra y sale sola.
-    if (!hayFoco) base = Math.max(base, alto);
-    const encogio = base > 0 && alto < base - 120;
+       Pero OJO: sólo se descarta la MEDIDA, no el resto de la función. Si acá
+       hubiera un `return`, una medida basura dejaría el escondite sin evaluar
+       —y con él, la señal del foco, que no depende de ninguna medida—. */
+    const sana = alto >= 200;
+    if (sana) {
+      raiz.style.setProperty('--alto-visible', alto + 'px');
+      // Sin foco en un campo, lo que se ve es el alto de reposo: sirve de
+      // patrón. Se guarda el mayor porque la barra del navegador entra y sale.
+      if (!hayFoco) base = Math.max(base, alto);
+      /* El veredicto se recuerda. Si la próxima medida viene en basura, se
+         queda éste: si no, una lectura mala con el teclado ARRIBA devolvía las
+         cinco barras de golpe y volvían a irse en la siguiente. Un parpadeo
+         encima del campo que se está escribiendo. */
+      encogio = base > 0 && alto < base - 120;
+    }
     /* Dos señales, y basta una. La medida sola falla cuando el navegador miente
        sobre el alto; el foco solo falla con un teclado externo conectado. Juntas
        cubren las dos. */
