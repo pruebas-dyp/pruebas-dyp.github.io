@@ -836,7 +836,26 @@ function fichaFotos(o) {
     <div class="cab"><div><h2>${ico('camara', 'g')}Recepción N° ${o.numeroOT}</h2>
       <div class="desc">Las fotos van por etapa, no solo al ingreso</div></div>
       ${res.cantidad ? '<span class="et gris">' + plural(res.cantidad, 'foto', 'fotos') + ' · ' +
-        Media.fPeso(res.bytesOriginal) + ' → ' + Media.fPeso(res.bytes) + '</span>' : ''}</div>
+        Media.fPeso(res.bytesOriginal) + ' → ' + Media.fPeso(res.bytes) + '</span>' : ''}
+      ${/* 🔴 SI SE VEN DESDE OTRO APARATO (28-08-2026, Marco: «cuando subo una
+            foto del celular no queda incrustada cuando la veo del computador»).
+
+            Desde hoy una copia liviana de cada foto viaja en la sala compartida
+            y el otro aparato la rearma al mirarla. La que NO alcanzó a viajar
+            —porque la bodega llegó a su tope— existe igual, pero sólo donde se
+            tomó. Acá se dice cuál es el caso, en la cabecera, que es donde Marco
+            estaba mirando cuando lo reportó. */''}
+      ${(function () {
+        const c = Media.viajan(todas.filter((m) => m.momento !== 'firma'));
+        if (!c.total) return '';
+        return c.viajan === c.total
+          ? '<span class="et verde" title="Una copia liviana de cada una viaja en la sala ' +
+            'compartida: se ven y se descargan desde el computador, el celular o la tablet.">' +
+            'se ven en los otros aparatos</span>'
+          : '<span class="et ambar" title="La copia que viaja tiene un tope de tamaño. Las que ' +
+            'no alcanzaron siguen guardadas en el aparato donde se tomaron.">' +
+            c.viajan + ' de ' + c.total + ' se ven en los otros aparatos</span>';
+      })()}</div>
     <div class="cuerpo">
       ${Modelo.puede('foto.cargar') ? `
       <fieldset class="bloque" style="margin-bottom:12px">

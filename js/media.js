@@ -126,7 +126,11 @@ const Media = (function () {
   function guardar(archivo, ficha) {
     return comprimir(archivo).then((r) => {
       const id = 'me-' + Date.now().toString(36) + '-' + Math.round(performance.now() * 1000).toString(36);
-      return conAlmacen('readwrite', (st) => st.put(r.blob, id)).then(() => ({
+      return conAlmacen('readwrite', (st) => st.put(r.blob, id))
+        // La copia liviana sale hacia la sala en cuanto el archivo está seguro
+        // acá. Si falla, la foto igual quedó guardada: ver `mandarALaSala`.
+        .then(() => mandarALaSala(id, r.blob))
+        .then(() => ({
         id,
         ot_id: (ficha && ficha.ot_id) || null,
         recepcion_id: (ficha && ficha.recepcion_id) || null,
@@ -172,7 +176,9 @@ const Media = (function () {
      pesa unos pocos KB: no se comprime). */
   function guardarBlob(blob, ficha) {
     const id = 'me-' + Date.now().toString(36) + '-' + Math.round(performance.now() * 1000).toString(36);
-    return conAlmacen('readwrite', (st) => st.put(blob, id)).then(() => ({
+    return conAlmacen('readwrite', (st) => st.put(blob, id))
+      .then(() => mandarALaSala(id, blob))
+      .then(() => ({
       id,
       ot_id: (ficha && ficha.ot_id) || null,
       recepcion_id: (ficha && ficha.recepcion_id) || null,
@@ -185,7 +191,89 @@ const Media = (function () {
     }));
   }
 
-  const obtener = (id) => conAlmacen('readonly', (st) => st.get(id));
+  /* ═════ LA COPIA QUE VIAJA ══════════════════════════════════════
+     28-08-2026. Los bytes viven en IndexedDB, que es de este navegador y de
+     este aparato. La foto que se saca en el teléfono no existía para el
+     computador: la ficha viajaba por la sala, el archivo no, y la pantalla
+     escribía «la imagen no está en este navegador».
+
+     Acá se arma una copia LIVIANA —1.000 px de lado largo— y se la entrega al
+     modelo, que la lleva dentro de su documento. Ver el bloque largo en
+     `modelo.js`, junto a `guardar_media_sala`, para el porqué del tamaño y del
+     tope.
+
+     La copia se hace sobre el archivo YA COMPRIMIDO, no sobre el original: el
+     original de un teléfono son 3 o 4 MB y volver a leerlo entero para achicarlo
+     otra vez es trabajo al pedo. */
+  const LADO_SALA = 1000;
+  const CALIDAD_SALA = 0.62;
+
+  function copiaParaLaSala(blob) {
+    return new Promise((resolver) => {
+      if (!/^image\//.test(blob.type)) return resolver(null);   // un PDF no se achica
+      const u = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onerror = () => { URL.revokeObjectURL(u); resolver(null); };
+      img.onload = () => {
+        URL.revokeObjectURL(u);
+        const escala = Math.min(1, LADO_SALA / Math.max(img.width, img.height));
+        const w = Math.round(img.width * escala), h = Math.round(img.height * escala);
+        const lienzo = document.createElement('canvas');
+        lienzo.width = w; lienzo.height = h;
+        const ctx = lienzo.getContext('2d');
+        ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, 0, 0, w, h);
+        lienzo.toBlob((chico) => resolver(chico || null), 'image/jpeg', CALIDAD_SALA);
+      };
+      img.src = u;
+    });
+  }
+
+  const aBase64 = (blob) => new Promise((resolver) => {
+    const fr = new FileReader();
+    fr.onload = () => { const t = String(fr.result); resolver(t.slice(t.indexOf(',') + 1)); };
+    fr.onerror = () => resolver(null);
+    fr.readAsDataURL(blob);
+  });
+
+  function deBase64(b64, mime) {
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: mime || 'image/jpeg' });
+  }
+
+  /* Deja la copia en el documento del modelo. Falla en silencio a propósito: si
+     no se puede —no hay `Modelo`, se pasó del tope— la foto igual quedó guardada
+     acá, que es lo que importa. Lo único que se pierde es que la vean los otros
+     aparatos, y eso lo dice la pantalla de Fotografías. */
+  function mandarALaSala(id, blob) {
+    return copiaParaLaSala(blob).then((chico) => {
+      if (!chico) return null;
+      return aBase64(chico).then((b64) => {
+        if (!b64) return null;
+        try { return Modelo.guardar_media_sala(id, chico.type, b64, chico.size); }
+        catch (e) { return null; }
+      });
+    }).catch(() => null);
+  }
+
+  /* 🔴 PRIMERO ACÁ, DESPUÉS LA SALA. Si el archivo no está en este navegador
+     pero sí viajó en el documento, se rearma, se guarda acá —para no rearmarlo
+     en cada pintada— y se devuelve. La primera vez cuesta unos milisegundos;
+     de ahí en adelante es igual de rápido que una foto propia. */
+  function obtener(id) {
+    return conAlmacen('readonly', (st) => st.get(id)).then((blob) => {
+      if (blob) return blob;
+      let fila = null;
+      try { fila = Modelo.mediaSala(id); } catch (e) { fila = null; }
+      if (!fila || !fila.b64) return null;
+      let rearmado;
+      try { rearmado = deBase64(fila.b64, fila.mime); } catch (e) { return null; }
+      return conAlmacen('readwrite', (st) => st.put(rearmado, id))
+        .then(() => rearmado).catch(() => rearmado);
+    });
+  }
 
   /* Devuelve una URL utilizable en un <img>. Quien la pide se hace cargo de
      revocarla: si no, cada repintado filtra memoria. */
@@ -202,7 +290,17 @@ const Media = (function () {
     nodos.forEach((img) => {
       img.dataset.mediaListo = '1';
       url(img.dataset.media).then((u) => {
-        if (!u) { img.alt = 'La imagen no está en este navegador'; return; }
+        if (!u) {
+          /* Ya no basta con decir «no está acá»: desde hoy las fotos viajan, así
+             que si no llegó es porque su copia se pasó del tope de la sala o
+             porque se subió antes de que esto existiera. Se dice cuál de las
+             dos, y dónde sí está. */
+          img.alt = 'La foto está en el aparato donde se tomó. Su copia no viajó ' +
+            'por la sala compartida — se pasó del tope, o se subió antes de que ' +
+            'las fotos viajaran.';
+          img.classList.add('sin-copia');
+          return;
+        }
         img.src = u;
         // Se revoca cuando el nodo deja el documento.
         img.addEventListener('load', () => setTimeout(() => URL.revokeObjectURL(u), 60000), { once: true });
@@ -357,7 +455,17 @@ const Media = (function () {
     return conAlmacen('readwrite', (st) => st.clear());
   }
 
-  return { guardar, guardarBlob, subir, obtener, url, eliminar, pintar, resumen, fPeso, vaciar,
+  /* Cuántas de las fotos de esta lista se ven en los DEMÁS aparatos. Es lo que
+     la pantalla de Fotografías necesita para no prometer de más. */
+  function viajan(fichas) {
+    let si = 0;
+    (fichas || []).forEach((f) => {
+      try { if (Modelo.mediaSala(f.id)) si++; } catch (e) { /* sin modelo */ }
+    });
+    return { viajan: si, total: (fichas || []).length };
+  }
+
+  return { guardar, guardarBlob, subir, obtener, url, eliminar, pintar, resumen, fPeso, vaciar, viajan,
     empaquetar, bajarCarpeta,
            ladoMax, objetivoBytes, comprimeSiempre };
 })();

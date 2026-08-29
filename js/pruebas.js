@@ -2218,6 +2218,59 @@ const Pruebas = (function () {
         });
       })();
 
+      /* 🔴 LA COPIA DE UNA FOTO VIAJA EN EL DOCUMENTO (28-08-2026).
+
+         Marco: «cuando subo una foto del celular no queda incrustada cuando la
+         veo del computador». Los bytes viven en IndexedDB, que es de ese
+         aparato; lo único que cruza es el documento del modelo. Desde hoy una
+         copia liviana viaja DENTRO de ese documento.
+
+         Lo que se ata acá es la parte que el navegador no puede olvidar: que la
+         copia entra en el documento, que el TOPE se respeta y que la recién
+         guardada nunca es la que se saca al podar —es la que más falta hace del
+         otro lado—. La vuelta completa —guardar, borrar de este navegador,
+         recuperarla de la sala— se probó en el navegador y está en el commit;
+         acá no se puede, porque el arnés no tiene IndexedDB. */
+      (function () {
+        const antes = Modelo.mediaSalaResumen();
+        const grande = 'x'.repeat(120 * 1024);      // 120 KB de «imagen»
+        const puestos = [];
+        for (let i = 0; i < 30; i++) {
+          const id = 'me-prueba-' + i;
+          const r = Modelo.guardar_media_sala(id, 'image/jpeg', grande, 120 * 1024);
+          if (r.ok) puestos.push(id);
+        }
+        const fin = Modelo.mediaSalaResumen();
+        const ultima = puestos[puestos.length - 1];
+        const laUltimaSigue = !!Modelo.mediaSala(ultima);
+        const bajoElTope = fin.bytes <= fin.tope;
+        // Una que se pasa sola del tope por archivo no entra, y lo dice.
+        const gorda = Modelo.guardar_media_sala('me-gorda', 'image/jpeg', 'x', 900 * 1024);
+
+        puestos.forEach((id) => Modelo.olvidar_media_sala(id));
+        Modelo.olvidar_media_sala('me-gorda');
+        const limpio = Modelo.mediaSalaResumen();
+
+        push({
+          nombre: '🔴 La copia de la foto viaja, con tope, y la última nunca se poda',
+          intento: 'Meter 30 copias de 120 KB en la bodega de la sala y mirar qué queda',
+          esperado: 'Se respeta el tope, la última guardada sigue estando, y una copia ' +
+            'sobre el tope por archivo se rechaza con motivo',
+          paso: bajoElTope && laUltimaSigue && !gorda.ok && limpio.cantidad === antes.cantidad,
+          detalle: !bajoElTope
+            ? 'La bodega quedó en ' + Math.round(fin.bytes / 1024) + ' KB, sobre el tope de ' +
+              Math.round(fin.tope / 1024)
+            : (!laUltimaSigue
+              ? 'La última copia guardada se podó: es justo la que el otro aparato está esperando'
+              : (gorda.ok
+                ? 'Aceptó una copia de 900 KB: el tope por archivo no está aplicando'
+                : (limpio.cantidad !== antes.cantidad
+                  ? 'La prueba dejó basura en la bodega'
+                  : fin.cantidad + ' copias entraron en ' + Math.round(fin.bytes / 1024) +
+                    ' KB, bajo el tope de ' + Math.round(fin.tope / 1024) + ' KB')))
+        });
+      })();
+
       /* ══ COD-1 · Las tres defensas de seguridad del 22-08-2026 ═════════
          Las tres son invisibles: no cambian ni una pantalla. Si alguien las
          deshace sin querer, nada se ve distinto — sólo vuelve a estar abierto

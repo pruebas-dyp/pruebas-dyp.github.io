@@ -296,6 +296,95 @@ const Modelo = (function () {
   function limpiarMemo() { Object.keys(memo).forEach((k) => delete memo[k]); }
   function tocado() { modificado = true; version++; limpiarMemo(); guardar(); }
 
+  /* ═════ LAS FOTOS QUE CRUZAN DE UN APARATO A OTRO ══════════════════════
+     28-08-2026, Marco: «cuando subo una foto del celular no queda incrustada en
+     el sistema cuando la veo del computador... debe vivir todo en un mismo
+     ecosistema, y para las pruebas con la gente del taller deberían aparecer y
+     poder descargarlas».
+
+     POR QUÉ PASABA. Los BYTES de una foto no caben en `localStorage` —el límite
+     del navegador son 5 a 10 MB y una sola foto de teléfono los llena—, así que
+     `media.js` los guarda en IndexedDB. IndexedDB es de ESE navegador y de ese
+     aparato: no viaja. La sala compartida sí viaja, pero lleva el documento del
+     modelo, y ahí sólo estaba la FICHA de la foto —su nombre, su peso, de qué
+     orden es—, no la imagen. El computador tenía la ficha y no el archivo, y por
+     eso escribía «la imagen no está en este navegador».
+
+     LO QUE SE HACE. Una COPIA LIVIANA de cada foto viaja dentro del documento,
+     en esta tabla. El aparato que la tomó conserva la suya entera; los demás
+     reciben la copia, la guardan en su propio IndexedDB la primera vez que la
+     miran, y de ahí en adelante la tienen local.
+
+     ⚠️ POR QUÉ UNA COPIA Y NO LA FOTO ENTERA. El documento de la sala se sube y
+     se baja COMPLETO en cada cambio. Hoy pesa 2,2 MB; una foto ya comprimida son
+     289 KB, y en base64 —que es como viaja el texto— 385 KB. Tres fotos y cada
+     tecla que alguien toque en el taller mueve 3,4 MB por la red del teléfono.
+     La copia va a 1.000 px y unos 120 KB: se ve perfecta en pantalla y pesa un
+     tercio.
+
+     ⚠️ Y POR QUÉ CON TOPE. Con `TOPE_MEDIA_SALA` la bodega no crece sin límite:
+     al pasarse, se van las más viejas. La foto sigue existiendo en el aparato
+     que la tomó —no se pierde—; lo que se pierde es que la vean los otros. Se
+     avisa en pantalla, no en silencio.
+
+     ⚠️ ESTO ES UN PUENTE PARA LAS PRUEBAS, no el modelo final. Cuando el sistema
+     viva en la nube del cliente, los archivos van a su almacenamiento y esta
+     tabla se borra entera. Marco ya lo tiene claro y por eso lo pidió «de
+     momento». */
+  const TOPE_MEDIA_SALA = 3 * 1024 * 1024;   // 3 MB de copias, en total
+  const TOPE_MEDIA_UNA  = 400 * 1024;        // ninguna copia sobre 400 KB
+
+  const mediaSalaTodas = () => (db.media_sala || (db.media_sala = []));
+
+  /* La copia de una foto, si viajó. `null` cuando no está: quien pregunta
+     decide qué hacer, que es lo que hace `media.js`. */
+  function mediaSala(id) {
+    return mediaSalaTodas().find((x) => x.id === id) || null;
+  }
+
+  function mediaSalaResumen() {
+    const t = mediaSalaTodas();
+    return { cantidad: t.length, bytes: t.reduce((a, x) => a + (x.bytes || 0), 0),
+      tope: TOPE_MEDIA_SALA };
+  }
+
+  /* Deja la copia en el documento. `b64` viene sin el prefijo `data:`; se
+     guarda el tipo aparte para poder rearmar el archivo del otro lado. */
+  function guardar_media_sala(id, mime, b64, bytes) {
+    if (!id || !b64) return { ok: false, motivo: 'Falta la imagen.' };
+    if (bytes > TOPE_MEDIA_UNA)
+      return { ok: false, motivo: 'La copia pesa ' + Math.round(bytes / 1024) +
+        ' KB y el tope por archivo son ' + Math.round(TOPE_MEDIA_UNA / 1024) + ' KB.' };
+    const t = mediaSalaTodas();
+    const ya = t.findIndex((x) => x.id === id);
+    const fila = { id, mime: mime || 'image/jpeg', b64, bytes, creado_at: ahora() };
+    if (ya >= 0) t[ya] = fila; else t.push(fila);
+
+    /* El tope se aplica DESPUÉS de meter la nueva: la que se acaba de subir es
+       la que más falta hace del otro lado, así que nunca es ella la que se va. */
+    let sobra = t.reduce((a, x) => a + (x.bytes || 0), 0) - TOPE_MEDIA_SALA;
+    const sacadas = [];
+    while (sobra > 0 && t.length > 1) {
+      const vieja = t.shift();
+      if (vieja.id === id) { t.push(vieja); break; }   // la nueva no se saca
+      sobra -= vieja.bytes || 0;
+      sacadas.push(vieja.id);
+    }
+    tocado();
+    return { ok: true, motivo: '', sacadas };
+  }
+
+  /* Se van con la orden: si la orden se borra, sus copias no tienen por qué
+     seguir ocupando el documento de todos. */
+  function olvidar_media_sala(id) {
+    const t = mediaSalaTodas();
+    const i = t.findIndex((x) => x.id === id);
+    if (i < 0) return { ok: true, motivo: '' };
+    t.splice(i, 1);
+    tocado();
+    return { ok: true, motivo: '' };
+  }
+
   const estaModificado = () => modificado;
   const base = () => db;
 
@@ -4484,6 +4573,8 @@ const Modelo = (function () {
     abrir_detencion, cerrar_detencion, detencionDe,
     // configuración
     guardar_catalogo, eliminar_catalogo, dar_de_baja_catalogo, reactivar_catalogo,
+    // Las copias de foto que viajan por la sala. Ver el bloque largo arriba.
+    mediaSala, mediaSalaResumen, guardar_media_sala, olvidar_media_sala,
     agregar_prerrequisito, quitar_prerrequisito, guardar_parametro, fijar_rol_permiso,
     // fuera de alcance, declarado
     agenda, crear_ot_desde_agendamiento

@@ -39,6 +39,11 @@ function zonaFotos(op) {
   const fotos = op.fotos || [];
   const res = Media.resumen(fotos);
   const comprime = Media.comprimeSiempre();
+  /* Cuántas de estas se ven desde OTRO aparato. Desde el 28-08-2026 una copia
+     liviana de cada foto viaja en la sala compartida; la que no alcanzó a
+     viajar —porque la bodega llegó a su tope— existe igual, pero sólo acá. Se
+     dice, no se deja adivinar. */
+  const cruzan = Media.viajan(fotos);
 
   return `
   <div class="zona-fotos" id="${esc(op.id)}-zona">
@@ -70,6 +75,11 @@ function zonaFotos(op) {
     <strong>${plural(res.cantidad, 'foto', 'fotos')}${comprime && res.ahorro > 0
       ? ' · ' + Media.fPeso(res.bytesOriginal) + ' → ' + Media.fPeso(res.bytes) + ' · ' + res.ahorro + '% menos'
       : ' · ' + Media.fPeso(res.bytes)}.</strong>
+    ${cruzan.total ? (cruzan.viajan === cruzan.total
+      ? '<span class="et verde" title="Una copia liviana de cada una viaja en la sala compartida: se ven y se descargan desde el computador, el celular o la tablet.">' +
+        'se ven en los otros aparatos</span>'
+      : '<span class="et ambar" title="La copia que viaja tiene un tope de tamaño. Las que no alcanzaron siguen guardadas acá, en el aparato donde se tomaron.">' +
+        cruzan.viajan + ' de ' + cruzan.total + ' se ven en los otros aparatos</span>') : ''}
     ${comprime
       ? 'El sistema las achica solo al subirlas.'
       : 'La compresión está apagada en Configuración: se guardan tal como vienen.'}
