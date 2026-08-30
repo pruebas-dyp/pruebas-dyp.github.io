@@ -39,10 +39,11 @@ function zonaFotos(op) {
   const fotos = op.fotos || [];
   const res = Media.resumen(fotos);
   const comprime = Media.comprimeSiempre();
-  /* Cuántas de estas se ven desde OTRO aparato. Desde el 28-08-2026 una copia
-     liviana de cada foto viaja en la sala compartida; la que no alcanzó a
-     viajar —porque la bodega llegó a su tope— existe igual, pero sólo acá. Se
-     dice, no se deja adivinar. */
+  /* Cuántas de estas se ven desde OTRO aparato, y por cuál de los dos caminos.
+     Desde el 29-08-2026 la foto ENTERA sube a Google Cloud; si la nube no
+     contestó —sin señal— viaja una copia liviana dentro del documento, que se
+     ve peor y tiene tope. La que no alcanzó ninguno de los dos existe igual,
+     pero sólo acá. Se dice cuál es el caso, no se deja adivinar. */
   const cruzan = Media.viajan(fotos);
 
   return `
@@ -76,9 +77,14 @@ function zonaFotos(op) {
       ? ' · ' + Media.fPeso(res.bytesOriginal) + ' → ' + Media.fPeso(res.bytes) + ' · ' + res.ahorro + '% menos'
       : ' · ' + Media.fPeso(res.bytes)}.</strong>
     ${cruzan.total ? (cruzan.viajan === cruzan.total
-      ? '<span class="et verde" title="Una copia liviana de cada una viaja en la sala compartida: se ven y se descargan desde el computador, el celular o la tablet.">' +
+      ? '<span class="et verde" title="' + (cruzan.sala
+          ? cruzan.nube + ' están completas en Google Cloud y ' + cruzan.sala + ' viajan como copia liviana, ' +
+            'porque al subirlas no había señal. Todas se ven desde el computador, el celular o la tablet.'
+          : 'Están guardadas enteras en Google Cloud: se ven y se descargan desde el computador, ' +
+            'el celular o la tablet, con la misma calidad con que se subieron.') + '">' +
         'se ven en los otros aparatos</span>'
-      : '<span class="et ambar" title="La copia que viaja tiene un tope de tamaño. Las que no alcanzaron siguen guardadas acá, en el aparato donde se tomaron.">' +
+      : '<span class="et ambar" title="Las que faltan no subieron a la nube ni alcanzaron a viajar por la sala. ' +
+        'Siguen guardadas acá, en el aparato donde se tomaron. Vuélvelas a cargar con señal.">' +
         cruzan.viajan + ' de ' + cruzan.total + ' se ven en los otros aparatos</span>') : ''}
     ${comprime
       ? 'El sistema las achica solo al subirlas.'

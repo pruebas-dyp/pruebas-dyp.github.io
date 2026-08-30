@@ -127,11 +127,14 @@ const Media = (function () {
     return comprimir(archivo).then((r) => {
       const id = 'me-' + Date.now().toString(36) + '-' + Math.round(performance.now() * 1000).toString(36);
       return conAlmacen('readwrite', (st) => st.put(r.blob, id))
-        // La copia liviana sale hacia la sala en cuanto el archivo está seguro
-        // acá. Si falla, la foto igual quedó guardada: ver `mandarALaSala`.
-        .then(() => mandarALaSala(id, r.blob))
-        .then(() => ({
+        // La foto sale hacia afuera en cuanto está segura acá. Si no puede,
+        // igual quedó guardada en este aparato: ver `guardarAfuera`.
+        .then(() => guardarAfuera(id, r.blob))
+        .then((nube) => ({
         id,
+        // La ruta del archivo en el bucket, o `null` si viajó por la sala.
+        // Viaja en la ficha, y por eso el otro aparato sabe dónde buscarla.
+        nube,
         ot_id: (ficha && ficha.ot_id) || null,
         recepcion_id: (ficha && ficha.recepcion_id) || null,
         etapa_id: (ficha && ficha.etapa_id) || null,
@@ -177,9 +180,9 @@ const Media = (function () {
   function guardarBlob(blob, ficha) {
     const id = 'me-' + Date.now().toString(36) + '-' + Math.round(performance.now() * 1000).toString(36);
     return conAlmacen('readwrite', (st) => st.put(blob, id))
-      .then(() => mandarALaSala(id, blob))
-      .then(() => ({
-      id,
+      .then(() => guardarAfuera(id, blob))
+      .then((nube) => ({
+      id, nube,
       ot_id: (ficha && ficha.ot_id) || null,
       recepcion_id: (ficha && ficha.recepcion_id) || null,
       etapa_id: null,
@@ -258,20 +261,70 @@ const Media = (function () {
     }).catch(() => null);
   }
 
-  /* 🔴 PRIMERO ACÁ, DESPUÉS LA SALA. Si el archivo no está en este navegador
-     pero sí viajó en el documento, se rearma, se guarda acá —para no rearmarlo
-     en cada pintada— y se devuelve. La primera vez cuesta unos milisegundos;
-     de ahí en adelante es igual de rápido que una foto propia. */
+  /* ═════ HACIA AFUERA: LA NUBE PRIMERO, LA SALA DE RESPALDO ══════════
+     29-08-2026. Hay dos caminos para que una foto cruce de un aparato a otro,
+     y se usa el primero que conteste:
+
+     1 · LA NUBE. El archivo ENTERO sube al bucket de Google Cloud. Lo que
+         viaja en el documento es la RUTA —unos 40 caracteres—, no la imagen.
+         Es el camino bueno: sin tope, sin perder calidad, y el documento de la
+         sala no engorda ni un byte.
+     2 · LA SALA. Si la nube no contesta —sin internet, en un `file://`, el
+         proyecto apagado— viaja una copia liviana adentro del documento, como
+         venía desde el 28-08. Tiene tope de 3 MB y se ve peor, pero el taller
+         sigue trabajando.
+
+     Devuelve la ruta del bucket, o `null` si hubo que caer al respaldo. Ese
+     valor va en la ficha y es lo que `obtener` usa del otro lado. */
+  function hayNube() {
+    try { return typeof Nube !== 'undefined' && !!Nube; } catch (e) { return false; }
+  }
+
+  function guardarAfuera(id, blob) {
+    const alRespaldo = () => mandarALaSala(id, blob).then(() => null).catch(() => null);
+    if (!hayNube()) return alRespaldo();
+    return Nube.subir(blob).then((objeto) => objeto || alRespaldo()).catch(alRespaldo);
+  }
+
+  /* Deja el archivo en este navegador y lo devuelve. Si guardarlo falla —modo
+     incógnito, disco lleno— se devuelve igual: no poder cachear no es motivo
+     para no mostrar la foto. */
+  function dejarAcaYDevolver(id, blob) {
+    return conAlmacen('readwrite', (st) => st.put(blob, id))
+      .then(() => blob).catch(() => blob);
+  }
+
+  function deLaNube(id) {
+    let ruta = null;
+    try { ruta = Modelo.rutaNube(id); } catch (e) { ruta = null; }
+    if (!ruta || !hayNube()) return Promise.resolve(null);
+    return Nube.bajar(ruta).then((b) => (b ? dejarAcaYDevolver(id, b) : null));
+  }
+
+  function deLaSala(id) {
+    let fila = null;
+    try { fila = Modelo.mediaSala(id); } catch (e) { fila = null; }
+    if (!fila || !fila.b64) return Promise.resolve(null);
+    let rearmado;
+    try { rearmado = deBase64(fila.b64, fila.mime); }
+    catch (e) { return Promise.resolve(null); }
+    return dejarAcaYDevolver(id, rearmado);
+  }
+
+  /* 🔴 DÓNDE SE BUSCA UNA FOTO, Y EN QUÉ ORDEN.
+
+     1 · ACÁ. IndexedDB de este navegador: instantáneo, y es el caso normal.
+     2 · LA NUBE. Si la ficha trae ruta, se baja del bucket y se guarda acá,
+         para no bajarla de nuevo en cada pintada.
+     3 · LA SALA. El puente viejo, para las fotos subidas antes de que la nube
+         existiera y para las que se subieron sin internet.
+
+     Devuelve `null` si no está en ninguna de las tres. Quien llama lo dice en
+     pantalla; no se inventa una imagen ni se deja un cuadro roto sin explicar. */
   function obtener(id) {
     return conAlmacen('readonly', (st) => st.get(id)).then((blob) => {
       if (blob) return blob;
-      let fila = null;
-      try { fila = Modelo.mediaSala(id); } catch (e) { fila = null; }
-      if (!fila || !fila.b64) return null;
-      let rearmado;
-      try { rearmado = deBase64(fila.b64, fila.mime); } catch (e) { return null; }
-      return conAlmacen('readwrite', (st) => st.put(rearmado, id))
-        .then(() => rearmado).catch(() => rearmado);
+      return deLaNube(id).then((b) => b || deLaSala(id));
     });
   }
 
@@ -295,9 +348,9 @@ const Media = (function () {
              que si no llegó es porque su copia se pasó del tope de la sala o
              porque se subió antes de que esto existiera. Se dice cuál de las
              dos, y dónde sí está. */
-          img.alt = 'La foto está en el aparato donde se tomó. Su copia no viajó ' +
-            'por la sala compartida — se pasó del tope, o se subió antes de que ' +
-            'las fotos viajaran.';
+          img.alt = 'La foto está en el aparato donde se tomó y no se pudo traer: ' +
+            'no subió a la nube ni alcanzó a viajar por la sala. Revisa la ' +
+            'conexión y vúlvela a cargar desde ese aparato.';
           img.classList.add('sin-copia');
           return;
         }
@@ -455,14 +508,18 @@ const Media = (function () {
     return conAlmacen('readwrite', (st) => st.clear());
   }
 
-  /* Cuántas de las fotos de esta lista se ven en los DEMÁS aparatos. Es lo que
-     la pantalla de Fotografías necesita para no prometer de más. */
+  /* Cuántas de las fotos de esta lista se ven en los DEMÁS aparatos, y por
+     cuál de los dos caminos. Es lo que las pantallas necesitan para no
+     prometer de más: `nube` son las que están completas en Google Cloud y
+     `sala` las que cruzan como copia liviana, que es peor pero sirve. */
   function viajan(fichas) {
-    let si = 0;
+    let porNube = 0, porSala = 0;
     (fichas || []).forEach((f) => {
-      try { if (Modelo.mediaSala(f.id)) si++; } catch (e) { /* sin modelo */ }
+      if (f && f.nube) { porNube++; return; }
+      try { if (Modelo.mediaSala(f.id)) porSala++; } catch (e) { /* sin modelo */ }
     });
-    return { viajan: si, total: (fichas || []).length };
+    return { viajan: porNube + porSala, total: (fichas || []).length,
+      nube: porNube, sala: porSala };
   }
 
   return { guardar, guardarBlob, subir, obtener, url, eliminar, pintar, resumen, fPeso, vaciar, viajan,

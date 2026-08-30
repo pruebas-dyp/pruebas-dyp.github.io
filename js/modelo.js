@@ -3405,6 +3405,31 @@ const Modelo = (function () {
     const f = db.media.find((x) => x.id === media_id);
     if (!f) return { ok: false, motivo: 'La imagen no existe.' };
     db.media = db.media.filter((x) => x.id !== media_id);
+
+    /* 🔴 LA COPIA DE LA SALA SE VA CON LA FICHA (29-08-2026).
+
+       `olvidar_media_sala` existía desde ayer y NO lo llamaba nadie: se borraba
+       la foto, desaparecía la ficha, se borraban los bytes de este navegador
+       —eso lo hace `Media.eliminar` en la pantalla— y la copia en base64
+       quedaba adentro del documento de la sala para siempre. Peso muerto que
+       le comía el tope de 3 MB a las fotos vivas.
+
+       Se hace ACÁ y no en la pantalla porque son dos pantallas las que borran
+       —la ficha y Documentos— y una tercera que borra en cadena al deshacer
+       una recepción. Una sola puerta. */
+    const dejo = mediaSalaTodas().findIndex((x) => x.id === media_id);
+    if (dejo >= 0) mediaSalaTodas().splice(dejo, 1);
+
+    /* ⚠️ EL ARCHIVO EN LA NUBE NO SE BORRA, Y ES A PROPÓSITO. Las reglas del
+       bucket dicen `delete: if false` para todos. Si permitieran borrar,
+       cualquiera que abra el sistema podría borrar la foto de cualquier orden:
+       la identidad del navegador es anónima y no distingue a una persona de
+       otra. Un archivo huérfano de 300 KB es un problema mucho menor.
+
+       Al mover esto a la base de verdad, el borrado pasa por el servidor —que
+       sí sabe quién pide— y ahí el archivo se va con la ficha. Mientras tanto,
+       la foto deja de verse en el sistema pero el archivo sigue en el bucket.
+       Está dicho, no escondido. */
     tocado();
     return { ok: true, motivo: '' };
   }
@@ -3417,6 +3442,20 @@ const Modelo = (function () {
            documentos piden `documento.ver`, que son cosas distintas: bodega
            necesita la guía de despacho y no las fotos del daño; el pintor no
            necesita ninguna de las dos. */
+  /* La ruta del archivo en el bucket de Google Cloud, para una foto. `null` si
+     esa foto no alcanzó a subir —y viajó por la sala— o si es de antes de que
+     existiera la nube.
+
+     No filtra por alcance ni por permiso, y conviene decir por qué: esto NO es
+     una vía para listar fotos —para eso está `mediaDe`, que sí filtra—, sino
+     la traducción de un id que quien pregunta ya sacó de ahí. Además la ruta
+     viaja igual dentro del documento de la sala, así que esconderla acá no
+     escondería nada. */
+  function rutaNube(media_id) {
+    const f = db.media.find((x) => x.id === media_id);
+    return (f && f.nube) || null;
+  }
+
   function mediaDe(ot_id, momento) {
     const o = db.orden_trabajo.find((x) => x.id === ot_id);
     if (!o || !enAlcance(vistaOT(o))) return [];
@@ -4575,6 +4614,8 @@ const Modelo = (function () {
     guardar_catalogo, eliminar_catalogo, dar_de_baja_catalogo, reactivar_catalogo,
     // Las copias de foto que viajan por la sala. Ver el bloque largo arriba.
     mediaSala, mediaSalaResumen, guardar_media_sala, olvidar_media_sala,
+    // La ruta del archivo en el bucket. Ver el bloque junto a `mediaDe`.
+    rutaNube,
     agregar_prerrequisito, quitar_prerrequisito, guardar_parametro, fijar_rol_permiso,
     // fuera de alcance, declarado
     agenda, crear_ot_desde_agendamiento

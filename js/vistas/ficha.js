@@ -849,11 +849,15 @@ function fichaFotos(o) {
         const c = Media.viajan(todas.filter((m) => m.momento !== 'firma'));
         if (!c.total) return '';
         return c.viajan === c.total
-          ? '<span class="et verde" title="Una copia liviana de cada una viaja en la sala ' +
-            'compartida: se ven y se descargan desde el computador, el celular o la tablet.">' +
-            'se ven en los otros aparatos</span>'
-          : '<span class="et ambar" title="La copia que viaja tiene un tope de tamaño. Las que ' +
-            'no alcanzaron siguen guardadas en el aparato donde se tomaron.">' +
+          ? '<span class="et verde" title="' + (c.sala
+              ? c.nube + ' están completas en Google Cloud y ' + c.sala + ' viajan como copia ' +
+                'liviana, porque al subirlas no había señal. Todas se ven desde el computador, ' +
+                'el celular o la tablet.'
+              : 'Están guardadas enteras en Google Cloud: se ven y se descargan desde el ' +
+                'computador, el celular o la tablet, con la misma calidad con que se subieron.') +
+            '">se ven en los otros aparatos</span>'
+          : '<span class="et ambar" title="Las que faltan no subieron a la nube ni alcanzaron a ' +
+            'viajar por la sala. Siguen guardadas en el aparato donde se tomaron.">' +
             c.viajan + ' de ' + c.total + ' se ven en los otros aparatos</span>';
       })()}</div>
     <div class="cuerpo">

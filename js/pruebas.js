@@ -2271,6 +2271,68 @@ const Pruebas = (function () {
         });
       })();
 
+      /* 🔴 LA RUTA DEL ARCHIVO EN LA NUBE, Y LA LIMPIEZA AL BORRAR (29-08-2026).
+
+         Desde hoy la foto ENTERA sube al bucket de Google Cloud y lo que viaja
+         en el documento es su ruta. El motor no puede subir nada —no tiene
+         `fetch` ni red—, así que lo que se ata acá son las dos cosas que sí
+         dependen del modelo y que, si se rompen, se rompen en silencio:
+
+         1 · que `rutaNube` devuelva la ruta que trae la ficha, porque es lo
+             Único que el otro aparato tiene para ir a buscar el archivo;
+         2 · que borrar una foto se lleve TAMBIÉN su copia de la sala.
+
+         La segunda es un error que estaba vivo: `olvidar_media_sala` existía
+         desde el 28-08 y no lo llamaba ninguna pantalla. Se borraba la foto y
+         su copia en base64 se quedaba adentro del documento para siempre,
+         coméndole el tope de 3 MB a las fotos vivas. La vuelta completa
+         —subir, borrar de este navegador, bajarla del bucket— se mide en el
+         navegador, que es donde hay red; acá no se puede. */
+      (function () {
+        const idA = 'me-nube-a', idB = 'me-nube-b';
+        const ruta = 'fotos/2026-08-29/abc123def456.jpg';
+        const antes = Modelo.mediaSalaResumen();
+
+        // A viajó por la nube: trae ruta y NO deja copia en la sala.
+        // B se subió sin internet: no trae ruta y dejó su copia liviana.
+        Modelo.adjuntar_media(null, [], [
+          { id: idA, nube: ruta, momento: 'ingreso', nombre: 'a.jpg', mime: 'image/jpeg', bytes: 300000 },
+          { id: idB, nube: null,  momento: 'ingreso', nombre: 'b.jpg', mime: 'image/jpeg', bytes: 300000 }
+        ]);
+        Modelo.guardar_media_sala(idB, 'image/jpeg', 'x'.repeat(1000), 1000);
+
+        const laRuta = Modelo.rutaNube(idA);
+        const sinRuta = Modelo.rutaNube(idB);
+        const bTeniaCopia = !!Modelo.mediaSala(idB);
+
+        Modelo.eliminar_media(idB);
+        const bYaNoTieneCopia = !Modelo.mediaSala(idB);
+
+        Modelo.eliminar_media(idA);
+        const limpio = Modelo.mediaSalaResumen();
+
+        push({
+          nombre: '🔴 La ruta del archivo en la nube viaja en la ficha, y borrar limpia la sala',
+          intento: 'Adjuntar una foto con ruta de bucket y otra sin ella, y después borrarlas',
+          esperado: '`rutaNube` devuelve la ruta de la primera y null para la segunda; ' +
+            'al borrar, la copia de la sala se va con la ficha',
+          paso: laRuta === ruta && sinRuta === null && bTeniaCopia &&
+            bYaNoTieneCopia && limpio.cantidad === antes.cantidad,
+          detalle: laRuta !== ruta
+            ? 'La ruta del bucket no llegó: `rutaNube` devolvió ' + JSON.stringify(laRuta) +
+              '. Sin ella, el otro aparato no sabe dónde está el archivo'
+            : (sinRuta !== null
+              ? 'Una foto sin ruta devolvió ' + JSON.stringify(sinRuta) + ' en vez de null'
+              : (!bTeniaCopia
+                ? 'La prueba no llegó a dejar la copia en la sala: no está midiendo el borrado'
+                : (!bYaNoTieneCopia
+                  ? 'Se borró la foto y su copia sigue en la sala, comiéndose el tope de 3 MB'
+                  : (limpio.cantidad !== antes.cantidad
+                    ? 'La prueba dejó basura en la bodega'
+                    : 'Ruta ' + laRuta + ' · la copia de la sala se fue con la ficha'))))
+        });
+      })();
+
       /* ══ COD-1 · Las tres defensas de seguridad del 22-08-2026 ═════════
          Las tres son invisibles: no cambian ni una pantalla. Si alguien las
          deshace sin querer, nada se ve distinto — sólo vuelve a estar abierto
