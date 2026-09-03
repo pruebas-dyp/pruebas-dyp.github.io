@@ -220,10 +220,13 @@ function bodegaRepuestosPresupuesto(o, p) {
   const fila = (r) => '<tr>' +
     '<td><input data-cod="' + esc(r.id) + '" value="' + esc(r.codigoInterno || '') +
       '" placeholder="El de bodega"></td>' +
-    // Deshabilitado a propósito: en el sistema actual está gris y vacío. No se
-    // inventa un dato que allá nadie llena.
-    '<td><input value="' + esc(r.codigoExterno || '') + '" disabled ' +
-      'title="En el sistema actual esta casilla está deshabilitada y vacía"></td>' +
+    /* 🔴 03-09-2026. Acá el campo estaba `disabled` a propósito, porque en el
+       sistema actual esa casilla también está gris y vacía. Nicole Hernández
+       lo probó con bodega y lo reportó como falla: quieren escribir el código
+       del proveedor. Copiar el sistema viejo vale hasta que alguien pida lo
+       contrario, y lo pidieron. */
+    '<td><input data-cod-ext="' + esc(r.id) + '" value="' + esc(r.codigoExterno || '') +
+      '" placeholder="El del proveedor"></td>' +
     '<td class="num">' + r.cantidad + '</td>' +
     '<td>' + esc(r.descripcion) + '</td>' +
     '<td><select data-pago="' + esc(r.id) + '">' + pagos.map((x) =>
@@ -238,13 +241,27 @@ function bodegaRepuestosPresupuesto(o, p) {
        casilla lo dice ANTES de apretarla en vez de rebotar después: un botón
        que se puede apretar y siempre falla enseña a no confiar en la
        pantalla. El vale se sube en la ficha de abajo. */
+    /* 🔴 03-09-2026, Nicole Hernández: «en el checklist no permite dar el check
+       de entregado». Y tenía razón en lo que veía. La regla estaba bien —el
+       vale es del punto 7 que pidió el cliente— pero el motivo vivía SOLO en
+       este `title`, o sea en un globo que aparece al posar el cursor. En tablet
+       y en teléfono no hay cursor: el globo no existe. Bodega veía una casilla
+       gris, sin explicación y sin salida, y la única lectura posible es que el
+       sistema está malo.
+
+       El remedio ya estaba, pero ocho columnas más a la derecha y llamado
+       «Subir el vale de retiro», que no se lee como «esto es lo que te falta».
+       Ahora el motivo se ve SIEMPRE bajo la casilla, y cuando lo que falta es
+       el vale, ese mismo texto es el botón que lo sube. El globo se queda para
+       quien use ratón. */
     '<td style="text-align:center"><input type="checkbox" data-ent="' + esc(r.id) + '"' +
       (r.fechaEntregaArea ? ' checked' : '') +
       (r.fechaBodega && (r.valeMediaId || r.fechaEntregaArea) ? '' : ' disabled') + ' title="' +
       (r.fechaEntregaArea ? 'Entregado el ' + esc(fFechaHora(r.fechaEntregaArea))
         : (!r.fechaBodega ? 'No se puede entregar lo que todavía no llegó'
           : (!r.valeMediaId ? 'Falta subir el vale de retiro, abajo en la ficha'
-            : 'Marcar al entregarlo al área'))) + '"></td>' +
+            : 'Marcar al entregarlo al área'))) + '">' +
+      motivoEntrega(r) + '</td>' +
     /* 🔶 LA COLUMNA QUE EL ORIGINAL NO TIENE (16-08-2026, Marco): el vale de
        retiro y la DEVOLUCIÓN, en la misma pantalla donde se marca que llegó.
 
@@ -281,7 +298,7 @@ function bodegaRepuestosPresupuesto(o, p) {
     <div class="cuerpo">
       <div class="nota">Las casillas guardan al marcarlas —cada una escribe su fecha y queda en el
         expediente con quién la marcó—, así que ahí <strong>no hay que apretar Guardar</strong>.
-        El código interno sí: se escribe y se guarda.</div>
+        Los dos códigos sí: se escriben y se guardan con este botón.</div>
       <div style="margin-top:9px"><button class="btn" id="bod-guardar-cod">Guardar</button></div>
     </div>
   </div>`;
@@ -493,6 +510,25 @@ function engancharRepuestos(otId) {
   }));
 }
 
+/* Por qué la casilla «Entregado» está gris, dicho DEBAJO de la casilla y no en
+   un globo que necesita cursor (03-09-2026, ver el comentario de la fila).
+
+   Cuando lo que falta es el vale, el texto no sólo avisa: es el botón que lo
+   sube, y usa el mismo `data-vale` que ya está enganchado más abajo. Así el
+   remedio queda donde nace la duda y no hay un camino nuevo que mantener.
+
+   Si la casilla se puede marcar, esto no dibuja nada: una pista que aparece
+   siempre deja de leerse. */
+function motivoEntrega(r) {
+  if (r.fechaEntregaArea) return '';
+  if (!r.fechaBodega) return '<span class="pista-check">no ha llegado</span>';
+  if (!r.valeMediaId) {
+    return '<button type="button" class="pista-check accion" data-vale="' + esc(r.id) +
+      '" title="Subir el vale de retiro para poder marcar entregado">falta el vale</button>';
+  }
+  return '';
+}
+
 function accionesRepuesto(r) {
   /* La vuelta, con EL MOTIVO de la última devolución en el globo. Marco
      preguntó dónde quedaba ese texto: queda en el historial de la orden y en
@@ -558,10 +594,17 @@ function pBodega() {
 
   const guardarCod = document.getElementById('bod-guardar-cod');
   if (guardarCod) guardarCod.addEventListener('click', () => {
-    const campos = [...document.querySelectorAll('[data-cod]')];
+    /* Los dos códigos se guardan con el MISMO botón. Desde el 03-09-2026 la
+       casilla de la derecha —el código del proveedor— también se escribe, y
+       darle un botón propio habría dejado a bodega adivinando cuál guarda qué:
+       son dos casillas de la misma fila y se llenan de una sola pasada. */
+    const campos = [...document.querySelectorAll('[data-cod]')]
+      .map((c) => ({ el: c, id: c.dataset.cod, fijar: Modelo.fijar_codigo_repuesto }))
+      .concat([...document.querySelectorAll('[data-cod-ext]')]
+        .map((c) => ({ el: c, id: c.dataset.codExt, fijar: Modelo.fijar_codigo_externo_repuesto })));
     let n = 0, malo = null;
     campos.forEach((c) => {
-      const r = Modelo.fijar_codigo_repuesto(c.dataset.cod, c.value);
+      const r = c.fijar(c.id, c.el.value);
       if (r.ok) n++;
       // "El código ya decía eso" no es un error que valga la pena mostrar.
       else if (!/ya decía/.test(r.motivo)) malo = r;

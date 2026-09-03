@@ -2809,6 +2809,28 @@ const Modelo = (function () {
     return { ok: true, motivo: '' };
   }
 
+  /* El código EXTERNO — el de la casilla de la derecha, el del proveedor.
+     🔴 03-09-2026, reportado por Nicole Hernández probando con bodega: la
+     casilla estaba deshabilitada y no se podía escribir en ella.
+
+     No era una falla: estaba gris A PROPÓSITO, porque en el sistema actual esa
+     casilla también está gris y vacía y no quisimos inventar un dato que allá
+     nadie llena. El argumento se cae solo cuando la jefatura dice que lo quiere
+     llenar: replicar el sistema viejo vale mientras nadie pida lo contrario.
+     El campo `codigo_externo` ya existía en el repuesto desde el primer día;
+     lo que faltaba era la operación para escribirlo. */
+  function fijar_codigo_externo_repuesto(repuesto_id, codigo) {
+    const r = db.repuesto.find((x) => x.id === repuesto_id);
+    if (!r) return { ok: false, motivo: 'El repuesto no existe.' };
+    const permiso = Reglas.puedeCargarRepuesto(db, { ot_id: r.ot_id });
+    if (!permiso.ok) return permiso;
+    const nuevo = String(codigo == null ? '' : codigo).trim() || null;
+    if (nuevo === (r.codigo_externo || null)) return { ok: false, motivo: 'El código ya decía eso.' };
+    r.codigo_externo = nuevo;
+    tocado();
+    return { ok: true, motivo: '' };
+  }
+
   function recibir_repuesto(repuesto_id, fecha) {
     const r = db.repuesto.find((x) => x.id === repuesto_id);
     if (!r) return { ok: false, motivo: 'El repuesto no existe.' };
@@ -4922,6 +4944,7 @@ const Modelo = (function () {
     recibir_repuesto: 'recibir un repuesto',
     entregar_repuesto_area: 'entregar un repuesto al área',
     fijar_codigo_repuesto: 'el código interno del repuesto',
+    fijar_codigo_externo_repuesto: 'el código externo del repuesto',
     adjuntar_vale_repuesto: 'cargar el vale de retiro',
     devolver_repuesto: 'la devolución del repuesto',
     declarar_perdida_total: 'la declaración de pérdida total',
@@ -4999,6 +5022,7 @@ const Modelo = (function () {
     recibir_repuesto: 'repuesto.cargar',
     entregar_repuesto_area: 'repuesto.cargar',
     fijar_codigo_repuesto: 'repuesto.cargar',
+    fijar_codigo_externo_repuesto: 'repuesto.cargar',
     /* 🔴 C-1 de la auditoría del 16-08-2026. Las dos estaban en `ESCRIBEN`
        —dejaban su hecho en el expediente— pero NO acá, y `conPermiso` sólo
        envuelve lo que aparece en este mapa: modificaban la orden sin preguntar
@@ -5120,6 +5144,7 @@ const Modelo = (function () {
   const OT_POR_TABLA = {
     recibir_repuesto: 'repuesto', entregar_repuesto_area: 'repuesto',
     fijar_responsable_pago: 'repuesto', fijar_codigo_repuesto: 'repuesto',
+    fijar_codigo_externo_repuesto: 'repuesto',
     adjuntar_vale_repuesto: 'repuesto', devolver_repuesto: 'repuesto',
     eliminar_presupuesto: 'presupuesto', cambiar_estado_presupuesto: 'presupuesto',
     nueva_version_presupuesto: 'presupuesto', generar_repuestos_desde_presupuesto: 'presupuesto',
@@ -5225,7 +5250,7 @@ const Modelo = (function () {
     programar_entrega, corregir_recepcion, correccionesDeRecepcion,
     cargar_repuesto, recibir_repuesto, entregar_repuesto_area, fijar_responsable_pago,
     adjuntar_vale_repuesto, devolver_repuesto, declarar_perdida_total,
-    fijar_codigo_repuesto,
+    fijar_codigo_repuesto, fijar_codigo_externo_repuesto,
     avisos, avisosDe,
     abrir_or_nueva,
     editar_orden,

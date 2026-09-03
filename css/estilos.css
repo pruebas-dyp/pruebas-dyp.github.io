@@ -971,6 +971,28 @@ table.grid tbody tr:nth-child(even of .fila) { background: var(--zebra); }
    paso del mouse. */
 table.grid tbody tr.fila.zebra-si { background: var(--zebra); }
 table.grid tbody tr.fila.zebra-no { background: transparent; }
+
+/* ── LA PISTA BAJO UNA CASILLA QUE NO SE PUEDE MARCAR ─────────────────────
+   03-09-2026. La casilla «Entregado» de Bodega venia deshabilitada y su motivo
+   vivia solo en un `title`. En tablet y en telefono no hay cursor y el globo
+   no aparece nunca: se veia una casilla gris, muda, y la unica lectura posible
+   era que el sistema estaba malo. Lo reporto Nicole probando con bodega.
+
+   Va DEBAJO de la casilla, en la misma celda. Cuando la pista ademas resuelve
+   —subir el vale— es un boton, y se ve que lo es. */
+.pista-check {
+  display: block; margin-top: 2px;
+  font-size: 10px; line-height: 1.2;
+  color: var(--gris-2); white-space: nowrap;
+}
+.pista-check.accion {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  width: 100%; font-family: inherit;
+  color: var(--ambar-texto); text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.pista-check.accion:hover { color: var(--tinta); }
+.pista-check.accion:focus-visible { outline: 2px solid var(--acento); outline-offset: 1px; }
 tr.fuera-de-pagina { display: none; }
 table.grid tbody tr.fila { cursor: pointer; }
 table.grid tbody tr.fila:hover { background: var(--superficie-2); }
