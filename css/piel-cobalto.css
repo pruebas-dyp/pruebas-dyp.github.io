@@ -1,0 +1,106 @@
+/* PIEL «COBALTO» — Automotora DyP
+   Se carga DESPUES de estilos.css y solo redefine variables de color.
+   Cero reglas de posicion, cero tamanos: la estructura, la densidad y el
+   comportamiento son los del sistema. Si algo se mueve de lugar, es un error
+   de este archivo.
+
+   Caracter: la version ejecutiva. Azul cobalto sobre azul profundo, un punto
+   mas luminosa y mas contrastada que la actual. */
+
+:root[data-piel="cobalto"],
+:root[data-piel="cobalto"][data-tema="oscuro"] {
+  --fondo: #0a0f1a;
+  --superficie: #111827;
+  --superficie-2: #1a2334;
+  --superficie-3: #0d1420;
+  --cabecera: #1a2334;
+  --borde: #24314a;
+  --borde-fuerte: #35486a;
+  --texto: #cbd5e1;
+  --tinta: #f1f5f9;
+  --gris: #94a3b8;
+  --gris-2: #8496ad;
+  --zebra: rgba(255, 255, 255, .022);
+
+  --menu-bg: #0c1322;
+  --menu-texto: #bccbdf;
+  --barra-bg: #0f1727;
+
+  --marca: #2563eb;
+  --acento: #60a5fa;
+  --acento-solido: #2563eb;
+  --acento-solido-hover: #1d4ed8;
+  --acento-hover: #3b82f6;
+  --acento-bg: rgba(96, 165, 250, .14);
+  --acento-borde: rgba(96, 165, 250, .42);
+  --acento-texto: #93c5fd;
+  --seleccion: rgba(96, 165, 250, .16);
+
+  --verde: #34d399; --verde-bg: rgba(52, 211, 153, .13); --verde-borde: rgba(52, 211, 153, .32); --verde-texto: #6ee7b7;
+  --ambar: #fbbf24; --ambar-bg: rgba(251, 191, 36, .13); --ambar-borde: rgba(251, 191, 36, .32); --ambar-texto: #fcd34d;
+  --rojo:  #f87171; --rojo-bg:  rgba(248, 113, 113, .13); --rojo-borde:  rgba(248, 113, 113, .32); --rojo-texto:  #fca5a5;
+  --violeta: #a78bfa; --violeta-bg: rgba(167, 139, 250, .13); --violeta-borde: rgba(167, 139, 250, .32); --violeta-texto: #c4b5fd;
+  --alta: #e07a9a; --alta-bg: rgba(224, 122, 154, .13);
+  --neutro-bg: rgba(148, 163, 184, .11); --neutro-borde: #2b3852;
+
+  --cinta-bg: rgba(251, 191, 36, .09); --cinta-borde: rgba(251, 191, 36, .28); --cinta-texto: #fcd34d;
+  --aviso-bg: rgba(251, 191, 36, .08); --aviso-borde: rgba(251, 191, 36, .24); --aviso-texto: #fbd167;
+  --info-bg: rgba(96, 165, 250, .10); --info-borde: rgba(96, 165, 250, .26); --info-texto: #bfdbfe;
+
+  --rueda: #44577a;
+  --campo-bg: #0c131f;
+  --sombra: 0 1px 3px rgba(0, 0, 0, .55);
+}
+
+:root[data-piel="cobalto"][data-tema="claro"] {
+  --fondo: #eef3fa;
+  --superficie: #ffffff;
+  --superficie-2: #f3f7fd;
+  --superficie-3: #fafcfe;
+  --cabecera: #eef3fa;
+  --borde: #d5e0ee;
+  --borde-fuerte: #b1c3da;
+  --texto: #26364a;
+  --tinta: #0b1524;
+  --gris: #536880;
+  --gris-2: #52667d;
+  --zebra: rgba(11, 21, 36, .024);
+
+  --menu-bg: #132038;
+  --menu-texto: #d2dfef;
+  --barra-bg: #f3f7fd;
+
+  --marca: #1d4ed8;
+  --acento: #1d4ed8;
+  --acento-solido: #1d4ed8;
+  --acento-solido-hover: #1e3fae;
+  --acento-hover: #1e3fae;
+  --acento-bg: #e7effd;
+  --acento-borde: #bcd2f7;
+  --acento-texto: #1a3ea4;
+  --seleccion: #ddeafc;
+
+  --verde: #12805a; --verde-bg: #e6f8f1; --verde-borde: #aee3ce; --verde-texto: #0d6a4a;
+  --ambar: #a96a06; --ambar-bg: #fdf4e5; --ambar-borde: #f0d7ab; --ambar-texto: #855206;
+  --rojo:  #c33630; --rojo-bg:  #fdecec; --rojo-borde:  #f3c1c0; --rojo-texto:  #a32a25;
+  --violeta: #5b46c8; --violeta-bg: #eeecfd; --violeta-borde: #cdc7f6; --violeta-texto: #473aa5;
+  --alta: #a84363; --alta-bg: rgba(168, 67, 99, .10);
+  --neutro-bg: #eef3fa; --neutro-borde: #d5e0ee;
+
+  --cinta-bg: #fdf4e5; --cinta-borde: #f0d7ab; --cinta-texto: #7a4a00;
+  --aviso-bg: #fdf7ec; --aviso-borde: #f0deb8; --aviso-texto: #7a4a00;
+  --info-bg: #eaf2ff; --info-borde: #c1d7fb; --info-texto: #10458f;
+
+  --zona-fill: #e2eaf4; --zona-stroke: #b1c3da; --zona-hover: #cddcee; --rueda: #93a6bd;
+  --campo-bg: #ffffff;
+  --sombra: 0 1px 2px rgba(11, 21, 36, .08);
+}
+
+/* Retoques de forma. Solo radio y transicion: nada que mueva un pixel de sitio. */
+:root[data-piel="cobalto"] .panel,
+:root[data-piel="cobalto"] .modal { border-radius: 5px; }
+:root[data-piel="cobalto"] .panel > .cab { border-radius: 5px 5px 0 0; }
+:root[data-piel="cobalto"] .hbtn,
+:root[data-piel="cobalto"] .btn,
+:root[data-piel="cobalto"] .chip { border-radius: 4px; transition: background .14s ease, border-color .14s ease, color .14s ease; }
+:root[data-piel="cobalto"] .nav a { transition: background .14s ease, color .14s ease; }

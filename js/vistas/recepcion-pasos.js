@@ -171,10 +171,14 @@ function recOrdenes() {
       campoBlq(i, 'deducible', 'Deducible neto',
         '<input type="number" data-blq="' + i + '" data-campo="deducible" value="' + esc(b.deducible) + '">') : '';
 
+    /* El numero de la empresa es una REFERENCIA, no la OR del taller, y desde
+       el 30-08-2026 tampoco es obligatorio: el ultimo argumento pasó a `false`.
+       El rotulo lo dice para que nadie escriba ahi el correlativo del sistema
+       creyendo que lo esta fijando. */
     const deEmpresa = t.exige_or
-      ? texto(i, b, 'numero_or', 'N° de OR de la empresa',
-          'El número del cliente corporativo, para SU trazabilidad. La OR del ' +
-          'taller la genera el sistema sola al ingresar el vehículo.', true)
+      ? texto(i, b, 'numero_or', 'N° de OR de la empresa (referencia)',
+          'El número del cliente corporativo, para SU trazabilidad. Es opcional. ' +
+          'La OR del taller la genera el sistema sola al ingresar el vehículo.', false)
       : '';
 
     return `

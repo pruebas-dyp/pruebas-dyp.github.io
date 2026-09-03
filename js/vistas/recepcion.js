@@ -247,8 +247,17 @@ function recFaltantesBloque(b, i) {
     faltan.push({ rot: 'La compañía' + n, paso: 'ordenes', campo: marca('compania_id') });
   if (t.exige_compania && !String(b.siniestro || '').trim())
     faltan.push({ rot: 'El N° de siniestro' + n, paso: 'ordenes', campo: marca('siniestro') });
-  if (t.exige_or && !String(b.numero_or || '').trim())
-    faltan.push({ rot: 'El N° de OR de la empresa' + n, paso: 'ordenes', campo: marca('numero_or') });
+  /* 🔴 LA OR DE LA EMPRESA NO TRABA EL INGRESO (30-08-2026, Marco: «tampoco
+     debe ser un campo prerrequisito para avanzar»).
+
+     Era obligatoria y no debia serlo: ese numero es de la EMPRESA —su
+     trazabilidad, su papeleo— y muchas veces no lo traen en el momento en que
+     el auto llega. La OR del taller no depende de el: la genera el correlativo
+     del sistema al crear la OT, y este se guarda aparte en `or_externa` como
+     lo que es, un dato de referencia.
+
+     Un campo obligatorio que la recepcionista no puede completar deja el
+     vehiculo sin ingresar, que es exactamente lo contrario de lo urgente. */
   return faltan;
 }
 

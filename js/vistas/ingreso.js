@@ -112,8 +112,20 @@ function pantallaIngreso(motivo) {
   }
   document.querySelectorAll('.velo-ingreso').forEach((v) => v.remove());
 
-  const gente = Modelo.sesionesPosibles();
-  const mostrar = verCredenciales();
+  /* 🔴 NO SE ENTRA HASTA QUE BAJEN LAS CUENTAS DE VERDAD (30-08-2026).
+
+     Las claves viven en la nube; la semilla solo es el respaldo por si
+     Firestore no contesta. Entre que se abre la pagina y que la nube contesta
+     pasan unos quince segundos, y en esa ventana las cuentas que hay son las
+     de la semilla —con la clave compartida de la demostracion—. Quien
+     alcanzara a entrar ahi se quedaba adentro cuando llegaban los datos
+     reales, o sea: cambiar las claves no servia de nada durante quince
+     segundos.
+
+     El boton espera. Es ademas lo que corresponde en pantalla: entrar y que
+     los datos cambien debajo tres segundos despues no se entiende. */
+  const esperando = typeof Base !== 'undefined' && Base.usaLaNube && Base.usaLaNube() &&
+    Modelo.origenDeLosDatos() !== 'nube';
 
   const velo = document.createElement('div');
   velo.className = 'velo-ingreso';
@@ -134,32 +146,11 @@ function pantallaIngreso(motivo) {
                autocomplete="username" autocapitalize="off" spellcheck="false"></div>
       <div class="campo"><label for="ing-clave">Clave</label>
         <input id="ing-clave" name="password" type="password" autocomplete="current-password"></div>
-      <button class="btn" type="submit">Entrar</button>
+      <button class="btn" type="submit" id="ing-entrar"${esperando ? ' disabled' : ''}>${
+        esperando ? 'Cargando los datos del taller…' : 'Entrar'}</button>
     </form>
 
     <div class="pie-ing">
-      <button type="button" class="enlace" id="ing-ver">
-        ${mostrar ? 'Ocultar las credenciales de demostración' : 'Ver credenciales de demostración'}
-      </button>
-
-      ${mostrar ? `
-      <div class="claves-demo">
-        <div class="tit"><span>Cuentas de demostración</span>
-          <button type="button" id="ing-nunca">No mostrarlas más</button></div>
-        <table><tbody>
-          ${gente.map((p) => '<tr><td><strong>' + esc(p.nombre) + '</strong>' +
-            '<div class="cargo">' + esc(p.cargo) + ' · ficha ' + esc(p.ficha) + '</div></td>' +
-            '<td><span class="cod">' + esc(p.usuario) + '</span><br>' +
-            (p.claveDemo
-              ? '<button type="button" class="entrar" data-ing-como="' + esc(p.id) + '">' +
-                esc(p.claveDemo) + ' · entrar</button>'
-              : '<span class="cargo">clave cambiada</span>') +
-            '</td></tr>').join('')}
-        </tbody></table>
-        <div class="aviso-demo">Están a la vista a propósito: esto corre en el navegador y una clave
-        guardada acá se puede leer. <strong>Es un ingreso modelado, no una autenticación.</strong></div>
-      </div>` : ''}
-
       <div class="firma">Automotora D y P · Sistema de control de taller<br>
         Arttmize SpA</div>
     </div>
@@ -193,23 +184,18 @@ function pantallaIngreso(motivo) {
     entrar(usuario.value, clave.value);
   });
 
-  document.getElementById('ing-ver').addEventListener('click', () => {
-    fijarVerCredenciales(!verCredenciales());
-    pantallaIngreso(motivo);
-  });
-
-  const nunca = document.getElementById('ing-nunca');
-  if (nunca) nunca.addEventListener('click', () => {
-    fijarVerCredenciales(false);
-    pantallaIngreso(motivo);
-  });
-
-  // Entrar de un clic desde la lista: en una presentación en vivo, escribir la
-  // clave letra por letra no aporta nada.
-  velo.querySelectorAll('[data-ing-como]').forEach((b) => b.addEventListener('click', () => {
-    const p = gente.find((x) => x.id === b.dataset.ingComo);
-    if (p) entrar(p.usuario, p.claveDemo);
-  }));
+  /* Mientras la nube no conteste el boton esta apagado; cuando llega, se
+     repinta la pantalla sola para encenderlo. Sin esto habria que recargar. */
+  if (esperando) {
+    let vueltas = 0;
+    const reloj = setInterval(() => {
+      if (!document.body.contains(velo)) { clearInterval(reloj); return; }
+      if (Modelo.origenDeLosDatos() === 'nube' || ++vueltas > 60) {
+        clearInterval(reloj);
+        if (document.body.contains(velo)) pantallaIngreso(motivo);
+      }
+    }, 500);
+  }
 }
 
 /* Lo que pasa una vez adentro: se dibuja el marco con el menú que le

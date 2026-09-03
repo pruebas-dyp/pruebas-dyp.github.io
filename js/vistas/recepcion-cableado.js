@@ -460,6 +460,34 @@ function recEntrarAlFormulario(paso) {
   return r;
 }
 
+/* 🔴 IR A UN PASO CUALQUIERA, RESPETANDO LA REGLA (31-08-2026).
+
+   Las pastillas numeradas ya la respetaban; el botón «Agregar fotos» de la
+   barra no, y aterrizaba en el paso 4 con los campos del 1 en blanco. Marco lo
+   vio. Esto es la misma comprobación que hacen las pastillas, en un solo lugar,
+   para que el próximo botón que quiera saltar a un paso la herede.
+
+   Devuelve `true` si llegó y `false` si rechazó — quien llama necesita saberlo
+   para no seguir haciendo cosas sobre un paso al que no se llegó. */
+function recIrAlPaso(id) {
+  const r = recEntrarAlFormulario();
+  const j = RECEPCION_PASOS.findIndex((x) => x.id === id);
+  if (j < 0) return false;
+  if (!recAlcanzable(j)) {
+    const faltan = [];
+    RECEPCION_PASOS.slice(0, j).forEach((x) => faltan.push.apply(faltan, recFaltantesDe(x.id)));
+    /* Se deja a la persona en el primer paso que le falta algo, no en el que
+       quiso alcanzar: ahí es donde tiene que escribir. */
+    if (faltan.length) r.paso = faltan[0].paso;
+    guardarBorrador();
+    recRechazar(faltan);
+    return false;
+  }
+  r.paso = id; r.marcados = [];
+  guardarBorrador(); render();
+  return true;
+}
+
 function recIrAVerificar() {
   // Desde el menú, `Ingresar recepción` entra al formulario: es lo que se pidió.
   const r = recEntrarAlFormulario();

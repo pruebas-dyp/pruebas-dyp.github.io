@@ -39,7 +39,35 @@ const Modelo = (function () {
   /* El CLIENTE, desde el 15-08-2026, tampoco tiene apellido aparte: su nombre
      completo vive entero en `nombres`. Esta misma función sirve para los dos
      porque nunca supuso que el apellido estuviera. */
-  const nombreDe = (p) => (p ? String((p.nombres || '') + ' ' + (p.apellidos || '')).trim() : '');
+  /* 🔴 EL NOMBRE, COMO SE ESCRIBE UN NOMBRE (30-08-2026, Marco: «a los nombres
+     sacales el parentesis y dejalo con mayuscula a Carlos»).
+
+     De su base venia `carlos (Beto) Rodriguez`, con la inicial en minuscula, y
+     salia igual en el desplegable de encargado, en la Torre, en el historial y
+     en el presupuesto impreso que se le manda a la compañia.
+
+     ⚠️ EL APODO SE QUEDA. La primera version de esto tambien borraba lo que iba
+     entre parentesis y estaba mal leido: el parentesis que sobraba era el
+     «(7)» que el sistema pegaba al final —las etapas abiertas—, no el «(Beto)»,
+     que es como lo llaman en el taller y sirve para reconocerlo. Se saco en
+     `etapas.js`, donde nacia.
+
+     Esto es PRESENTACION: el dato guardado no se toca, asi que el dia que
+     alguien corrija la ficha en Personal, manda la ficha.
+
+     La palabra que viene entera en minuscula se capitaliza. Las particulas
+     castellanas quedan como estan —«juan de la cruz» es «Juan de la Cruz» y no
+     «Juan De La Cruz»— y lo que ya trae mayuscula no se toca, para no romper un
+     «McKay», un «O'Brien» ni el propio «(Beto)». */
+  const PARTICULAS = ['de', 'del', 'la', 'las', 'los', 'y', 'e', 'da', 'do', 'van', 'von'];
+  const enBonito = (t) => String(t || '')
+    .replace(/\s+/g, ' ').trim()
+    .split(' ')
+    .map((w, i) => (w === w.toLowerCase() && (i === 0 || PARTICULAS.indexOf(w) < 0)
+      ? w.charAt(0).toUpperCase() + w.slice(1)
+      : w))
+    .join(' ');
+  const nombreDe = (p) => (p ? enBonito((p.nombres || '') + ' ' + (p.apellidos || '')) : '');
 
   /* Los cuatro estados del inventario salen del catálogo de la semilla, nunca
      escritos a mano. Un valor desconocido —o una fila vieja, con el booleano
@@ -57,6 +85,11 @@ const Modelo = (function () {
   }
 
   let db = null;
+  /* De dónde salen los datos que hay en memoria. Se declara acá arriba —y no
+     junto a `adoptarNube`, que sería lo natural— porque `sembrar()` la
+     necesita y corre mucho antes. */
+  let origen = 'demostracion';     // 'demostracion' | 'nube'
+  let resumen = null;
   let modificado = false;
   let version = 0;          // sube en cada mutación: invalida los memos
   const memo = {};
@@ -91,32 +124,148 @@ const Modelo = (function () {
     return valor && typeof valor === 'object' && valor.__fecha ? new Date(valor.__fecha) : valor;
   }
 
-  function guardar() {
+  /* 🔴 LAS CUENTAS SE GUARDAN APARTE, Y ANTES QUE LA BASE (31-08-2026).
+
+     El dueño del sistema: «cada vez que pincho una ventana emergente me pide
+     clave», «si refresco la pantalla también me pide la clave nuevamente». A
+     Marco no le pasaba. El dueño usa Mac.
+
+     LO MEDIDO. El conjunto de trabajo —92 órdenes vivas y todo lo que cuelga—
+     pesa 2,70 MB de texto, y `localStorage` cuenta en UTF-16: 5,41 MB contra un
+     límite de 5 MB. Ya no cabe. Y `db.media_sala` puede sumar hasta 3 MB más de
+     fotos en base64 cuando la sala compartida está prendida.
+
+     LO QUE PASABA. `guardar()` era todo o nada: si `setItem` reventaba se perdía
+     la base ENTERA y sólo quedaba un `console.warn`. Al recargar, `cargar()`
+     devolvía null, el sistema volvía a la semilla —que no tiene las cuentas
+     reales— y `retomar_sesion()` buscaba a la persona de la sesión en
+     `db.persona`, no la encontraba, y mandaba a la pantalla de ingreso.
+
+     La sesión nunca se perdió: el id seguía en `sessionStorage`, que sobrevive a
+     un F5. Lo que faltaba era la CUENTA contra la cual comprobarlo.
+
+     Y por eso a uno sí y al otro no: 5,41 contra 5,00 es un borde. Lo cruza
+     quien tenga la sala prendida, quien haya abierto un par de órdenes del
+     Histórico, o quien use el navegador más estricto con la cuota.
+
+     Las cuentas son unos 50 KB y se escriben PRIMERO, para que ganen el espacio
+     antes que la base. Con eso la sesión sobrevive aunque la base no quepa. */
+  const CLAVE_CUENTAS = 'dyp-cuentas-v1';
+  const TABLAS_DE_CUENTA = ['persona_rol', 'persona_permiso', 'persona_etapa'];
+  const CATALOGOS_DE_CUENTA = ['rol', 'permiso', 'rol_permiso'];
+
+  function guardarCuentas() {
+    /* 🔴 SOLO CON LA BASE DE VERDAD. Al arrancar sin base guardada, `sembrar()`
+       carga la semilla y llama a `guardar()` en el acto. Si esto escribiera
+       tambien ahi, la cache real quedaria pisada por las cuentas de la
+       demostracion antes de que `retomar_sesion` alcanzara a mirarla — y el
+       dueño terminaria en la pantalla de ingreso igual que antes. Pasó en la
+       primera version de este arreglo y se vio en la prueba. */
+    if (origen !== 'nube') return;
     try {
-      localStorage.setItem(CLAVE, JSON.stringify({ modificado, sello: Semilla.SELLO, db }, aJSON));
+      const cuentas = (db.persona || []).filter((p) => p.usuario);
+      if (!cuentas.length) return;
+      const suyas = {};
+      cuentas.forEach((p) => { suyas[p.id] = true; });
+      const dato = { persona: cuentas };
+      TABLAS_DE_CUENTA.forEach((t) => {
+        dato[t] = (db[t] || []).filter((f) => suyas[f.persona_id]);
+      });
+      CATALOGOS_DE_CUENTA.forEach((t) => { dato[t] = db[t] || []; });
+      localStorage.setItem(CLAVE_CUENTAS, JSON.stringify(dato, aJSON));
+    } catch (e) { /* sin almacenamiento: se entra a mano, como antes */ }
+  }
+
+  /* Devuelve las cuentas al modelo cuando la base con que arrancó no las trae
+     —porque no cupo y se volvió a la semilla—. Sólo AGREGA lo que falta: nunca
+     pisa una fila que ya está, que sería reemplazar datos frescos por la copia.
+
+     No es una puerta nueva. Estas cuentas salieron de esta misma base, en este
+     mismo navegador, y traen la huella de la clave, no la clave. Para entrar
+     hay que teclearla igual; lo que esto permite es que un F5 no eche a quien
+     ya la tecleó. */
+  /* El candado es por INTENTO, no para siempre: al arrancar la caché puede no
+     estar todavía y hay que poder volver a mirar cuando la nube llegue. Lo que
+     evita es releer el almacenamiento en cada llamada de la misma tanda. */
+  let cuentasRepuestas = false;
+  const olvidarQueSeRepuso = () => { cuentasRepuestas = false; };
+  function reponerCuentas() {
+    if (cuentasRepuestas) return false;
+    cuentasRepuestas = true;
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(CLAVE_CUENTAS) || 'null', deJSON); }
+    catch (e) { return false; }
+    if (!d || !Array.isArray(d.persona) || !d.persona.length) return false;
+    let sumadas = 0;
+    ['persona'].concat(TABLAS_DE_CUENTA, CATALOGOS_DE_CUENTA).forEach((t) => {
+      if (!Array.isArray(d[t])) return;
+      db[t] = db[t] || [];
+      const hay = {};
+      db[t].forEach((f) => { if (f && f.id) hay[f.id] = true; });
+      d[t].forEach((f) => { if (f && f.id && !hay[f.id]) { db[t].push(f); sumadas++; } });
+    });
+    if (sumadas) { version++; limpiarMemo(); }
+    return sumadas > 0;
+  }
+
+  /* 🔶 QUÉ SE SUELTA CUANDO NO CABE, Y EN QUÉ ORDEN.
+
+     Primero lo que el sistema puede volver a conseguir solo. `media_sala` son
+     copias de fotos que vuelven a bajar de la sala; `evento` es el historial,
+     que está en la nube; `media` son las fichas de las fotos, que el arranque
+     vuelve a pedir para las 92 órdenes vivas. Lo que NUNCA se suelta es la
+     orden, el presupuesto, el repuesto y la recepción: eso es el trabajo. */
+  const RECORTES = [
+    { quita: [], dice: '' },
+    { quita: ['media_sala'], dice: 'las copias de fotos de la sala' },
+    { quita: ['media_sala', 'evento'], dice: 'las copias de fotos y el historial de eventos' },
+    { quita: ['media_sala', 'evento', 'media'],
+      dice: 'las copias de fotos, el historial de eventos y las fichas de las imágenes' }
+  ];
+
+  /* Lo último que pasó al guardar, para poder DECIRLO en pantalla. Que esto
+     viviera sólo en la consola es la razón por la que el problema estuvo dando
+     vueltas sin que nadie supiera qué miraba. */
+  let recorteAlGuardar = null;
+  const problemaAlGuardar = () => recorteAlGuardar;
+
+  function guardar() {
+    /* Primero las cuentas: son chicas y sostienen la sesión. Si el almacén está
+       al tope, que lo que quede afuera sea la base, no la posibilidad de
+       volver a entrar. */
+    guardarCuentas();
+    for (let i = 0; i < RECORTES.length; i++) {
+      const r = RECORTES[i];
+      let recortada = db;
+      if (r.quita.length) {
+        recortada = {};
+        Object.keys(db).forEach((t) => { recortada[t] = r.quita.indexOf(t) < 0 ? db[t] : []; });
+      }
+      try {
+        localStorage.setItem(CLAVE,
+          JSON.stringify({ modificado, sello: Semilla.SELLO, db: recortada }, aJSON));
+      } catch (e) {
+        if (i < RECORTES.length - 1) continue;
+        /* Ni siquiera lo mínimo cupo. Se anota y se sigue: el sistema funciona
+           en memoria y la nube tiene la verdad. */
+        recorteAlGuardar = { guardo: false, solto: '', motivo: (e && e.message) || 'sin espacio' };
+        console.warn('No se pudo guardar el estado:', e && e.message);
+        return false;
+      }
+      recorteAlGuardar = r.quita.length
+        ? { guardo: true, solto: r.dice, motivo: 'no cabía en este navegador' }
+        : null;
       // Acá y sólo acá cambia el documento guardado, que es lo que la sala manda.
       versionGuardada++;
+      /* Y de acá sale también a Firestore, cuando el sistema está trabajando
+         con la data de verdad. `Base.empujar` NO escribe al toque: espera a que
+         la persona deje de teclear y manda SÓLO las filas que cambiaron. No se
+         espera su respuesta —guardar no puede quedarse esperando a la red— y si
+         falla, lo pendiente se reintenta en el próximo cambio. */
+      if (origen === 'nube' && typeof Base !== 'undefined') Base.empujar(db);
       return true;
-    } catch (e) {
-      /* Cuota llena o file:// sin almacenamiento: el borrador sigue andando
-         en memoria, solo que no recuerda al cerrar.
-
-         🔶 LOS CUATRO `console.warn` DE ESTE ARCHIVO SE QUEDAN, y queda
-         dicho para no volver a discutirlo (COD-2, 22-08-2026). Son los unicos
-         cuatro del proyecto y los cuatro son diagnostico de almacenamiento o de
-         version de esquema: ninguno imprime el dato de una persona, que es lo
-         que los volveria un problema.
-
-         Se quedan porque cuando algo falla en el navegador del cliente son lo
-         unico que hay. Los dos de resiembra ademas repiten en la consola lo
-         que el sistema ya dice en pantalla —`resembradoPorVersion`—, asi que
-         sirven para diagnosticar por telefono sin pedirle nada a nadie.
-
-         Si algun dia se sacan, que sea envolviendolos en una guarda de
-         depuracion y no borrandolos: el diagnostico que dan es real. */
-      console.warn('No se pudo guardar el estado:', e && e.message);
-      return false;
     }
+    return false;
   }
 
   function cargar() {
@@ -131,7 +280,36 @@ const Modelo = (function () {
     }
   }
 
-  function sembrar() { db = Semilla.generar(); modificado = false; version++; limpiarMemo(); alinearSeqEvento(); guardar(); }
+  /* 🔴 SEMBRAR TIENE QUE DECIR QUE LOS DATOS VOLVIERON A SER DE MENTIRA.
+
+     Costó caro descubrirlo y queda escrito para que no se repita. `origen`
+     pasaba a `'nube'` al adoptar la data real, y sembrar NO lo devolvía. O sea
+     que después de «Reiniciar a datos de demostración» el sistema tenía las 222
+     órdenes inventadas en memoria y seguía creyéndose conectado a la nube.
+
+     Las consecuencias, las tres, medidas de verdad en una prueba:
+
+       · La barra de abajo decía «Datos reales · 92 unidades activas» encima de
+         222 autos que no existen.
+       · La sala compartida seguía bloqueada por datos personales que ya no
+         estaban.
+       · Y la grave: `guardar()` EMPUJÓ LAS 222 ÓRDENES DE MENTIRA A FIRESTORE.
+         Los ids de la semilla chocaron con los reales y 222 órdenes del cliente
+         quedaron sobreescritas, más 6.017 documentos inventados agregados.
+         Se restauró todo desde la salida del ETL —nada se perdió, la verdad
+         está en tres lugares— pero pudo no haber sido así.
+
+     Una variable de estado que se enciende en un lado y no se apaga en el otro
+     es una bomba de tiempo. Ahora la apaga el ÚNICO sitio donde nace la
+     demostración, que es acá. */
+  function sembrar() {
+    db = Semilla.generar();
+    origen = 'demostracion'; resumen = null;
+    /* Y la nube se olvida de la huella: la que tenía era de los datos reales, y
+       comparar la semilla contra ella daría «cambió todo». */
+    if (typeof Base !== 'undefined' && Base.soltar) Base.soltar();
+    modificado = false; version++; limpiarMemo(); alinearSeqEvento(); guardar();
+  }
 
   /* ¿La base guardada quedó vieja para este código? Se compara su catálogo de
      permisos con el que trae la semilla. Si falta alguno, ese navegador tiene
@@ -189,6 +367,21 @@ const Modelo = (function () {
   function iniciar() {
     const g = cargar();
     if (!g) return sembrar();
+
+    /* 🔴 Y SI EL DOCUMENTO GUARDADO ES DEL TALLER, TAMPOCO SE RESIEMBRA.
+
+       Se reconoce porque sus órdenes NO están marcadas como demostración. Al
+       publicar una versión nueva cambia el sello, y sin esto el sistema
+       arrancaba borrando los datos reales del navegador para poner la
+       demostración — y recién después la nube los volvía a traer. Entremedio,
+       una pantalla con autos que no existen. */
+    const esDelTaller = g.db && Array.isArray(g.db.orden_trabajo) &&
+      g.db.orden_trabajo.length && !g.db.orden_trabajo.some((o) => o.demo === true);
+    if (esDelTaller && g.sello !== Semilla.SELLO) {
+      db = g.db; modificado = !!g.modificado; origen = 'nube';
+      version++; limpiarMemo(); alinearSeqEvento();
+      return;
+    }
 
     /* 🔴 EL SELLO PRIMERO. Es la comprobación que se da cuenta SIEMPRE: una
        huella de la forma de los datos —cuántas cuentas, con qué usuario, a qué
@@ -260,6 +453,28 @@ const Modelo = (function () {
        arranque con el almacenamiento local, y es lo correcto: un documento de
        otra versión de la semilla no se puede mezclar con ésta. Se avisa en
        pantalla, que para eso está `porQueSeResembro`. */
+    /* 🔴 CON DATOS REALES EL SELLO NO MANDA (30-08-2026).
+
+       El sello compara la forma de la SEMILLA, y existe para que un navegador
+       con datos de demostración viejos no arranque a medias. Con la data del
+       cliente cargada esa comparación no aplica: la verdad es Firestore, no la
+       semilla.
+
+       Y hacía daño de verdad. Con dos pestañas abiertas del sistema —que es
+       como se usa: la Torre en una, la orden en otra— y una de ellas con la
+       versión anterior, el aviso de cambio llegaba a la vieja, ésta veía un
+       sello distinto, VOLVÍA A SEMBRAR la demostración y la escribía. La
+       pestaña buena la leía acto seguido y se quedaba con 222 autos inventados
+       encima de los 92 del taller. Sin un error a la vista.
+
+       Con datos reales se ignora el documento que llegó y se sigue con lo que
+       hay: si de verdad cambió algo, la nube lo trae en el próximo arranque. */
+    if (g.sello !== Semilla.SELLO && origen === 'nube') {
+      console.warn('Llegó un documento de otra versión de la semilla y se ignora: ' +
+        'este navegador está trabajando con los datos del taller.');
+      return false;
+    }
+
     if (g.sello !== Semilla.SELLO) {
       resembradoPorVersion = 'Los datos de demostración se actualizaron a la versión nueva ' +
         'del sistema. Lo que hubiera en la sala compartida se reemplazó.';
@@ -282,6 +497,217 @@ const Modelo = (function () {
     pila.length = 0;   // la pila de deshacer es de esta pestaña y ya no aplica
     return true;
   }
+
+  /* ═══════════════════════════════════════════════════════════════════════
+     LA DATA DE VERDAD. Reemplaza la demostración por los doce años reales.
+
+     🔴 POR QUÉ ES UN INJERTO Y NO UN REEMPLAZO COMPLETO (30-08-2026).
+
+     Podría parecer más limpio que Firestore trajera TODO y la semilla no
+     corriera nunca. No es así, y la razón es que en Firestore no está todo:
+
+       · LOS CATÁLOGOS DEL MODELO NUEVO no vienen del sistema viejo. `estado`,
+         `etapa`, `etapa_prerrequisito`, `compania`, `tipo_ingreso`,
+         `prioridad`, `inventario_item`, `tipo_dano`, `zona_dano`, los roles y
+         los permisos son maestros NUESTROS: definen cómo funciona el sistema
+         nuevo, no cómo funcionaba el viejo. El ETL mapea HACIA ellos.
+
+       · LAS CUENTAS tampoco. El legacy guarda las claves en MD5-crypt, un
+         algoritmo de 1994, y migrar ese hash sería heredar el problema y
+         hacerlo nuestro. Las cuentas con las que se entra son las de la
+         semilla; las 6.550 personas que llegan de Firestore son CLIENTES y
+         los trabajadores del taller, y ninguna tiene con qué entrar.
+
+     Entonces: la semilla pone el esqueleto —catálogos y cuentas— y Firestore
+     pone la carne. Lo que se reemplaza es la OPERACIÓN, que es justo donde
+     estaban los datos de mentira.
+
+     ⚠️ Y ACÁ SE VA LA DEMOSTRACIÓN. Las 222 órdenes inventadas, sus 222 autos,
+     sus 224 personas y todo lo que colgaba de ellas se reemplazan de una vez,
+     por tabla completa. No queda una fila mezclada: no es un filtro por
+     `demo:true` —que sólo estaba en dos tablas— sino que la tabla entera se
+     cambia por la de verdad. Se puede comprobar, y `resumenNube()` lo dice.
+     ═══════════════════════════════════════════════════════════════════════ */
+
+  /* Las tablas de OPERACIÓN: se reemplazan enteras por lo que traiga la nube.
+     Si la nube no trae una, queda VACÍA y no con los datos de mentira — que un
+     auto de demostración aparezca entre los reales es peor que una tabla
+     vacía: se ve como un dato del cliente y no lo es. */
+  const TABLAS_DE_LA_NUBE = [
+    'orden_trabajo', 'vehiculo', 'recepcion', 'recepcion_inventario',
+    'recepcion_correccion', 'presupuesto', 'presupuesto_linea', 'repuesto',
+    'ot_etapa', 'ot_estadia', 'ot_detencion', 'costo_adicional', 'compromiso',
+    'bitacora', 'evento', 'media', 'aviso', 'dano',
+    /* Los tres catálogos del vehículo también son reales: 73 marcas, 1.016
+       modelos y 168 colores salidos de doce años, contra las 20/80/16 que
+       inventaba la semilla. Van juntos con `vehiculo` a propósito — los autos
+       apuntan a ESTOS ids, y dejar el catálogo viejo dejaría cada auto sin
+       marca. */
+    'marca', 'modelo', 'color_vehiculo'
+  ];
+
+
+  /* 🔴 LO QUE ESTE EQUIPO NO ALCANZO A SUBIR NO SE PISA (30-08-2026).
+
+     `adoptarNube` reemplaza las tablas enteras con lo que trae la nube, y eso
+     es correcto: la nube es la verdad. Pero si este equipo tenia trabajo que
+     nunca salio de aca —una recepcion hecha en el telefono antes de que se
+     congelara la pagina— ese reemplazo lo borra sin decir nada.
+
+     Se repone DESPUES de adoptar y DESPUES de tomar la huella, a proposito: asi
+     queda marcado como distinto de lo que hay en la nube y el proximo empujon
+     lo manda. Al reves quedaria dado por sincronizado y se perderia igual, solo
+     que mas tarde.
+
+     Se repone por id: si la nube ya trae esa fila —porque alcanzo a subir desde
+     otro equipo— gana la de aca, que es la que la persona vio por ultima vez. */
+  function reponerPendientes(lista) {
+    if (!Array.isArray(lista) || !lista.length) return 0;
+    let n = 0;
+    lista.forEach((x) => {
+      const t = x && x.tabla;
+      if (!t || !x.fila || !x.fila.id) return;
+      if (!Array.isArray(db[t])) db[t] = [];
+      const i = db[t].findIndex((f) => f && f.id === x.fila.id);
+      if (i >= 0) db[t][i] = x.fila; else db[t].push(x.fila);
+      n++;
+    });
+    version++; limpiarMemo(); alinearSeqEvento();
+    return n;
+  }
+
+  function adoptarNube(tablas) {
+    if (!db) iniciar();
+    if (!tablas || !Array.isArray(tablas.orden_trabajo) || !tablas.orden_trabajo.length)
+      return { ok: false, motivo: 'La nube no devolvió ninguna orden.' };
+
+    const antes = { ordenes: (db.orden_trabajo || []).length,
+                    demo: (db.orden_trabajo || []).filter((o) => o.demo === true).length };
+
+    TABLAS_DE_LA_NUBE.forEach((t) => { db[t] = tablas[t] || []; });
+
+    /* PERSONA es la única que se mezcla, y tiene que ser así: de un lado están
+       las cuentas con las que se entra al sistema —que viven en la semilla y
+       tienen `usuario` y `clave_hash`—, y del otro los clientes y trabajadores
+       reales, que no tienen ninguna de las dos.
+
+       Se conserva TODA cuenta que pueda entrar. Si en vez de esto se
+       reemplazara la tabla entera, el sistema quedaría con 6.675 personas y
+       CERO cuentas: nadie podría entrar, ni siquiera el administrador. */
+    /* 🔴 LAS CUENTAS TAMBIEN VIENEN DE LA BASE DESDE EL 30-08-2026.
+
+       Antes se conservaban las de la semilla, o sea las que iban escritas en el
+       codigo publicado. Eso tenia una consecuencia que no se veia: cambiarle un
+       modulo a alguien desde Configuracion no servia de nada, porque al
+       recargar volvia a mandar la semilla. La configuracion de quien ve que
+       tiene que vivir donde vive el resto del sistema.
+
+       Si la nube no las trae, se quedan las de la semilla. No es un respaldo
+       decorativo: sin cuentas no entra NADIE, ni el administrador. */
+    const deLaNube = (tablas.cuenta || []).filter((x) => x && x.usuario);
+    const cuentas = deLaNube.length
+      ? deLaNube
+      : (db.persona || []).filter((x) => x && x.usuario);
+    const suyos = (tablas.persona || []).filter((x) => x && !x.usuario);
+    const yaEsta = {};
+    cuentas.forEach((c) => { yaEsta[c.id] = true; });
+    db.persona = cuentas.concat(suyos.filter((x) => !yaEsta[x.id]));
+
+    /* Los permisos y roles cuelgan de las cuentas, no de los clientes: se
+       limpian los que apuntaban a una persona de demostración que ya no está. */
+    /* Los catalogos del sistema, si la nube los trajo. Van uno por uno y sólo
+       si tienen filas: un catalogo vacio deja el sistema sin estados, sin
+       etapas o sin permisos, y eso no se ve como un error — se ve como un
+       sistema a medias. */
+    ['estado', 'etapa', 'etapa_prerrequisito', 'compania', 'tipo_ingreso',
+     'prioridad', 'asunto_bitacora', 'responsable_pago', 'motivo_detencion',
+     'inventario_item', 'tipo_dano', 'zona_dano', 'parametro',
+     'rol', 'permiso', 'rol_permiso',
+     'persona_rol', 'persona_permiso', 'persona_etapa'].forEach((t) => {
+      if (Array.isArray(tablas[t]) && tablas[t].length) db[t] = tablas[t];
+    });
+
+    const hay = {};
+    db.persona.forEach((x) => { hay[x.id] = true; });
+    ['persona_rol', 'persona_permiso', 'persona_etapa'].forEach((t) => {
+      db[t] = (db[t] || []).filter((x) => hay[x.persona_id]);
+    });
+
+    origen = 'nube';
+    /* 🔴 EL AVISO DE LA DEMOSTRACION MIENTE UNA VEZ QUE ENTRAN LOS DATOS REALES
+       (30-08-2026).
+
+       `resembradoPorVersion` se enciende cuando el arranque no reconoce el
+       sello y vuelve a sembrar. Eso pasa un instante ANTES de que la nube
+       conteste, asi que el cartel quedaba armado y se mostraba despues, ya con
+       las 92 del taller en pantalla: «Los datos de demostracion se
+       actualizaron... lo que hubiera en la sala se reemplazo», con la barra de
+       abajo diciendo «Datos reales - 92 unidades activas» al mismo tiempo.
+
+       A quien lo lee le dice que le pisaron el trabajo. No le pisaron nada: la
+       demostracion que se resembro es justo lo que la nube acaba de reemplazar.
+       El aviso se apaga porque ya no describe nada que haya pasado. */
+    resembradoPorVersion = null;
+    resumen = {
+      cuando: new Date(),
+      ordenes: db.orden_trabajo.length,
+      vehiculos: db.vehiculo.length,
+      personas: db.persona.length,
+      cuentas: cuentas.length,
+      demoQueSalio: antes.demo,
+      ordenesAntes: antes.ordenes,
+      /* La comprobación que importa: después de esto NO puede quedar una sola
+         fila de demostración en la operación. Si queda, algo salió mal y hay
+         que verlo en pantalla, no descubrirlo con un cliente al lado. */
+      demoQueQueda: TABLAS_DE_LA_NUBE.reduce((n, t) =>
+        n + (db[t] || []).filter((x) => x && x.demo === true).length, 0)
+    };
+
+    modificado = false; version++; limpiarMemo(); alinearSeqEvento(); guardar();
+    return { ok: true, motivo: '', resumen };
+  }
+
+  /* Trae filas de la nube y las SUMA a lo que ya hay, sin pisar nada.
+
+     Es lo que usa el Histórico: en memoria sólo viven las 92 órdenes activas
+     —el 0,7 %—, así que buscar en los doce años exige ir a preguntar. Lo que
+     vuelve se mezcla acá y desde ese momento el resto del sistema lo trata como
+     a cualquier otra orden: se puede abrir su expediente, ver sus fotos e
+     imprimir su ficha, sin una sola línea especial para «las viejas».
+
+     🔴 NO MARCA EL DOCUMENTO COMO MODIFICADO, y es la parte importante. Estas
+     filas vienen de la nube tal cual están allá: si se marcaran como cambiadas,
+     el próximo empujón las devolvería a Firestore —cientos de documentos que
+     nadie tocó, escritos encima de sí mismos—. Buscar no es editar. */
+  function mezclarNube(tablas) {
+    if (!db || !tablas) return { ok: false, motivo: 'sin base' };
+    let sumadas = 0;
+    Object.keys(tablas).forEach((t) => {
+      if (!Array.isArray(db[t]) || !Array.isArray(tablas[t])) return;
+      const hay = {};
+      db[t].forEach((x) => { if (x && x.id) hay[x.id] = true; });
+      tablas[t].forEach((x) => {
+        if (x && x.id && !hay[x.id]) { db[t].push(x); hay[x.id] = true; sumadas++; }
+      });
+    });
+    if (sumadas) {
+      /* Se avisa a la nube que estas filas ya las conoce, ANTES de guardar: si
+         no, `guardar()` dispara el empujón y las ve como nuevas. */
+      if (typeof Base !== 'undefined' && Base.conectada()) Base.anotarHuella(db);
+      version++; limpiarMemo(); alinearSeqEvento();
+      try { localStorage.setItem(CLAVE, JSON.stringify({ modificado, sello: Semilla.SELLO, db }, aJSON)); }
+      catch (e) { /* no cabe: se queda en memoria, que es lo que esta pantalla necesita */ }
+    }
+    return { ok: true, motivo: '', sumadas };
+  }
+
+  /* ¿Lo que hay en memoria son datos de personas de verdad? Lo pregunta la
+     sala compartida antes de subir nada: su documento es legible por cualquiera
+     que abra el código del sitio, y ahí no puede ir el RUT ni el domicilio de
+     6.550 clientes. Ver el bloque rojo en `sala.js`. */
+  const esReal = () => origen === 'nube';
+  const origenDeLosDatos = () => origen;
+  const resumenNube = () => resumen;
 
   function reiniciar() {
     try { localStorage.removeItem(CLAVE); } catch (e) { /* sin almacenamiento */ }
@@ -470,11 +896,36 @@ const Modelo = (function () {
          acá para que la torre la pueda mostrar aunque todavía no se haya
          valorizado nada — que es el caso de toda orden recién ingresada. */
       numeroOR: o.numero_or || null,
+      /* 🔴 CUANTAS ORDENES DE REPARACION TIENE (30-08-2026). Es lo que su Torre
+         muestra en la columna «OR»: no el número, sino cuántas. La OT 23556
+         tiene dos y la columna dice 2. El número sigue en `numeroOR`, que es lo
+         que se busca en el Histórico. */
+      ors: Number(o.ors) || (o.numero_or ? 1 : 0),
+      /* 🔴 LOS DÍAS QUE MUESTRA SU TORRE (30-08-2026).
+
+         No son los días desde el ingreso: son los que pasaron desde el último
+         CAMBIO DE ESTADO. La OT 23435 entró el 23-07 —38 días— y su Torre dice
+         20, que son los que van desde el 10-08, cuando pasó a «Fuera de
+         taller». Sale de `tb_ordenes.fecha`, la fecha propia de la orden que
+         su sistema regraba al tocar el estado: explica las 92 de 92. Ya estaba
+         anotado en el encabezado de esta columna sin saber que era literal:
+         «en el original hay uno solo y se reinicia al regrabar el estado».
+
+         Y es mejor pregunta que la nuestra: no mide cuánto lleva el auto, mide
+         CUÁNTO LLEVA ATASCADO. Un auto de 108 días que avanzó ayer no es el
+         problema; uno de 20 que no se mueve, sí. */
+      diasEstado: Reglas.dias(o.regrabado_at || o.fecha_ingreso, Reglas.hoyEnChile()),
       patente: veh.patente,
       marca: (ix.marca.get(veh.marca_id) || {}).nombre,
-      modelo: (ix.modelo.get(veh.modelo_id) || {}).nombre,
+      /* 🔴 CON RESPALDO AL TEXTO (30-08-2026). El sistema viejo guarda el
+         modelo del auto como TEXTO libre, no como referencia a un catalogo.
+         El ETL cruza y llena `modelo_id` en 12.892 de 13.201; los 309 que no
+         calzan traen su nombre en `modelo_texto`. Sin este respaldo esos autos
+         mostraban la columna Modelo en blanco, y su Torre de Control SI la
+         muestra: seria una funcion que perdimos en la migracion. */
+      modelo: (ix.modelo.get(veh.modelo_id) || {}).nombre || veh.modelo_texto || '',
       anio: veh.anio,
-      color: (ix.color.get(veh.color_id) || {}).nombre,
+      color: (ix.color.get(veh.color_id) || {}).nombre || veh.color_texto || '',
       vin: veh.vin,
       cliente: nombreDe(cli),
       rut: cli.rut, telefono: cli.telefono, direccion: cli.direccion, correo: cli.correo,
@@ -648,6 +1099,12 @@ const Modelo = (function () {
         };
       }),
 
+      /* La venta calculada al migrar, para las órdenes viejas cuyos
+         presupuestos no están en memoria. Ver `plataDe` en historico.js. */
+      ventaGuardada: (o.venta_mo != null || o.venta_rep != null || o.venta_tot != null)
+        ? { mo: Number(o.venta_mo) || 0, rep: Number(o.venta_rep) || 0,
+            tot: Number(o.venta_tot) || 0 }
+        : null,
       presupuestos: (ix.presupuestosDeOT.get(o.id) || [])
         .sort((a, b) => a.version - b.version)
         .map((p) => {
@@ -717,8 +1174,28 @@ const Modelo = (function () {
     const hayFiltro = f.todo || ['patente', 'cliente', 'compania_id', 'estado', 'desde', 'hasta']
       .some((k) => f[k]);
     if (!hayFiltro) return [];
+    /* 🔴 EL PERÍODO SE RECORTA ACÁ, SOBRE LA FILA CRUDA (31-08-2026).
+
+       Debajo está el `.map(vistaOT)`, que arma la vista completa de cada orden:
+       sus relojes, su plata, sus etapas. Con las 92 vivas en memoria daba lo
+       mismo; con las 15.534 del histórico cargadas, la Reportería construía
+       quince mil vistas para quedarse con las mil seiscientas del período, y en
+       cada repintado. La pantalla dejaba de responder por más de 45 segundos.
+
+       Esto no cambia el resultado: el filtro de fechas de más abajo sigue
+       siendo el que manda. Sólo evita armar lo que se va a botar. */
+    const enFecha = (o) => {
+      if (!f.entregada_desde && !f.entregada_hasta) return true;
+      const d = o.fecha_entrega_real;
+      if (!d) return false;
+      const t = (d instanceof Date) ? d.getTime() : new Date(d).getTime();
+      if (f.entregada_desde && t < f.entregada_desde.getTime()) return false;
+      if (f.entregada_hasta && t > f.entregada_hasta.getTime()) return false;
+      return true;
+    };
     return db.orden_trabajo
       .filter((o) => Reglas.esFinal(db, o.estado))
+      .filter(enFecha)
       .map(vistaOT)
       .filter(enAlcance)
       .filter((o) => {
@@ -755,6 +1232,16 @@ const Modelo = (function () {
      que si no existiera. Distinguir "no existe" de "existe pero no es tuya" se
      hace aparte, con `otFueraDeAlcance`, para poder escribir un mensaje que no
      mienta sin regalar de paso qué patentes hay en el taller. */
+  /* 🔴 CONTAR NO ES CONSTRUIR (31-08-2026). La barra de estado del Histórico
+     pedía `historico({todo:true}).length`, y eso arma la vista completa de las
+     15.534 órdenes —con sus relojes, su plata y sus etapas— para quedarse con
+     un número. En cada repintado. Medido: 44 segundos por repintado con el
+     histórico cargado, contra 43 milisegundos que cuesta la pantalla entera.
+
+     Esto recorre las filas crudas y no construye nada. */
+  const cuantasEntregadas = () =>
+    db.orden_trabajo.filter((o) => Reglas.esFinal(db, o.estado)).length;
+
   const otPorId = (id) => {
     const o = db.orden_trabajo.find((x) => x.id === id);
     if (!o) return null;
@@ -1029,6 +1516,12 @@ const Modelo = (function () {
         id: b.id, fecha: b.fecha, mensaje: b.mensaje,
         asunto: (ix.asunto.get(b.asunto_id) || {}).nombre,
         destinatario: (() => { const p = ix.persona.get(b.destinatario_id); return p ? nombreDe(p) : '—'; })(),
+        /* 🔴 QUIEN ESCRIBIO EL MENSAJE (30-08-2026). No se devolvia, así que la
+           tabla no lo mostraba — y su sistema sí: cada mensaje empieza con «De:
+           Iván Villalobos». Un mensaje sin autor sirve la mitad: cuando la
+           compañía discute lo que se le dijo, lo primero que se pregunta es
+           quién lo dijo. El dato estaba migrado desde el principio. */
+        autor: (() => { const p = ix.persona.get(b.autor_id); return p ? nombreDe(p) : '—'; })(),
         apagada: !!b.alerta_apagada
       }));
   }
@@ -1225,6 +1718,19 @@ const Modelo = (function () {
       db.inventario_item.forEach((it) => {
         const pedido = (ficha.inventario || {})[it.id];
         db.recepcion_inventario.push({
+          /* 🔴 SIN `id` ESTAS FILAS NO LLEGABAN A LA NUBE (30-08-2026).
+
+             La tabla nacio como una lista suelta colgada de la recepcion y no
+             necesitaba id: en el navegador basta con `recepcion_id + item_id`.
+             Desde que el sistema escribe en Firestore, un documento sin id no
+             se puede direccionar y el empujon lo saltaba EN SILENCIO — la
+             recepcion se guardaba, la pantalla decia que si, y al dia siguiente
+             el auto no tenia checklist. Justo el papel que se mira cuando el
+             cliente reclama que le falta algo.
+
+             El id se arma con los dos campos que ya lo identificaban, asi que
+             volver a guardar el mismo item no crea un duplicado: lo pisa. */
+          id: rec_id + '-' + it.id,
           recepcion_id: rec_id, item_id: it.id,
           estado: invValidos.indexOf(pedido) >= 0 ? pedido : Semilla.INVENTARIO_POR_OMISION,
           observacion: (ficha.obsInventario || {})[it.id] || ''
@@ -2549,6 +3055,29 @@ const Modelo = (function () {
       descripcion: '', horas_dm: 0, horas_rep: 0, horas_pint: 0,
       codigo: '', cantidad: 1, proveedor: '', precio_unitario: 0
     }, l, { proveedor: Reglas.normalizarProveedor(l.proveedor) })));
+
+    /* 🔴 EL PRESUPUESTO NACE CON UNA FILA EN CADA BLOQUE (30-08-2026, Marco:
+       «que ya esten generados una fila en Repuestos y en Trabajos externos
+       TOT»).
+
+       Los tres bloques empezaban vacios, con el cartel «Sin repuestos» y un
+       boton «Añadir» abajo. Para escribir la primera pieza habia que bajar,
+       encontrar el boton y recien ahi aparecia donde escribir. Mano de obra no
+       tenia el problema porque casi siempre llega con lineas; los otros dos si.
+
+       Solo cuando el presupuesto se abre VACIO, que es el caso de la pantalla.
+       Si viene con lineas —una version nueva, o la carga de su sistema— se
+       respeta lo que trae y no se le cuelga nada. */
+    if (!(lineas || []).length) {
+      [['repuesto', 2], ['externo', 3]].forEach(([bloque, n]) => {
+        db.presupuesto_linea.push({
+          id: pid + '-l' + n, presupuesto_id: pid, orden: n, bloque,
+          proceso: bloque === 'externo' ? 'externo' : 'cambio',
+          descripcion: '', horas_dm: 0, horas_rep: 0, horas_pint: 0,
+          codigo: '', cantidad: 1, proveedor: '', precio_unitario: 0
+        });
+      });
+    }
     recalcularPresupuesto(pid);
 
     encolarAviso(ot_id, 'Presupuesto ' + numero_or + ' creado',
@@ -3036,8 +3565,20 @@ const Modelo = (function () {
        cuando el presupuesto es sólo mano de obra y cuando los repuestos ya
        estaban pedidos, y ninguna de las dos cosas es motivo para no aprobar.
        Por eso se ignora el resultado a propósito y sólo se cuenta lo creado. */
+    /* 🔴 ENVIAR ES EL ACTO FINAL (30-08-2026, Marco: «eso no debe pasar por
+       aprobacion. Cuando se envia es que se genera nomas»).
+
+       Acá los repuestos bajaban a bodega recién al APROBAR, y aprobar era un
+       boton aparte que alguien tenia que acordarse de apretar despues. En el
+       taller eso no ocurre: se manda el presupuesto y con eso queda hecho. Un
+       paso que nadie da es un paso donde el trabajo se queda parado, y lo que
+       se quedaba parado eran las piezas.
+
+       `aprobado` sigue disparando: las 86 ordenes que ya venian aprobadas de
+       su sistema son de antes de esta regla, y la funcion se niega sola si las
+       piezas ya estaban pedidas — no las pide dos veces. */
     let pedidos = 0;
-    if (estado === 'aprobado') {
+    if (estado === 'enviado' || estado === 'aprobado') {
       const gen = generar_repuestos_desde_presupuesto(pid);
       if (gen && gen.ok) pedidos = gen.creados || 0;
     }
@@ -4026,6 +4567,58 @@ const Modelo = (function () {
      cerrar, y que una cuenta desactivada no entre. */
   const CLAVE_SESION = 'dyp-sesion';
 
+  /* 🔴 LA SESIÓN ES DEL EQUIPO, NO DE LA PESTAÑA (31-08-2026, Marco).
+
+     «Si él no cerró sesión debiese poder entrar si copia la url.» Antes no
+     podía: la sesión vivía sólo en `sessionStorage`, que es por pestaña, así
+     que una pestaña abierta a mano arrancaba sin nada y pedía la clave.
+
+     Ahora queda también acá, con vencimiento, y cualquier pestaña del mismo
+     navegador la levanta.
+
+     ⚠️ ESTO REVIERTE LO DE COD-1 (22-08-2026) Y VA DICHO DERECHO. Aquello sacó
+     la sesión de `localStorage` porque en el mesón de recepción el computador
+     lo usan tres personas al día, y el siguiente entraba como el anterior sin
+     teclear nada. Lo que hace que no sea volver atrás del todo:
+
+       · VENCE a las doce horas del último uso, y se refresca en cada arranque.
+         El equipo que quedó abierto anoche amanece cerrado.
+       · «Cerrar sesión» la borra de la pestaña Y del equipo. Ésa fue la
+         condición que puso Marco: «si él no cerró sesión».
+
+     ⚠️ Y NO CRUZA A OTRO NAVEGADOR. El almacenamiento es de cada navegador y la
+     URL no lleva ningún identificador: pegarla en otro va a pedir la clave, y
+     está bien que la pida — si no lo hiciera, esa URL sería una llave que se
+     puede reenviar por WhatsApp. Para eso hace falta autenticación de verdad. */
+  const CLAVE_EQUIPO = 'dyp-sesion-equipo';
+  const SESION_DURA = 12 * 60 * 60 * 1000;
+
+  function anotarSesion(id) {
+    try { if (guardaSesion) guardaSesion.setItem(CLAVE_SESION, id); } catch (e) { /* nada */ }
+    try {
+      localStorage.setItem(CLAVE_EQUIPO,
+        JSON.stringify({ id: id, hasta: new Date().getTime() + SESION_DURA }));
+    } catch (e) { /* sin espacio: queda la de la pestaña, que es lo de antes */ }
+  }
+
+  function borrarSesion() {
+    try { if (guardaSesion) guardaSesion.removeItem(CLAVE_SESION); } catch (e) { /* nada */ }
+    try { localStorage.removeItem(CLAVE_EQUIPO); } catch (e) { /* nada */ }
+  }
+
+  /* La del equipo, si no venció. Vencida se borra en el momento: dejarla ahí
+     es dejar un id de alguien dando vueltas sin que sirva para nada. */
+  function sesionDelEquipo() {
+    let d = null;
+    try { d = JSON.parse(localStorage.getItem(CLAVE_EQUIPO) || 'null'); } catch (e) { return null; }
+    if (!d || !d.id || !d.hasta) return null;
+    if (new Date().getTime() > d.hasta) {
+      try { localStorage.removeItem(CLAVE_EQUIPO); } catch (e) { /* nada */ }
+      return null;
+    }
+    return d.id;
+  }
+
   /* 🔴 LA SESION VIVE EN `sessionStorage`, NO EN `localStorage` (22-08-2026).
 
      Estaba en `localStorage`, que sobrevive a cerrar el navegador: quien
@@ -4079,7 +4672,7 @@ const Modelo = (function () {
 
     const r = fijar_persona_actual(p.id);
     if (!r.ok) return r;
-    try { if (guardaSesion) guardaSesion.setItem(CLAVE_SESION, p.id); } catch (e) { /* sin almacenamiento */ }
+    anotarSesion(p.id);
     return { ok: true, motivo: '', persona: p.id, claveInicial: !!p.clave_inicial };
   }
 
@@ -4087,7 +4680,7 @@ const Modelo = (function () {
     persona_actual = null;
     rol_actual = 'ro-6';
     version++; limpiarMemo();
-    try { if (guardaSesion) guardaSesion.removeItem(CLAVE_SESION); } catch (e) { /* nada */ }
+    borrarSesion();
     return { ok: true, motivo: '' };
   }
 
@@ -4095,11 +4688,40 @@ const Modelo = (function () {
      nadie: la recepcionista tiene el formulario a medio llenar. */
   function retomar_sesion() {
     let id = null;
-    try { id = guardaSesion ? guardaSesion.getItem(CLAVE_SESION) : null; } catch (e) { return false; }
+    try { id = guardaSesion ? guardaSesion.getItem(CLAVE_SESION) : null; } catch (e) { id = null; }
+    /* Si esta pestaña no trae la suya —se abrió a mano, se pegó la URL— se usa
+       la del equipo. Es lo que hace que copiar la dirección funcione. */
+    if (!id) id = sesionDelEquipo();
     if (!id) return false;
+    /* 🔴 SI LA CUENTA NO ESTÁ, SE REPONE ANTES DE RENDIRSE (31-08-2026).
+
+       Acá se caía todo. El id de la sesión estaba —`sessionStorage` sobrevive a
+       un F5— pero la base con la que el sistema acababa de arrancar era la
+       semilla, porque la de verdad no cupo en el navegador. Y en la semilla esa
+       persona no existe. Entonces `find` daba `undefined`, y el sistema
+       concluía «no hay sesión» cuando lo que no había era la CUENTA. */
+    if (!db.persona.find((x) => x.id === id)) reponerCuentas();
     const p = db.persona.find((x) => x.id === id);
-    if (!p || !p.activo) { cerrar_sesion(); return false; }
-    return fijar_persona_actual(id).ok;
+    /* 🔴 NO ENCONTRARLA NO ES ECHARLA (31-08-2026).
+
+       Acá había un `cerrar_sesion()` para el caso de no encontrar la cuenta, y
+       eso BORRABA el id de `sessionStorage`. Pero no encontrarla, en el primer
+       arranque, sólo quiere decir que la nube todavía no llega: las cuentas
+       tardan unos quince segundos. Al borrar el id se destruía la única pista
+       que quedaba para reintentar cuando sí llegaran, y la persona terminaba
+       tecleando la clave de nuevo aunque el sistema fuera a saber quién era un
+       rato después. Se vio en la prueba con el almacenamiento lleno.
+
+       Se devuelve `false` y se deja el id donde está. `arrancarLaNube` reintenta
+       en cuanto tiene las cuentas de verdad. */
+    if (!p) return false;
+    if (!p.activo) { cerrar_sesion(); return false; }
+    if (!fijar_persona_actual(id).ok) return false;
+    /* Se vuelve a anotar: le deja la sesión a ESTA pestaña y corre el
+       vencimiento doce horas más desde ahora. Quien usa el sistema todos los
+       días no lo ve vencer nunca; el equipo que nadie tocó, sí. */
+    anotarSesion(id);
+    return true;
   }
 
   /* 🔴 LA SESIÓN SE PUEDE ADOPTAR DESDE LA PESTAÑA QUE NOS ABRIÓ (26-08-2026).
@@ -4125,10 +4747,13 @@ const Modelo = (function () {
      la pantalla de ingreso, como siempre. */
   function adoptar_sesion(persona_id) {
     if (!persona_id) return false;
+    // Misma historia que en `retomar_sesion`: la ventana nueva puede arrancar
+    // con la semilla y no tener la cuenta de quien la abrió.
+    if (!db.persona.find((x) => x.id === persona_id)) reponerCuentas();
     const p = db.persona.find((x) => x.id === persona_id);
     if (!p || !p.activo) return false;
     if (!fijar_persona_actual(persona_id).ok) return false;
-    try { if (guardaSesion) guardaSesion.setItem(CLAVE_SESION, persona_id); } catch (e) { /* sin almacenamiento */ }
+    anotarSesion(persona_id);
     return true;
   }
 
@@ -4553,6 +5178,9 @@ const Modelo = (function () {
      registra—, deshacer en medio, y el registro pegado a la operación. */
   return conPermiso(conDeshacer(conRegistro({
     iniciar, reiniciar, sembrar, estaModificado, porQueSeResembro, base, sandbox,
+    reponerPendientes,
+    // La data real: ver el bloque grande junto a `adoptarNube`.
+    adoptarNube, mezclarNube, esReal, origenDeLosDatos, resumenNube,
     /* El día del sistema junto al reloj del computador. Sale porque `media.js`
        lo necesita: un documento que se carga AHORA tiene que quedar con la hora
        de ahora, no con la medianoche del día. (23-08-2026) */
@@ -4584,8 +5212,10 @@ const Modelo = (function () {
        `permisosDePersona` los lee, los dos `fijar_` los mueven. */
     permisosDePersona, fijar_persona_permiso, fijar_persona_modulo,
     personaActual, fijar_persona_actual, sesionesPosibles,
+    problemaAlGuardar, olvidarQueSeRepuso,
     iniciar_sesion, cerrar_sesion, retomar_sesion, adoptar_sesion, haySesion, cambiar_clave,
-    sesionGuardada, sesionAlDia, CLAVE_SESION,
+    cuantasEntregadas,
+    sesionGuardada, sesionAlDia, CLAVE_SESION, CLAVE_EQUIPO, sesionDelEquipo,
     // operación
     crear_ot_desde_recepcion, asignar_etapas, finalizar_etapa, finalizar_etapas, quitar_etapa,
     tomar_etapa, soltar_etapa, miTrabajo, asignar_responsable_ot,

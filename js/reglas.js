@@ -12,7 +12,43 @@ const Reglas = (function () {
   const ok = () => ({ ok: true, motivo: '' });
   const no = (motivo) => ({ ok: false, motivo });
 
-  const dias = (desde, hasta) => Math.max(0, Math.round((hasta - desde) / MS_DIA));
+  /* 🔴 DIAS DE CALENDARIO, NO HORAS REDONDEADAS (30-08-2026).
+
+     Antes era `Math.round((hasta - desde) / MS_DIA)`, o sea las horas
+     transcurridas redondeadas. Dos problemas, y el segundo es el que importa:
+
+       · No calzaba con su sistema. Un auto que entro el 27 mostraba 2 el dia 30
+         y su Torre mostraba 3. Marco lo vio poniendo las dos pantallas al lado.
+
+       · EL NUMERO CAMBIABA SOLO DURANTE EL DIA. Un auto que entro a las 17:26
+         mostraba 2 en la manana y 3 en la tarde, sin que pasara nada. En una
+         pantalla que mide el cumplimiento contra una meta de dias, un numero
+         que se mueve solo no se puede discutir con nadie.
+
+     Se cuenta como lo cuenta el taller: dias de calendario entre las dos
+     fechas, sin la hora. El auto que entro ayer lleva un dia, entrara a la hora
+     que entrara. */
+  /* 🔴 UN «2026-08-30» PELADO ES UTC, NO CHILE (30-08-2026).
+
+     `hoyEnChile()` devuelve el dia como TEXTO, `2026-08-30`. Y
+     `new Date('2026-08-30')` no es la medianoche de aca: la norma dice que una
+     fecha sin hora se lee como UTC, y en Chile eso son las 20:00 del dia
+     ANTERIOR. Con `setHours(0,0,0,0)` encima quedaba el 29, y las 92 ordenes
+     mostraban un dia menos que su Torre.
+
+     Un texto `AAAA-MM-DD` se arma a mano con sus tres numeros, que es la unica
+     forma de que sea la medianoche local y no la de Greenwich. */
+  const aMedianoche = (d) => {
+    if (typeof d === 'string') {
+      const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(d);
+      if (m) return new Date(+m[1], +m[2] - 1, +m[3]).getTime();
+    }
+    const x = new Date(d);
+    x.setHours(0, 0, 0, 0);
+    return x.getTime();
+  };
+  const dias = (desde, hasta) =>
+    Math.max(0, Math.round((aMedianoche(hasta) - aMedianoche(desde)) / MS_DIA));
 
   /* ── Parámetros de negocio ─────────────────────────────────────────────
      Viven en la tabla `parametro`, no en constantes. La meta de días y cuál
@@ -571,6 +607,18 @@ const Reglas = (function () {
     if (!t) return '';
     // d y p · d&p · dyp · d-p, con o sin espacios y en cualquier caja.
     if (/^d\s*[y&\-]?\s*p$/i.test(t)) return PROVEEDOR_TALLER;
+    /* 🔴 Y «TALLER», QUE ES LA MISMA CASA (30-08-2026).
+
+       Al migrar los doce años aparecieron 4.336 líneas de repuesto con el
+       proveedor escrito «Taller» —$82.839.036— que esta función trataba como
+       un proveedor externo y por lo tanto no se cobraban. No es un tercero: es
+       el taller escribiendo su propio nombre en vez de su sigla.
+
+       Es exactamente el problema que esta función vino a resolver, sólo que
+       con una grafía más de la que se conocía cuando se escribió: «que debiese
+       ser DYP, Dyp, dyp DyP y no mas» era la lista de lo que se había visto,
+       no un límite. */
+    if (/^taller$/i.test(t)) return PROVEEDOR_TALLER;
     return t;
   }
   const esProveedorTaller = (txt) => normalizarProveedor(txt) === PROVEEDOR_TALLER;
@@ -581,6 +629,22 @@ const Reglas = (function () {
      escribir $0 en el papel. */
   function cobroRepuesto(linea) {
     const bruto = (Number(linea.cantidad) || 0) * (Number(linea.precio_unitario) || 0);
+    /* 🔴 LA LINEA MIGRADA DICE SI SE COBRA, Y MANDA ELLA (30-08-2026).
+
+       En los doce años de historia el precio YA trae la decisión adentro:
+       cuando la pieza la puso la compañía, el sistema viejo guardó $0. Volver a
+       filtrarla por proveedor la deja en cero dos veces — se caían $2.024
+       millones de venta que el taller sí cobró.
+
+       Se comprobó contra `tb_consolidado`, la tabla de totales de su propio
+       sistema: cobrando todas las líneas calzan 14.843 de 15.433 órdenes;
+       filtrando por proveedor, 14.388.
+
+       Para lo que se cargue de aquí en adelante la regla sigue siendo la de
+       abajo, y ahí tiene sentido: en el sistema nuevo la pieza que aporta la
+       compañía SÍ lleva su precio de referencia escrito, que es lo que el
+       original perdía. */
+    if (linea.cobrar === true) return bruto;
     return esProveedorTaller(linea.proveedor) ? bruto : 0;
   }
 

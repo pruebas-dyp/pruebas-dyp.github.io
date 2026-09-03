@@ -1,5 +1,5 @@
-﻿<!DOCTYPE html>
-<html lang="es-CL" data-tema="oscuro">
+<!DOCTYPE html>
+<html lang="es-CL" data-tema="oscuro" data-piel="neon">
 <head>
 <meta charset="utf-8">
 <!-- `viewport-fit=cover` para que el sistema use la pantalla completa en un
@@ -9,11 +9,16 @@
 <!-- Este modelo se publica para que el cliente lo pruebe desde su telefono, no
      para que aparezca en buscadores. Se comparte por link, no se indexa. -->
 <meta name="robots" content="noindex, nofollow">
-<title>Automotora DyP · Control de Taller</title>
+<title>Automotora DyP · Control de Taller — Neón</title>
 <link rel="stylesheet" href="css/estilos.css?v=202609030005">
+<link rel="stylesheet" href="css/piel-neon.css?v=202609030005">
 <script>
   // Se aplica antes de pintar para que no haya un destello del tema anterior.
   try {
+    if (!localStorage.getItem('dyp-piel-vista-neon')) {
+      localStorage.setItem('dyp-tema', 'oscuro');
+      localStorage.setItem('dyp-piel-vista-neon', '1');
+    }
     var t = localStorage.getItem('dyp-tema');
     if (t === 'claro' || t === 'oscuro') document.documentElement.dataset.tema = t;
   } catch (e) { /* file:// sin almacenamiento: queda el tema por defecto */ }

@@ -239,7 +239,19 @@ const Semilla = (function () {
        nadie más. Sin eso no se podía cumplir lo que pidió — Gabriel y Alejandra
        comparten el rol Administración, así que cualquier permiso que venga del
        rol le llega a los dos. */
-    ['reporteria.ver',       'Ver la Reportería: venta, márgenes y rentabilidad', true]
+    ['reporteria.ver',       'Ver la Reportería: venta, márgenes y rentabilidad', true],
+    /* 🔴 LA VENTA DEL HISTÓRICO, RESERVADA (30-08-2026).
+
+       El dueño no quiere que nadie vea la venta en el Histórico. Es una
+       excepción DELIBERADA a la regla de que un módulo se da completo: el
+       Histórico se le da a casi todo el mundo —es la memoria del taller, se
+       busca una patente vieja todos los días— pero las cuatro columnas de plata
+       son otra cosa.
+
+       Reservado significa que no lo da ningún módulo ni ningún rol, ni siquiera
+       uno de acceso total: va con nombre y apellido desde Personal. Hoy lo
+       tienen tres cuentas y ninguna más. */
+    ['historico.montos',     'Ver la venta en el Histórico', true]
   ];
 
   /* Los permisos que no se heredan de ningún rol. Se leen desde el catálogo
@@ -396,6 +408,26 @@ const Semilla = (function () {
     { id: 'pe-t-13', nombre: 'Andrés', apellidos: 'Guzmán', rol: 'ro-2', etapas: [],
       cargo: 'Jefe de Recepción', usuario: 'andres.guzman',
       modulos: ['torre', 'historico', 'recepcion', 'taller', 'presupuesto', 'consolidado'] },
+
+    /* 🔴 EL SEGUNDO GABRIEL (30-08-2026). En el sistema del cliente hay DOS
+       cuentas Gabriel Díaz y son personas distintas: `gabriel.diaz.m@` —Moreno,
+       el gerente general— y `gdiazh@` —Hernández—. Nuestra lista de accesos
+       traía sólo al primero.
+
+       Marco lo nombró al pedir quién ve la venta del Histórico: «el perfil de
+       Gabriel Díaz Moreno y Gabriel Díaz Hernández».
+
+       ⚠️ SUS MÓDULOS ESTÁN COPIADOS DE LOS DE MORENO Y HAY QUE CONFIRMARLOS.
+       Lo único que se pidió expresamente es que vea la venta del Histórico; el
+       resto es un supuesto razonable —los dos son gerencia— pero es un
+       supuesto, y dar accesos por deducción es de las cosas que no se hacen sin
+       preguntar. */
+    /* ⚠️ `pe-t-26` Y NO `pe-t-15`: el 15 ya era José Castillo, operario del
+       taller. Al ponerle ese id, esta cuenta quedó con DOS roles —Administración
+       y Operario— y el sistema tomaba el último. Los ids de la lista van hasta
+       el 25; éste sigue después. */
+    { id: 'pe-t-26', nombre: 'Gabriel', apellidos: 'Díaz Hernández', rol: 'ro-5', etapas: [],
+      cargo: 'Gerencia', usuario: 'gabriel.diaz.h', modulos: MODULOS_TODOS },
 
     /* ── Y la nuestra, que no es del taller ──────────────────────────────
        🔴 SE BORRÓ POR ERROR EL 22-08-2026 Y VOLVIÓ EL MISMO DÍA. Marco pidió
@@ -1889,12 +1921,75 @@ const Semilla = (function () {
        Las cuentas de rol total no llevan filas: su permiso no sale de acá sino
        de la marca del rol, y esa garantía no puede depender de que la tabla
        esté bien sembrada. */
+  /* ═══════════════════════════════════════════════════════════════════════
+     🔴 UN MÓDULO SE DA COMPLETO O NO SE DA (30-08-2026).
+
+     Marco, después de probarlo con el cliente: «recuerda bien los perfiles y
+     que puede ver cada uno; si a alguien se le da un módulo, él puede verlo
+     completo».
+
+     Hasta hoy los permisos salían SÓLO del rol, y los módulos de otra lista.
+     Las dos cosas podían no coincidir, y no coincidían: **ocho cuentas tenían
+     el módulo Recepción y sólo tres podían entregar un vehículo**. Gabriel
+     Díaz, Nicole Hernández, Esteban Calvo, Andrés Guzmán y hasta el
+     administrador abrían Recepción y el botón «Entregar Unidad» no les
+     respondía. Ni un error: simplemente no pasaba nada.
+
+     Desde acá el módulo manda. Si una cuenta tiene `recepcion`, tiene todo lo
+     que la pantalla de Recepción necesita para funcionar — porque un módulo a
+     medias es peor que no tenerlo: la persona lo abre, lo intenta, y concluye
+     que el sistema está roto.
+
+     ⚠️ LO RESERVADO NO ENTRA ACÁ. `etapa.validar` y `reporteria.ver` no los da
+     ningún módulo ni ningún rol: van con nombre y apellido desde Personal. Y
+     desde hoy `historico.montos` tampoco — ver el bloque de la venta más abajo.
+     ═══════════════════════════════════════════════════════════════════════ */
+  const PERMISOS_DEL_MODULO = {
+    recepcion:    ['ot.crear', 'ot.editar', 'entrega.registrar', 'presupuesto.abrir',
+                   'ficha.completa', 'foto.ver', 'foto.cargar', 'documento.ver',
+                   'datos.rut_completo', 'salida.registrar'],
+    torre:        ['torre.ver', 'ficha.completa', 'foto.ver', 'documento.ver',
+                   'repuesto.ver', 'salida.registrar', 'detencion.gestionar',
+                   'espera.ver', 'exportar', 'datos.rut_completo'],
+    taller:       ['taller.ver', 'etapa.asignar', 'etapa.finalizar', 'ficha.completa',
+                   'foto.ver', 'foto.cargar', 'repuesto.ver'],
+    presupuesto:  ['presupuesto.ver', 'presupuesto.crear', 'presupuesto.abrir',
+                   'presupuesto.montos', 'perdida_total.declarar', 'ficha.completa'],
+    bodega:       ['repuesto.ver', 'repuesto.cargar', 'repuesto.devolver',
+                   'ficha.completa', 'presupuesto.ver'],
+    documentos:   ['documento.ver', 'documento.cargar', 'foto.ver', 'foto.cargar'],
+    /* 🔴 EL HISTÓRICO NO DA LOS MONTOS. Es la única excepción a la regla de
+       arriba y la pidió el dueño: ver el bloque de la venta más abajo. */
+    historico:    ['historico.ver', 'exportar', 'ficha.completa'],
+    personal:     ['personal.ver', 'personal.editar'],
+    consolidado:  ['consolidado.ver'],
+    configuracion:['configuracion']
+  };
+
     const persona_permiso = [];
     persona_rol.forEach((pr) => {
       const r = rol.find((x) => x.id === pr.rol_id);
       if (!r || r.total) return;
       (M[r.codigo] || []).forEach((codigo) =>
         persona_permiso.push({ persona_id: pr.persona_id, permiso_codigo: codigo }));
+    });
+
+    /* Y ahora los del MÓDULO, que es lo que manda. Se suman a los del rol y no
+       los reemplazan: el rol puede dar cosas que ningún módulo da —el evaluador
+       declara pérdida total— y eso se respeta. Lo que no puede pasar es lo
+       contrario: tener el módulo y que le falte algo para usarlo. */
+    const yaTiene = {};
+    persona_permiso.forEach((x) => { yaTiene[x.persona_id + '|' + x.permiso_codigo] = true; });
+    persona.filter((p) => p.usuario && Array.isArray(p.modulos)).forEach((p) => {
+      p.modulos.forEach((m) => {
+        (PERMISOS_DEL_MODULO[m] || []).forEach((codigo) => {
+          if (PERMISOS_RESERVADOS.indexOf(codigo) >= 0) return;
+          const k = p.id + '|' + codigo;
+          if (yaTiene[k]) return;
+          yaTiene[k] = true;
+          persona_permiso.push({ persona_id: p.id, permiso_codigo: codigo });
+        });
+      });
     });
 
     /* 🔴 LA REPORTERÍA, CON NOMBRE Y APELLIDO (23-08-2026, Marco).
@@ -1916,6 +2011,24 @@ const Semilla = (function () {
     VEN_REPORTERIA.forEach((persona_id) => {
       if (persona.some((p) => p.id === persona_id))
         persona_permiso.push({ persona_id, permiso_codigo: 'reporteria.ver' });
+    });
+
+    /* 🔴 LA VENTA DEL HISTÓRICO, TRES CUENTAS (30-08-2026, Marco: «el dueño no
+       quiere que nadie tenga acceso a ver venta en el histórico... salvo
+       administrador y el perfil de Gabriel Díaz Moreno y Gabriel Díaz
+       Hernández»).
+
+       Son los dos Gabriel del taller, que en su sistema son dos usuarios
+       distintos —`gabriel.diaz.m@` y `gdiazh@`— y acá también. Y la cuenta de
+       Arttmize, que acompaña la puesta en marcha.
+
+       Va acá y no en un rol por lo mismo que la Reportería: Gabriel y Alejandra
+       comparten el rol Administración, así que cualquier permiso que venga del
+       rol le llegaría a los dos. */
+    const VEN_VENTA_HISTORICO = ['pe-t-2', 'pe-t-26', 'pe-t-14'];
+    VEN_VENTA_HISTORICO.forEach((persona_id) => {
+      if (persona.some((p) => p.id === persona_id))
+        persona_permiso.push({ persona_id, permiso_codigo: 'historico.montos' });
     });
 
     return {

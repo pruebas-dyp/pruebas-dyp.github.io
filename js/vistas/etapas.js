@@ -12,7 +12,8 @@
 
      APLICA  — declara que la etapa va en este vehículo. Se apaga en cuanto
               queda asignada: sacarla es «Quitar», que pregunta.
-     CERRAR  — la da por terminada. Sólo aparece si está asignada y abierta.
+     TERMINAR — boton por fila. Cierra la etapa al apretarlo, sin pasar por
+              Guardar. Solo aparece si esta asignada, abierta y es suya.
 
    ⚠️ Y EL ENCARGADO PASÓ A SER UNO SOLO POR FILA. Antes había dos desplegables
    para la misma pregunta —uno en Asignar y otro en Finalizar— y podían
@@ -120,27 +121,49 @@ function vEtapasTabla(o) {
           ' · ya no habilitado</option>' : '';
       quien = '<select data-resp="' + esc(e.codigo) + '">' +
         (a ? '' : '<option value="">Seleccionar encargado</option>') + extra +
+        /* 🔴 EL NUMERO SALIO DE LA LISTA (30-08-2026, Marco).
+
+           Cada nombre terminaba en «(7)»: las etapas abiertas que ya tiene esa
+           persona, para repartir mirando quien esta cargado. La intencion era
+           buena y la forma no: un parentesis pegado al apellido se lee como
+           parte del nombre —mas todavia en «carlos (Beto) Rodriguez (7)», que
+           llevaba dos—.
+
+           El dato no se pierde: queda en el globo que sale al posar el mouse
+           sobre la opcion. La lista muestra nombres, que es lo que se elige. */
         gente.map((p) => '<option value="' + esc(p.id) + '"' +
-          (suyo === p.id ? ' selected' : '') + '>' + esc(p.nombre) +
-          ' (' + cuantoTiene(p.id) + ')</option>').join('') + '</select>';
+          (suyo === p.id ? ' selected' : '') +
+          ' title="' + esc(p.nombre) + ' tiene ' + cuantoTiene(p.id) +
+          (cuantoTiene(p.id) === 1 ? ' etapa abierta' : ' etapas abiertas') + '">' +
+          esc(p.nombre) + '</option>').join('') + '</select>';
     } else {
       quien = '<span class="et ambar" title="Se habilita en Personal, en la ficha de cada persona">' +
         'Nadie habilitado</span>';
     }
 
-    /* ── Cerrar ── */
-    const cerrar = (a && !a.finalizada && mia)
-      ? '<input type="checkbox" data-cerrar="' + esc(a.codigo) + '">' : '';
+    /* 🔴 «CERRAR» ERA UNA CASILLA SIN ROTULO (30-08-2026, Marco: «no queda claro
+       como se finalizan, como se van marcando que estan hechas; hazlo mas
+       simple»).
 
-    /* ── Estado ── */
+       Habia una columna CERRAR con un cuadradito vacio, y para que sirviera de
+       algo habia que ademas bajar y apretar Guardar. Nadie adivina eso. La
+       columna se fue entera y en su lugar hay un boton que dice **Terminar** y
+       termina: un clic, y la fila pasa a «Terminada» con su fecha.
+
+       Asignar sigue siendo por casillas y un Guardar —ahi se eligen varias
+       cosas a la vez y conviene revisarlas juntas—, pero terminar es un acto
+       suelto, del que la hizo, y en el momento en que la hizo. */
     let estado;
     if (!a) estado = noSeAsigna
       ? '<span style="color:var(--gris-2)">—</span>'
       : '<span class="et gris">No aplica todavía</span>';
-    else if (a.finalizada) estado = '<span class="et verde">Completado</span>';
-    /* Sin "esperando visto bueno": ese estado se fue el 27-08-2026 con la
-       validación. Una etapa está abierta o cerrada. */
+    else if (a.finalizada) estado = '<span class="et verde">Terminada</span>';
     else estado = '<span class="et azul">En curso</span>';
+
+    const acciones = (a && !a.finalizada && mia)
+      ? '<button class="btn" data-terminar="' + esc(a.codigo) + '" ' +
+        'title="Dar esta etapa por terminada. Queda con tu nombre y la hora.">Terminar</button>'
+      : '';
 
     return '<tr' + (a ? ' class="ya"' : '') + '>' +
       '<td class="num">' + aplica + '</td>' +
@@ -152,12 +175,14 @@ function vEtapasTabla(o) {
          pensar que las otras ocho sí son obligatorias. */
       '</td>' +
       '<td>' + quien + '</td>' +
-      '<td class="num">' + cerrar + '</td>' +
       '<td>' + estado +
+        (a && a.finalizadaAt
+          ? ' <span class="cod" style="color:var(--gris)">' + fFechaHora(a.finalizadaAt) + '</span>' : '') +
+        '</td>' +
+      '<td class="acciones-etapa">' + acciones +
         (a && !a.finalizada && reparte
           ? ' <button class="btn secundario" data-quitaretapa="' + esc(e.codigo) +
-            '" title="Sacar esta etapa de la orden">Quitar</button>' : '') + '</td>' +
-      '<td class="num">' + (a && a.finalizadaAt ? fFechaHora(a.finalizadaAt) : '—') + '</td></tr>';
+            '" title="Sacar esta etapa de la orden">Quitar</button>' : '') + '</td></tr>';
   };
 
   return `
@@ -172,8 +197,8 @@ function vEtapasTabla(o) {
       <thead><tr>
         <th style="width:54px" title="La etapa va en este vehículo">Aplica</th>
         <th>Etapa</th><th style="width:30%">Encargado</th>
-        <th style="width:54px" title="Darla por terminada al guardar">Cerrar</th>
-        <th>Estado</th><th style="width:130px">Cerrada</th>
+        <th style="width:170px">Estado</th>
+        <th style="width:150px"></th>
       </tr></thead>
       <tbody>${ETAPAS.map(fila).join('')}</tbody>
     </table></div>
@@ -208,8 +233,9 @@ function vEtapasTabla(o) {
       ${reparte ? '<button class="btn secundario" id="btn-etapas-todas">Marcar todas</button>' : ''}
       <button class="btn" id="btn-etapas-guardar">Guardar</button>
       <button class="btn secundario" id="btn-cancelar-etapas">Cancelar</button>
-      <span class="pie-nota" style="margin:0">Un solo guardado: lo que marques en
-        <strong>Aplica</strong> se asigna, lo que marques en <strong>Cerrar</strong> se cierra.
+      <span class="pie-nota" style="margin:0">Marca <strong>Aplica</strong>, elige el
+        encargado y guarda. Para dar una etapa por terminada, aprieta
+        <strong>Terminar</strong> en su fila: eso no pasa por Guardar.
         ${abiertasMias.length
           ? 'Abiertas ahora: <strong>' + esc(abiertasMias.map((a) => a.nombre).join(', ')) + '</strong>.'
           : 'Ninguna etapa abierta a tu nombre.'}
@@ -251,6 +277,21 @@ function pEtapas(o) {
   document.querySelectorAll('[data-quitaretapa]').forEach((b) => b.addEventListener('click', () =>
     ejecutar(() => Modelo.quitar_etapa(o.id, b.dataset.quitaretapa), 'Etapa quitada.')));
 
+  /* 🔴 TERMINAR, EN UN CLIC (30-08-2026, Marco). El boton cierra SU etapa y
+     nada mas: no toca lo que este marcado en Aplica ni la fecha de entrega,
+     que siguen esperando a Guardar. Se cierra a nombre de quien la tiene —o de
+     quien aprieta, si no hay desplegable, que es el caso del operario que solo
+     cierra lo suyo—. */
+  document.querySelectorAll('[data-terminar]').forEach((b) => b.addEventListener('click', () => {
+    const codigo = b.dataset.terminar;
+    const yo = Modelo.personaActual();
+    const sel = document.querySelector('[data-resp="' + codigo + '"]');
+    const quien = (sel && sel.value) ? sel.value : (yo ? yo.id : null);
+    const etapa = (Modelo.base().etapa || []).find((e) => e.codigo === codigo) || {};
+    ejecutar(() => Modelo.finalizar_etapas(o.id, [{ codigo, persona_id: quien }]),
+      (etapa.nombre || 'La etapa') + ' quedó terminada.');
+  }));
+
   /* 🔴 UN SOLO GUARDADO (27-08-2026, Marco: «todo en uno»). Asigna lo marcado
      en Aplica, cierra lo marcado en Cerrar y guarda la fecha si cambió, en ese
      orden —una etapa se puede asignar y cerrar en el mismo gesto—.
@@ -286,12 +327,9 @@ function pEtapas(o) {
     });
     const ids = aAsignar.map((c) => (base.etapa.find((e) => e.codigo === c) || {}).id);
 
-    const yo = Modelo.personaActual();
-    const cierres = Array.from(document.querySelectorAll('[data-cerrar]:checked')).map((c) => ({
-      codigo: c.dataset.cerrar,
-      // Sin desplegable —el que sólo cierra lo suyo— se cierra a su nombre.
-      persona_id: respDe(c.dataset.cerrar) || (yo ? yo.id : null)
-    }));
+    /* Cerrar etapas salio de aca el 30-08-2026: cada fila tiene su boton
+       «Terminar» y actua sola. Guardar quedo para asignar y para la fecha. */
+    const cierres = [];
 
     const campo = document.getElementById('f-compromiso');
     const actual = o.fechaCompromiso ? isoConHora(o.fechaCompromiso) : '';
@@ -301,9 +339,9 @@ function pEtapas(o) {
        significar algo. */
     const fechaNueva = campo && campo.value && campo.value !== actual ? campo.value : null;
 
-    if (!aAsignar.length && !cierres.length && !fechaNueva)
-      return avisar({ ok: false, motivo: 'No marcaste nada. Marca Aplica para asignar una etapa, ' +
-        'Cerrar para darla por terminada, o cambia la fecha de entrega.' });
+    if (!aAsignar.length && !fechaNueva)
+      return avisar({ ok: false, motivo: 'No marcaste nada. Marca Aplica para asignar una etapa ' +
+        'o cambia la fecha de entrega. Para terminar una etapa, usa el botón Terminar de su fila.' });
 
     /* Y recién ahora se guarda. Cada paso avisa si falla y corta: media
        asignación es mejor que una asignación a medias y en silencio. */

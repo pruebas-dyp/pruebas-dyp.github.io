@@ -20,7 +20,21 @@ const IMPRESOS = {
 /* El estilo del impreso va acá y no en estilos.css a propósito: es una hoja
    de papel, no una pantalla, y conviene que se lea junto al documento. */
 const CSS_IMPRESO = `
-.velo-impreso{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;overflow:auto;padding:20px}
+/* 🔴 SE VEIAN DOS BARRAS Y NINGUNA MOVIA LA HOJA (30-08-2026, Marco: «no me
+   deja arrastrar para ver toda la recepcion»).
+
+   La hoja mide 1.386 px y la ventana 900: hay que desplazar. Y la caja SI
+   desplazaba, pero al llegar a su fondo el gesto se encadenaba a la pagina de
+   atras —la ficha, que es larga— asi que seguia moviendose algo que no era el
+   documento. Con las dos barras dibujadas una al lado de la otra, la de la
+   derecha era la de la pagina y no hacia nada sobre el papel.
+
+   La regla overscroll-behavior:contain corta el encadenado, y al abrir se bloquea el
+   desplazamiento del cuerpo: mientras se mira el documento, lo unico que se
+   mueve es el documento. */
+.velo-impreso{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;overflow:auto;
+  padding:20px;overscroll-behavior:contain}
+body.mirando-impreso{overflow:hidden}
 .impreso{background:#fff;color:#111;width:210mm;min-height:297mm;margin:0 auto;padding:14mm 13mm;
   box-shadow:0 10px 40px rgba(0,0,0,.4);font-family:Arial,Helvetica,sans-serif;font-size:11px;
   position:relative;display:flex;flex-direction:column}
@@ -174,6 +188,13 @@ const CSS_IMPRESO = `
 .impreso table.detalle tr{page-break-inside:avoid}
 .impreso table.detalle td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .impreso table.detalle td.c{text-align:center;color:#666}
+/* Las actividades de un mismo item se leen como un bloque: la linea que sigue
+   no repite el numero ni la descripcion, y su borde superior se atenua para que
+   se vea que cuelga de la de arriba y no que es otro item. */
+.impreso table.detalle tr.sigue td{border-top-color:#f0f1f5}
+.impreso table.detalle .prov{color:#666;font-size:9px}
+/* Un item y sus actividades no se parten entre dos hojas. */
+.impreso table.detalle tbody tr{page-break-inside:avoid}
 .impreso table.detalle td.trabajo{font-size:9px;color:#333}
 /* El proveedor, mas chico (27-08-2026, Marco: "en el PDF no puede aparecer
    lo pone sino mejor el detalle del Proveedor pero mas chico"). */
@@ -409,10 +430,35 @@ function impresoRecepcion(o) {
   ${svgSiluetaImpresa(o.danos)}
   <div style="margin-top:5px">
     <strong>Piezas marcadas:</strong>
-    ${o.danos.length ? esc(impresoPiezas(o.danos)) : 'ninguna'}
+    ${o.danos.length ? esc(impresoPiezas(o.danos))
+      : (o.ventaGuardada
+          /* `ventaGuardada` sólo la tienen las órdenes que vinieron de la
+             migración: el total se calculó al traerlas. Sirve de marca de
+             origen sin agregar un campo nuevo ni volver a subir 15.534
+             documentos — y sin un número mágico que alguien tenga que
+             acordarse de mover. */
+          ? 'el sistema anterior no marcaba los daños sobre la silueta'
+          : 'ninguna')}
   </div>
 
-  <h2>Inventario del vehículo · ${inv.length} ítems</h2>
+  <h2>Inventario del vehículo${inv.length ? ' · ' + inv.length + ' ítems' : ''}</h2>
+  ${!inv.length ? `
+  <!-- 🔴 UN CERO EN ESTE PAPEL NO ES UN CERO (30-08-2026).
+
+       Éste es el comprobante que el cliente FIRMA. Con la data migrada, las
+       órdenes que vienen del sistema viejo no traen checklist —lo dejaron de
+       usar en 2019— y la leyenda salía «✔ presente 0 · ✘ no presente 0 ·
+       △ dañado 0 · – sin verificar 0».
+
+       Eso no se lee como «no hay dato»: se lee como SE REVISÓ Y NO HABÍA NADA.
+       Y va firmado. Si después el cliente reclama que le faltó la rueda de
+       repuesto, ese papel dice que se revisó y que no estaba.
+
+       Cuando no hay checklist se dice que no lo hay, con todas sus letras. */ -->
+  <div class="leyenda-inv" style="font-style:italic">
+    Esta orden viene del sistema anterior, que no registraba el inventario del
+    vehículo. No es que se haya revisado y no hubiera nada: no se registró.
+  </div>` : `
   <div class="inv">
     ${inv.map((i) => {
       const cod = i.estado || (i.presente ? 'presente' : 'no_presente');
@@ -425,7 +471,7 @@ function impresoRecepcion(o) {
     <span class="falta">✘</span> no presente ${cuenta('no_presente')} ·
     <span class="danado">△</span> dañado ${cuenta('danado')} ·
     <span class="sinver">–</span> sin verificar ${cuenta('sin_verificar')}
-  </div>
+  </div>`}
 
   ${o.recepcion && o.recepcion.observaciones ?
     '<h2>Observaciones</h2><div>' + esc(o.recepcion.observaciones) + '</div>' : ''}
@@ -532,44 +578,93 @@ function impresoPresupuesto(o, p) {
      del original y el mismo del recuadro de totales. */
   const grupo = (l) => Reglas.esManoObra(l) ? 0 : (Reglas.esRepuesto(l) ? 1 : 2);
 
-  let n = 0;
-  const filas = lineas.slice()
+  /* 🔴 EL DETALLE, AGRUPADO POR LO QUE SE LE HACE AL AUTO (30-08-2026, Marco,
+     con un Excel de ejemplo).
+
+     Antes cada linea del presupuesto era una fila numerada suelta, y la mano de
+     obra de «Cambio parachoque» quedaba en la fila 1 mientras su repuesto —el
+     parachoque— caia en la 5, despues de todas las demas. Quien lee el
+     documento no puede sumar lo que cuesta cambiar un parachoque sin ir
+     saltando por la hoja.
+
+     Ahora manda el ITEM: «Cambio parachoque» es el numero 1, y debajo van sus
+     actividades con sus valores separados —la mano de obra por un lado, el
+     repuesto por otro—. Es como lo pidio y es como se lee un presupuesto de
+     taller: por trabajo, no por tipo de gasto.
+
+     El agrupador es la DESCRIPCION, que es lo que ya usan para relacionarlas:
+     en su prueba «Cambio parachoque» aparecia identico en la linea de obra y en
+     la de repuesto. Lo que no calza con nada queda solo en su propio numero,
+     que tampoco esta mal.
+
+     Y el proveedor se fue a la columna de actividad —«Repuesto · Sura»— porque
+     el formato pedido tiene siete columnas y una octava en A4 aprieta el
+     documento. No se pierde: decide si la pieza se cobra o va en cero. */
+  const linea = (l) => {
+    const horas = (Number(l.horas_dm) || 0) + (Number(l.horas_rep) || 0) + (Number(l.horas_pint) || 0);
+    if (Reglas.esManoObra(l))
+      return { valor: Math.round(horas * p.tempario), cant: horas ? hs(horas) + ' h' : '—' };
+    if (Reglas.esRepuesto(l))
+      return { valor: Reglas.cobroRepuesto(l), cant: String(l.cantidad || 1) };
+    return { valor: Number(l.precio_unitario) || 0, cant: String(l.cantidad || 1) };
+  };
+
+  const clave = (l) => String(l.descripcion || '').trim().toLowerCase();
+  const orden = new Map();          // conserva el orden de aparicion
+  lineas.slice()
     .sort((a, b) => grupo(a) - grupo(b) || (Number(a.orden) || 0) - (Number(b.orden) || 0))
-    .map((l) => {
-      const horas = (Number(l.horas_dm) || 0) + (Number(l.horas_rep) || 0) + (Number(l.horas_pint) || 0);
-      let valor, cant;
-      if (Reglas.esManoObra(l)) {
-        valor = Math.round(horas * p.tempario);
-        cant = horas ? hs(horas) + ' h' : '—';
-      } else if (Reglas.esRepuesto(l)) {
-        valor = Reglas.cobroRepuesto(l);
-        cant = l.cantidad || 1;
-      } else {
-        valor = Number(l.precio_unitario) || 0;
-        cant = l.cantidad || 1;
-      }
-      /* Una línea en cero no se imprime: alarga el documento y no dice nada.
-         La pieza que pone la compañía SÍ va —es parte del trabajo— con su
-         proveedor y con $0, que es exactamente lo que el taller cobra por
-         ella. */
-      if (!valor && !Reglas.esRepuesto(l)) return '';
-      return '<tr><td class="c">' + (++n) + '</td>' +
-        '<td>' + esc(l.descripcion || '—') + '</td>' +
-        '<td class="trabajo">' + esc(trabajoDe(l)) + '</td>' +
-        '<td class="prov">' + esc(l.proveedor || '—') + '</td>' +
-        '<td class="n">' + esc(String(cant)) + '</td>' +
-        '<td class="n valor">' + fMonto(valor) + '</td></tr>';
+    .forEach((l) => {
+      const v = linea(l);
+      /* Una linea en cero no se imprime: alarga el documento y no dice nada. La
+         pieza que pone la compañia SI va —es parte del trabajo— con $0, que es
+         exactamente lo que el taller cobra por ella. */
+      if (!v.valor && !Reglas.esRepuesto(l)) return;
+      /* 🔴 Y LA FILA DE ARRANQUE TAMPOCO (30-08-2026).
+
+         Desde que el presupuesto nace con una fila lista en Repuestos y otra en
+         Trabajos externos, la que nadie llenó llegaba al documento como
+         «4 · — · Repuesto · 1 · $0». Un item numerado que no dice nada, en el
+         papel que se le manda al cliente.
+
+         Vacia de verdad: sin descripcion, sin codigo, sin proveedor y sin
+         precio. Con cualquiera de las cuatro cosas escritas es una linea que
+         alguien puso a proposito y se respeta. */
+      const vacia = !String(l.descripcion || '').trim() && !String(l.codigo || '').trim() &&
+        !String(l.proveedor || '').trim() && !Number(l.precio_unitario);
+      if (vacia) return;
+      const k = clave(l) || ('__' + (orden.size + 1));
+      if (!orden.has(k)) orden.set(k, { desc: l.descripcion || '—', actos: [] });
+      orden.get(k).actos.push({ l, v });
+    });
+
+  let n = 0;
+  const filas = [...orden.values()].map((g) => {
+    n++;
+    return g.actos.map((a, i) => {
+      const iva = Math.round(a.v.valor * (Number(ivaPct) || 0) / 100);
+      const prov = String(a.l.proveedor || '').trim();
+      return '<tr' + (i ? ' class="sigue"' : '') + '>' +
+        '<td class="c">' + (i ? '' : n) + '</td>' +
+        '<td>' + (i ? '' : esc(g.desc)) + '</td>' +
+        '<td class="trabajo">' + esc(trabajoDe(a.l)) +
+          (prov ? ' <span class="prov">· ' + esc(prov) + '</span>' : '') + '</td>' +
+        '<td class="n">' + esc(a.v.cant) + '</td>' +
+        '<td class="n valor">' + fMonto(a.v.valor) + '</td>' +
+        '<td class="n">' + fMonto(iva) + '</td>' +
+        '<td class="n valor">' + fMonto(a.v.valor + iva) + '</td></tr>';
     }).join('');
+  }).join('');
 
   const tabla = !filas ? '' : `
     <table class="detalle">
       <thead><tr>
         <th class="cen" style="width:8mm">N°</th>
         <th>Descripción</th>
-        <th style="width:30mm">Trabajo</th>
-        <th style="width:26mm">Proveedor</th>
-        <th class="der" style="width:17mm">Cant.</th>
-        <th class="der" style="width:26mm">Valor</th>
+        <th style="width:38mm">Actividad</th>
+        <th class="der" style="width:15mm">Cant.</th>
+        <th class="der" style="width:23mm">Valor neto</th>
+        <th class="der" style="width:19mm">IVA</th>
+        <th class="der" style="width:24mm">Valor total</th>
       </tr></thead>
       <tbody>${filas}</tbody>
     </table>`;
@@ -894,13 +989,46 @@ function mostrarImpreso(cuerpo, nombre) {
   // documento. Es lo que hace que el guion pueda decir cuál debe quedar.
   const tituloPrevio = document.title;
 
-  const cerrar = () => { velo.remove(); document.title = tituloPrevio; };
+  document.body.classList.add('mirando-impreso');
+  const cerrar = () => {
+    velo.remove();
+    document.body.classList.remove('mirando-impreso');
+    document.title = tituloPrevio;
+  };
   velo.querySelector('#imp-cerrar').addEventListener('click', cerrar);
   velo.addEventListener('click', (ev) => { if (ev.target === velo) cerrar(); });
-  velo.querySelector('#imp-print').addEventListener('click', () => {
+  /* 🔴 SE IMPRIMIA A LOS 250 ms Y LAS FOTOS NO ESTABAN (30-08-2026, Marco:
+     «es super lento como para guardarlo como PDF»).
+
+     Las fotos se resuelven de IndexedDB y se pintan cuando llegan. El codigo
+     esperaba un cuarto de segundo fijo y mandaba a imprimir: con un comprobante
+     de siete fotos de 300 KB eso es demasiado pronto, asi que el navegador
+     abria el dialogo y se quedaba pensando ahi —con la ventana ya bloqueada—
+     mientras terminaba de decodificarlas. Se ve como lentitud del sistema y en
+     realidad es una espera mal puesta.
+
+     Ahora se espera a que cada imagen este DECODIFICADA. El boton lo dice
+     mientras tanto, que es la diferencia entre esperar y no saber si se
+     apreto. `decode()` puede rechazar en una imagen rota: se ignora, porque una
+     foto que no carga no puede impedir que se imprima el documento. */
+  velo.querySelector('#imp-print').addEventListener('click', async (ev) => {
+    const boton = ev.currentTarget;
+    const rotulo = boton.textContent;
+    const fotos = [...velo.querySelectorAll('img')];
+    if (fotos.length) {
+      boton.disabled = true;
+      boton.textContent = 'Preparando ' + fotos.length +
+        (fotos.length === 1 ? ' imagen…' : ' imágenes…');
+      await Promise.all(fotos.map((im) => {
+        if (!im.src) return Promise.resolve();
+        return (im.decode ? im.decode() : Promise.resolve()).catch(() => {});
+      }));
+      boton.disabled = false;
+      boton.textContent = rotulo;
+    }
     document.title = nombre;
-    // Las imágenes se resuelven de IndexedDB: hay que darles un respiro.
-    setTimeout(() => { window.print(); document.title = tituloPrevio; }, 250);
+    window.print();
+    document.title = tituloPrevio;
   });
   document.addEventListener('keydown', function esc_(ev) {
     if (ev.key === 'Escape') { cerrar(); document.removeEventListener('keydown', esc_); }

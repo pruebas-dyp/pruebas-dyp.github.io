@@ -1,0 +1,125 @@
+/* PIEL «TERMINAL» — Automotora DyP
+   Caracter: retro tecnica. Verde fosforo sobre negro y tipografia
+   monoespaciada, como una consola de operaciones. Es la mas distinta de todas.
+
+   La monoespaciada NO cambia el tamano del texto (siguen los 12,5 px del
+   sistema): cambia la familia. Las columnas de numeros quedan mejor alineadas
+   que en cualquiera de las otras, que es el chiste. */
+
+:root[data-piel="terminal"],
+:root[data-piel="terminal"][data-tema="oscuro"] {
+  --fondo: #020604;
+  --superficie: #06110b;
+  --superficie-2: #0b1c12;
+  --superficie-3: #040d08;
+  --cabecera: #0b1c12;
+  --borde: #163a25;
+  --borde-fuerte: #1f5c39;
+  --texto: #8ce0ab;
+  --tinta: #d7ffe7;
+  --gris: #57a877;
+  --gris-2: #5cb07e;
+  --zebra: rgba(53, 208, 127, .04);
+
+  --menu-bg: #010402;
+  --menu-texto: #7fd9a2;
+  --barra-bg: #040d07;
+
+  --marca: #35d07f;
+  --acento: #35d07f;
+  --acento-solido: #11683b;
+  --acento-solido-hover: #0c4f2c;
+  --acento-hover: #2bb96e;
+  --acento-bg: rgba(53, 208, 127, .13);
+  --acento-borde: rgba(53, 208, 127, .42);
+  --acento-texto: #6ee7a5;
+  --seleccion: rgba(53, 208, 127, .15);
+
+  --verde: #35d07f; --verde-bg: rgba(53, 208, 127, .13); --verde-borde: rgba(53, 208, 127, .34); --verde-texto: #6ee7a5;
+  --ambar: #d8c04a; --ambar-bg: rgba(216, 192, 74, .13); --ambar-borde: rgba(216, 192, 74, .32); --ambar-texto: #e6d47c;
+  --rojo:  #ff6b6b; --rojo-bg:  rgba(255, 107, 107, .13); --rojo-borde:  rgba(255, 107, 107, .34); --rojo-texto:  #ff9d9d;
+  --violeta: #5fd6cc; --violeta-bg: rgba(95, 214, 204, .13); --violeta-borde: rgba(95, 214, 204, .32); --violeta-texto: #93e5de;
+  --alta: #e08fae; --alta-bg: rgba(224, 143, 174, .12);
+  --neutro-bg: rgba(87, 168, 119, .11); --neutro-borde: #1c4a2f;
+
+  --cinta-bg: rgba(216, 192, 74, .09); --cinta-borde: rgba(216, 192, 74, .28); --cinta-texto: #e6d47c;
+  --aviso-bg: rgba(216, 192, 74, .08); --aviso-borde: rgba(216, 192, 74, .24); --aviso-texto: #ded06a;
+  --info-bg: rgba(95, 214, 204, .09); --info-borde: rgba(95, 214, 204, .26); --info-texto: #93e5de;
+
+  --zona-fill: #0b1c12; --zona-stroke: #1f5c39; --zona-hover: #10281a; --rueda: #276b44;
+  --campo-bg: #030a06;
+  --sombra: 0 1px 0 rgba(0, 0, 0, .8);
+}
+
+:root[data-piel="terminal"][data-tema="claro"] {
+  /* La version «papel de impresora»: fondo hueso, tinta casi negra, acento
+     verde oscuro. Misma monoespaciada. */
+  --fondo: #eceadf;
+  --superficie: #f9f8f2;
+  --superficie-2: #efeee5;
+  --superficie-3: #f5f4ee;
+  --cabecera: #eceadf;
+  --borde: #ccc9ba;
+  --borde-fuerte: #a5a294;
+  --texto: #222a24;
+  --tinta: #0b100c;
+  --gris: #5a6159;
+  --gris-2: #585f57;
+  --zebra: rgba(11, 16, 12, .032);
+
+  --menu-bg: #10160f;
+  --menu-texto: #d9e2d8;
+  --barra-bg: #efeee5;
+
+  --marca: #0f6b3c;
+  --acento: #0f6b3c;
+  --acento-solido: #0f6b3c;
+  --acento-solido-hover: #0b5330;
+  --acento-hover: #0b5330;
+  --acento-bg: #e4f2e9;
+  --acento-borde: #b3d7c2;
+  --acento-texto: #0b5330;
+  --seleccion: #dcefe3;
+
+  --verde: #0f6b3c; --verde-bg: #e4f2e9; --verde-borde: #b3d7c2; --verde-texto: #0b5330;
+  --ambar: #8a6a06; --ambar-bg: #f7f1dd; --ambar-borde: #ddcc94; --ambar-texto: #6d5305;
+  --rojo:  #a83232; --rojo-bg:  #f9e9e7; --rojo-borde:  #e5bcb8; --rojo-texto:  #8c2828;
+  --violeta: #2f6f6a; --violeta-bg: #e5f0ef; --violeta-borde: #b4d3d0; --violeta-texto: #245652;
+  --alta: #9c4560; --alta-bg: rgba(156, 69, 96, .10);
+  --neutro-bg: #eceadf; --neutro-borde: #ccc9ba;
+
+  --cinta-bg: #f7f1dd; --cinta-borde: #ddcc94; --cinta-texto: #6d5305;
+  --aviso-bg: #f8f4e6; --aviso-borde: #e2d5ae; --aviso-texto: #6d5305;
+  --info-bg: #e5f0ef; --info-borde: #b4d3d0; --info-texto: #245652;
+
+  --zona-fill: #e6e4d8; --zona-stroke: #a5a294; --zona-hover: #d8d6c8; --rueda: #93907f;
+  --campo-bg: #f9f8f2;
+  --sombra: 0 1px 0 rgba(11, 16, 12, .14);
+}
+
+/* La familia monoespaciada y la esquina recta: eso es toda la piel. */
+:root[data-piel="terminal"] body,
+:root[data-piel="terminal"] table.grid,
+:root[data-piel="terminal"] .btn,
+:root[data-piel="terminal"] .hbtn,
+:root[data-piel="terminal"] .chip,
+:root[data-piel="terminal"] input,
+:root[data-piel="terminal"] select,
+:root[data-piel="terminal"] textarea,
+:root[data-piel="terminal"] button {
+  font-family: "Cascadia Mono", Consolas, "DejaVu Sans Mono", "Courier New", monospace;
+}
+:root[data-piel="terminal"] .panel,
+:root[data-piel="terminal"] .modal,
+:root[data-piel="terminal"] .panel > .cab,
+:root[data-piel="terminal"] .hbtn,
+:root[data-piel="terminal"] .btn,
+:root[data-piel="terminal"] .chip { border-radius: 0; }
+:root[data-piel="terminal"] .cab-modulo h1 { letter-spacing: .5px; }
+:root[data-piel="terminal"] .barra-menu { border-bottom: 1px solid var(--acento-borde); }
+
+/* El logo a color no convive con el fosforo: se pasa a la tinta de la piel. */
+:root[data-piel="terminal"][data-tema="oscuro"] .barra-menu .prod img.logo,
+:root[data-piel="terminal"][data-tema="oscuro"] #ing-placa img {
+  filter: grayscale(1) brightness(1.7) sepia(1) hue-rotate(85deg) saturate(3);
+}

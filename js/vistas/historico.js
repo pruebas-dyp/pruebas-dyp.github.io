@@ -1,3 +1,110 @@
+/* 🔴 LA VENTA DEL HISTÓRICO NO LA VE CUALQUIERA (30-08-2026).
+
+   Marco, del dueño: «no quiere que nadie tenga acceso a ver venta en el
+   histórico, por lo tanto todo lo que es venta en el histórico no lo debería
+   poder ver nadie. Salvo administrador y el perfil de Gabriel Díaz Moreno y
+   Gabriel Díaz Hernández».
+
+   Es la ÚNICA excepción a la regla de que un módulo se da completo, y por eso
+   está escrita acá arriba y no escondida en una celda: el Histórico se le da a
+   casi todo el mundo —es la memoria del taller— pero las cuatro columnas de
+   plata son otra cosa.
+
+   `historico.montos` es un permiso RESERVADO: no lo da ningún módulo ni ningún
+   rol, ni siquiera uno de acceso total. Va con nombre y apellido desde Personal.
+
+   Las columnas no se vacían: DESAPARECEN. Una columna «Venta Total» con un
+   guión adentro invita a preguntar por qué, y quien pregunta insiste. */
+const verVentaHistorico = () => Modelo.puede('historico.montos');
+
+/* Los doce años completos, de una. Son 35.410 documentos y unos 8 MB: se piden
+   SOLO cuando alguien aprieta «Ver todos», y una vez por sesión. */
+let historiaCompletaLista = false;
+let historiaCompletaCargando = false;
+
+async function traerTodaLaHistoria() {
+  if (typeof Base === 'undefined' || !Base.conectada()) return;
+  if (historiaCompletaLista || historiaCompletaCargando) return;
+  historiaCompletaCargando = true;
+  estadoHistorico = 'Trayendo los doce años…';
+  if (typeof render === 'function') render();
+  try {
+    const t = await Base.historicoCompleto((n) => {
+      estadoHistorico = 'Trayendo los doce años… ' + n.toLocaleString('es-CL') + ' órdenes';
+    });
+    Modelo.mezclarNube(t);
+    historiaCompletaLista = true;
+    estadoHistorico = '';
+  } catch (e) {
+    estadoHistorico = 'No se pudieron traer todas: ' + ((e && e.message) || 'sin conexión');
+  }
+  historiaCompletaCargando = false;
+  if (typeof render === 'function') render();
+}
+let estadoHistorico = '';
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   BUSCAR EN LOS DOCE AÑOS.
+
+   En memoria viven las 92 órdenes activas. Las otras 15.442 están en Firestore
+   y no se bajan «por si acaso»: bajarlas todas serían 15.442 lecturas cada vez
+   que alguien abre esta pantalla, y el 99 % de las veces se busca UNA.
+
+   Así que esta pantalla pregunta. Lo que vuelve se mezcla en el modelo y a
+   partir de ahí es una orden como cualquier otra: se abre, se imprime, se ven
+   sus fotos. La pantalla se repinta sola cuando llega.
+   ═══════════════════════════════════════════════════════════════════════════ */
+let historicoBuscando = false;
+let historicoUltimaBusqueda = '';
+
+async function traerDeLosDoceAnios(h) {
+  if (typeof Base === 'undefined' || !Base.conectada()) return;
+
+  /* La firma de lo que se está buscando. Sin esto, cada repintado —y repinta
+     por cualquier cosa, hasta por cambiar de página— volvía a preguntarle a
+     Firestore lo mismo, y cada vuelta cuesta lecturas. */
+  const firma = JSON.stringify([h.patente, h.compania_id, h.estado, h.todos]);
+  if (historicoBuscando || firma === historicoUltimaBusqueda) return;
+  historicoBuscando = true;
+  historicoUltimaBusqueda = firma;
+
+  try {
+    const q = String(h.patente || '').trim();
+    const criterio = {};
+    /* El mismo cuadro busca patente, número de OT y siniestro — que es como en
+       el taller se nombra un trabajo, según de quién venga la llamada. Se
+       decide por la forma: sólo dígitos y del largo de una OT es una OT; un
+       número largo es un siniestro; lo demás, patente. */
+    if (/^\d{1,6}$/.test(q))       criterio.numero_ot = q;
+    else if (/^\d{7,}$/.test(q))   criterio.siniestro = q;
+    else if (q)                    criterio.patente = q;
+    if (h.compania_id) criterio.compania_id = h.compania_id;
+    if (h.estado)      criterio.estado = h.estado;
+    if (!q && !h.compania_id && !h.estado) criterio.limite = 200;
+
+    const r = await Base.buscarOrdenes(criterio);
+    if (r.ordenes.length) {
+      /* Y los clientes de esas órdenes, o la columna sale sin nombre. */
+      const t = { orden_trabajo: r.ordenes, vehiculo: r.vehiculos };
+      /* Personas y presupuestos se piden A LA VEZ: son consultas
+         independientes y en serie la pantalla tardaba el doble. */
+      const [exp, plata] = await Promise.all([
+        Base.personasDe(r.ordenes),
+        Base.presupuestosDe(r.ordenes).catch(() => ({ presupuesto: [], presupuesto_linea: [], ot_estadia: [] }))
+      ]);
+      if (exp.length) t.persona = exp;
+      t.presupuesto = plata.presupuesto;
+      t.presupuesto_linea = plata.presupuesto_linea;
+      t.ot_estadia = plata.ot_estadia || [];
+      Modelo.mezclarNube(t);
+    }
+  } catch (e) {
+    /* Sin nube el Histórico muestra lo que tenga en memoria. No se cae. */
+  }
+  historicoBuscando = false;
+  if (typeof render === 'function') render();
+}
+
 /* HISTÓRICO Y CONSOLIDADO.
 
    El histórico es un BUSCADOR, no un listado: sin filtro no muestra nada, igual que el
@@ -30,6 +137,22 @@ function historicoEstado() {
    columnas de dinero que quedan del Histórico real. */
 function plataDe(o) {
   const z = { ventaMO: 0, ventaRep: 0, ventaToT: 0 };
+
+  /* 🔴 SI LOS PRESUPUESTOS NO ESTAN EN MEMORIA, SE USA LA VENTA GUARDADA.
+
+     Con «Ver todos» hay 15.534 órdenes en pantalla y sus presupuestos son
+     333.554 documentos más: no se bajan. Al migrar se calculó la venta de cada
+     orden con `Reglas.totalesPresupuesto` —la misma función que corre unas
+     líneas más abajo— y quedó guardada en la propia orden.
+
+     El orden importa: si los presupuestos ESTAN, mandan ellos, porque pueden
+     tener cambios de hoy que la copia guardada no conoce. La copia es para
+     cuando no hay nada mejor, no para ahorrarse la cuenta. */
+  if (!o.presupuestos.length && o.ventaGuardada) {
+    return { ventaMO: o.ventaGuardada.mo, ventaRep: o.ventaGuardada.rep,
+      ventaToT: o.ventaGuardada.tot,
+      ventaTotal: o.ventaGuardada.mo + o.ventaGuardada.rep + o.ventaGuardada.tot };
+  }
   /* Los tres montos salen de `totales`, que es la MISMA cuenta del documento:
      mano de obra = horas × tempario en las tres columnas; repuestos, sólo los
      que puso el taller; T.O.T., los trabajos externos. Antes acá se sumaba
@@ -226,7 +349,9 @@ function vHistorico() {
         <th>Fecha de Entrega</th>
         <th title="El original NO tiene esta columna: al entregar, el contador desaparece">Días tot.</th>
         <th title="Tampoco existe allá">Reparación</th>
-        <th>Venta MO</th><th>Venta Rep</th><th title="Deducción: trabajos a terceros. Pregunta 5">Venta ToT</th><th>Venta Total</th>
+        ${verVentaHistorico() ? '<th>Venta MO</th><th>Venta Rep</th>' +
+          '<th title="Deducción: trabajos a terceros. Pregunta 5">Venta ToT</th>' +
+          '<th>Venta Total</th>' : ''}
         <th>Observación</th><th title="La inicial del asunto de cada mensaje de bitácora">Alerta</th>
       </tr></thead>
       <tbody>${pagina.length ? pagina.map((o) => {
@@ -244,21 +369,24 @@ function vHistorico() {
           '<td class="num"><strong>' + o.diasTotales + '</strong></td>' +
           '<td class="num" style="color:' + (o.diasReparacion > Modelo.metricas().metaDias ? 'var(--ambar)' : 'inherit') + '">' +
             o.diasReparacion + '</td>' +
-          '<td class="num">' + fMonto(z.ventaMO) + '</td><td class="num">' + fMonto(z.ventaRep) + '</td>' +
-          '<td class="num">' + fMonto(z.ventaToT) + '</td>' +
-          '<td class="num"><strong>' + fMonto(z.ventaTotal) + '</strong></td>' +
+          (verVentaHistorico()
+            ? '<td class="num">' + fMonto(z.ventaMO) + '</td><td class="num">' + fMonto(z.ventaRep) + '</td>' +
+              '<td class="num">' + fMonto(z.ventaToT) + '</td>' +
+              '<td class="num"><strong>' + fMonto(z.ventaTotal) + '</strong></td>'
+            : '') +
           '<td>' + esc(((o.recepcion || {}).observaciones || '').slice(0, 90) ||
             '—') + '</td>' +
           '<td>' + chipsAlerta(o) + '</td></tr>';
-      }).join('') : '<tr><td colspan="19">' +
+      }).join('') : '<tr><td colspan="' + (verVentaHistorico() ? 19 : 15) + '">' +
         (hayFiltro || h.todos ? sinResultados(h) :
           '<div class="vacio"><div class="titulo">Escribe un filtro y aprieta Buscar</div>' +
           '<div class="texto">El Histórico es un buscador, no un listado. ' +
           'Así es el sistema actual y así se replica — y para verlo entero está <strong>Ver todos</strong>.</div></div>') +
         '</td></tr>'}</tbody>
-      ${todas.length ? '<tfoot><tr><td colspan="16" style="text-align:right">Venta de las ' +
-        todas.length + ' órdenes filtradas</td>' +
-        '<td class="num"><strong>' + fMonto(suma.venta) + '</strong></td></tr></tfoot>' : ''}
+      ${todas.length && verVentaHistorico()
+        ? '<tfoot><tr><td colspan="16" style="text-align:right">Venta de las ' +
+          todas.length + ' órdenes filtradas</td>' +
+          '<td class="num"><strong>' + fMonto(suma.venta) + '</strong></td></tr></tfoot>' : ''}
     </table></div>
     ${/* El pie aparece cuando hay más filas que la opción más chica, no cuando
           hay más que la página actual: con «Todas» puesto y 214 órdenes a la
@@ -408,16 +536,19 @@ function impresoListadoHistorico(filas, rotulo) {
       <div>${esc(rotulo)}</div><div>Emitido ${fFechaHora(HOY)}</div></div>
   </div>
   <table><thead><tr><th>OT</th><th>Patente</th><th>Cliente</th><th>Marca</th><th>Modelo</th>
-    <th>Fecha de Ingreso</th><th>Fecha de Entrega</th><th>Estado</th><th class="n">Días</th><th class="n">Venta</th>
+    <th>Fecha de Ingreso</th><th>Fecha de Entrega</th><th>Estado</th><th class="n">Días</th>
+    ${verVentaHistorico() ? '<th class="n">Venta</th>' : ''}
   </tr></thead><tbody>
     ${filas.map((o) => '<tr><td>' + o.numeroOT + '</td><td>' + esc(o.patente) + '</td>' +
       '<td>' + esc(o.cliente) + '</td><td>' + esc(o.marca || '—') + '</td>' +
       '<td>' + esc(o.modelo || '—') + '</td>' +
       '<td>' + fFechaHora(o.fechaIngreso) + '</td><td>' + fFechaHora(o.fechaEntrega) + '</td>' +
       '<td>' + esc(o.estadoNombre) + '</td><td class="n">' + o.diasTotales + '</td>' +
-      '<td class="n">' + fMonto(plataDe(o).ventaTotal) + '</td></tr>').join('')}
-  </tbody><tfoot><tr><td colspan="9" style="text-align:right"><strong>Venta del listado</strong></td>
-    <td class="n"><strong>${fMonto(total)}</strong></td></tr></tfoot></table>
+      (verVentaHistorico() ? '<td class="n">' + fMonto(plataDe(o).ventaTotal) + '</td>' : '') +
+      '</tr>').join('')}
+  </tbody>${verVentaHistorico()
+    ? '<tfoot><tr><td colspan="9" style="text-align:right"><strong>Venta del listado</strong></td>' +
+      '<td class="n"><strong>' + fMonto(total) + '</strong></td></tr></tfoot>' : ''}</table>
   ${pieImpreso()}`;
 }
 
@@ -452,6 +583,9 @@ function impresoEstadisticas() {
 }
 
 function pHistorico() {
+  /* Al entrar, las últimas 200 cerradas: la pantalla no puede abrirse vacía
+     cuando hay 15.442 órdenes guardadas. */
+  if (typeof historicoEstado === 'function') traerDeLosDoceAnios(historicoEstado());
   const h = historicoEstado();
 
   // La hoja de reportes tiene sus propios botones y sale de acá derecho.
@@ -479,7 +613,14 @@ function pHistorico() {
     h.pagina = 1;
   };
   const buscar = document.getElementById('h-buscar');
-  if (buscar) buscar.addEventListener('click', () => { leer(); h.todos = false; render(); });
+  if (buscar) buscar.addEventListener('click', () => {
+    leer(); h.todos = false;
+    /* Primero se le pregunta a los doce años y después se pinta: si sólo se
+       filtrara lo que hay en memoria, buscar una patente de 2019 devolvería
+       cero — y cero se lee como «ese auto nunca entró». */
+    traerDeLosDoceAnios(h);
+    render();
+  });
   const limpiar = document.getElementById('h-limpiar');
   if (limpiar) limpiar.addEventListener('click', () => {
     h.patente = h.cliente = h.compania_id = h.estado = h.desde = h.hasta = '';
@@ -497,7 +638,12 @@ function pHistorico() {
 
   const todos = document.getElementById('h-todos');
   if (todos) todos.addEventListener('click', () => {
-    h.todos = !h.todos; h.pagina = 1; render();
+    h.todos = !h.todos; h.pagina = 1;
+    /* «Ver todos» quiere decir TODOS: las 15.534 órdenes de doce años, no las
+       200 que se trajeron al abrir la pantalla. Se piden una vez y quedan en
+       memoria para el resto de la sesión. */
+    if (h.todos) traerTodaLaHistoria();
+    render();
   });
   const est = document.getElementById('h-estadisticas');
   if (est) est.addEventListener('click', () => { h.vista = 'estadisticas'; render(); });
@@ -556,7 +702,9 @@ function vConsolidado() {
   return `
   <div class="panel">
     <div class="cab"><div><h2>${ico('consolidado', 'g')}Consolidado</h2>
-      <div class="desc">Las 17 columnas de la Torre más el dinero</div></div>
+      <div class="desc">${verVentaHistorico()
+        ? 'Las 17 columnas de la Torre más el dinero'
+        : 'Las 17 columnas de la Torre, con el detalle de repuestos'}</div></div>
       <button class="btn secundario" data-pendiente="Exportar el consolidado|6|la exportación es un permiso aparte y queda en la traza">Exportar</button></div>
     <div class="grid-envoltorio"><table class="grid">
       <thead><tr><th>OT</th><th>OR</th><th>Patente</th><th>Siniestro</th><th>Cliente</th><th>Compañia</th>
@@ -565,7 +713,19 @@ function vConsolidado() {
               la tabla la dejaba en 90px, el texto se partía cada dos palabras y
               cada fila crecía a seis líneas. La tabla ya tiene su barra
               horizontal, y el ancho igual se puede arrastrar. */''}
-        <th>Venta</th><th style="min-width:250px">Rep Pend.</th><th>Rep OK.</th>
+        ${/* 🔴 LA VENTA TAMBIEN SE APAGA ACA (30-08-2026, Marco: «nadie ve nada de
+             venta, salvo administrador y los dos Gabriel»).
+
+             Esa regla ya estaba puesta en el Historico y se habia quedado corta:
+             el Consolidado es «las 17 columnas de la Torre mas el dinero», y
+             Andres Guzman lo tiene por su lista de modulos. Con la columna
+             puesta, la regla no se cumplia — solo estaba escrita en otra
+             pantalla.
+
+             Conserva el modulo, que le sirve para seguir los repuestos y los
+             dias; lo que se va es la plata. La columna DESAPARECE en vez de
+             mostrar un guion: un guion invita a preguntar que dice ahi. */''}
+        ${verVentaHistorico() ? '<th>Venta</th>' : ''}<th style="min-width:250px">Rep Pend.</th><th style="min-width:250px">Rep OK.</th>
         ${TH_LUPA}</tr></thead>
       ${/* Sin el `slice(0, 60)`: el pie de abajo decía «Mostrando 60 de 102»
             mientras el total del pie de tabla sumaba las 102. Dos números
@@ -585,7 +745,7 @@ function vConsolidado() {
           '<td class="num">' + o.diasKpi + '</td>' +
           '<td><span class="et ' + esc(o.estadoClase) + '">' + esc(o.estadoNombre) + '</span></td>' +
           '<td>' + esc(o.etapaNombre) + '</td>' +
-          '<td class="num"><strong>' + fMonto(z.ventaTotal) + '</strong></td>' +
+          (verVentaHistorico() ? '<td class="num"><strong>' + fMonto(z.ventaTotal) + '</strong></td>' : '') +
           /* 🔶 TEXTO, NO CANTIDAD (16-08-2026, Marco): «debiese quedar el texto
              de repuesto pendiente, no la cantidad ya que así lo tiene en el
              sistema actual». Un «2» hay que traducirlo cada vez.
@@ -614,7 +774,26 @@ function vConsolidado() {
                   ? ' <span class="prov">(' + esc(String(r.responsablePago).toLowerCase()) + ')</span>'
                   : '')).join(', ') + '</div>'
             : '<span style="color:var(--gris-2)">—</span>') + '</td>' +
-          '<td class="num">' + llegados.length + '</td>' +
+          /* 🔷 EL DETALLE, NO LA CANTIDAD (31-08-2026, Marco). Igual que la
+             columna de al lado: la etiqueta que se lee de una arriba y las
+             piezas debajo, con su proveedor. Un «4» obliga a abrir la fila
+             para saber QUÉ llegó, teniendo justo al lado una columna que dice
+             las que faltan por su nombre.
+
+             La fecha va en el globo y no en la fila: es lo primero que se
+             pregunta de una pieza que llegó, pero puestas todas en la celda
+             tapan lo que se vino a leer. */
+          '<td style="max-width:420px">' + (llegados.length
+            ? '<span class="et verde" title="' + llegados.length +
+              (llegados.length === 1 ? ' pieza en bodega' : ' piezas en bodega') +
+              '">Repuesto en bodega</span>' +
+              '<div class="piezas-pend">' + llegados.map((r) =>
+                '<span title="' + (r.fechaBodega ? 'Llegó el ' + fFecha(r.fechaBodega) : 'Sin fecha de llegada') + '">' +
+                esc(r.descripcion) +
+                (r.responsablePago
+                  ? ' <span class="prov">(' + esc(String(r.responsablePago).toLowerCase()) + ')</span>'
+                  : '') + '</span>').join(', ') + '</div>'
+            : '<span style="color:var(--gris-2)">—</span>') + '</td>' +
           CELDA_LUPA(o.numeroOT) + '</tr>';
       }).join('')}</tbody>
       ${/* El pie cierra 17 columnas: 13 + venta + las dos de repuestos + la lupa. */''}

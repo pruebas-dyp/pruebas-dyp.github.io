@@ -1,0 +1,110 @@
+/* PIEL «PAPEL» — Automotora DyP
+   Caracter: la menos corporativa. Crema, terracota y esquinas redondeadas.
+   Se siente aplicacion liviana en vez de sistema de gestion, sin dejar de
+   mostrar exactamente lo mismo.
+
+   Arranca en tema CLARO —es donde vive— pero trae su version oscura en cafe
+   para que el interruptor siga sirviendo. */
+
+:root[data-piel="papel"],
+:root[data-piel="papel"][data-tema="claro"] {
+  --fondo: #f4efe6;
+  --superficie: #fffdf8;
+  --superficie-2: #f8f3ea;
+  --superficie-3: #fbf8f2;
+  --cabecera: #f4efe6;
+  --borde: #e2d8c8;
+  --borde-fuerte: #c3b5a0;
+  --texto: #4a4038;
+  --tinta: #241d17;
+  --gris: #786c5e;
+  --gris-2: #766a5c;
+  --zebra: rgba(90, 70, 45, .032);
+
+  --menu-bg: #3b322a;
+  --menu-texto: #ece3d6;
+  --barra-bg: #f8f3ea;
+
+  --marca: #a0522d;
+  --acento: #9a4b26;
+  --acento-solido: #9a4b26;
+  --acento-solido-hover: #7d3c1e;
+  --acento-hover: #7d3c1e;
+  --acento-bg: #f7e9e0;
+  --acento-borde: #e0c3b1;
+  --acento-texto: #86401f;
+  --seleccion: #f3e5d9;
+
+  --verde: #3f7d4f; --verde-bg: #eaf5ec; --verde-borde: #bcdcc3; --verde-texto: #326540;
+  --ambar: #a97614; --ambar-bg: #fcf3e0; --ambar-borde: #ecd7a4; --ambar-texto: #855c0f;
+  --rojo:  #b0453a; --rojo-bg:  #fbebe9; --rojo-borde:  #eec4bf; --rojo-texto:  #93382e;
+  --violeta: #7a5aa8; --violeta-bg: #f2edf8; --violeta-borde: #d7c9e8; --violeta-texto: #634789;
+  --alta: #a55870; --alta-bg: rgba(165, 88, 112, .10);
+  --neutro-bg: #f1ebe1; --neutro-borde: #e2d8c8;
+
+  --cinta-bg: #fcf3e0; --cinta-borde: #ecd7a4; --cinta-texto: #855c0f;
+  --aviso-bg: #fdf6e8; --aviso-borde: #eddfb8; --aviso-texto: #855c0f;
+  --info-bg: #ecf1f7; --info-borde: #c6d5e6; --info-texto: #2f5478;
+
+  --zona-fill: #efe7da; --zona-stroke: #c3b5a0; --zona-hover: #e5d9c7; --rueda: #a6957e;
+  --campo-bg: #fffdf8;
+  --sombra: 0 1px 2px rgba(80, 60, 35, .08);
+}
+
+:root[data-piel="papel"][data-tema="oscuro"] {
+  --fondo: #191410;
+  --superficie: #231c16;
+  --superficie-2: #2e251d;
+  --superficie-3: #1d1712;
+  --cabecera: #2e251d;
+  --borde: #3c3128;
+  --borde-fuerte: #544537;
+  --texto: #ded3c6;
+  --tinta: #f8f2e9;
+  --gris: #a8998a;
+  --gris-2: #9b8c7d;
+  --zebra: rgba(255, 240, 220, .028);
+
+  --menu-bg: #120e0b;
+  --menu-texto: #ddd1c2;
+  --barra-bg: #1d1712;
+
+  --marca: #e0a072;
+  --acento: #e0a072;
+  --acento-solido: #8a4523;
+  --acento-solido-hover: #6f371c;
+  --acento-hover: #cd8d5f;
+  --acento-bg: rgba(224, 160, 114, .14);
+  --acento-borde: rgba(224, 160, 114, .40);
+  --acento-texto: #eebb95;
+  --seleccion: rgba(224, 160, 114, .14);
+
+  --verde: #7fc08f; --verde-bg: rgba(127, 192, 143, .13); --verde-borde: rgba(127, 192, 143, .32); --verde-texto: #a3d5ae;
+  --ambar: #e3b45c; --ambar-bg: rgba(227, 180, 92, .13); --ambar-borde: rgba(227, 180, 92, .32); --ambar-texto: #efcd8b;
+  --rojo:  #e08079; --rojo-bg:  rgba(224, 128, 121, .13); --rojo-borde:  rgba(224, 128, 121, .32); --rojo-texto:  #eda9a3;
+  --violeta: #b39ee0; --violeta-bg: rgba(179, 158, 224, .13); --violeta-borde: rgba(179, 158, 224, .32); --violeta-texto: #cbbcec;
+  --alta: #d1899e; --alta-bg: rgba(209, 137, 158, .12);
+  --neutro-bg: rgba(168, 153, 138, .12); --neutro-borde: #443a2f;
+
+  --cinta-bg: rgba(227, 180, 92, .10); --cinta-borde: rgba(227, 180, 92, .28); --cinta-texto: #efcd8b;
+  --aviso-bg: rgba(227, 180, 92, .09); --aviso-borde: rgba(227, 180, 92, .24); --aviso-texto: #e9c377;
+  --info-bg: rgba(150, 190, 230, .09); --info-borde: rgba(150, 190, 230, .26); --info-texto: #b6d4ee;
+
+  --zona-fill: #2e251d; --zona-stroke: #544537; --zona-hover: #3a2f25; --rueda: #63513f;
+  --campo-bg: #1b1511;
+  --sombra: 0 1px 3px rgba(0, 0, 0, .45);
+}
+
+/* Forma: es lo que mas cambia el caracter. Redondeo generoso y sombra suave.
+   Nada de esto mueve un elemento de sitio ni cambia una medida. */
+:root[data-piel="papel"] .panel,
+:root[data-piel="papel"] .modal { border-radius: 9px; }
+:root[data-piel="papel"] .panel > .cab { border-radius: 9px 9px 0 0; }
+:root[data-piel="papel"] .hbtn,
+:root[data-piel="papel"] .btn { border-radius: 7px; transition: background .15s ease, border-color .15s ease, color .15s ease; }
+:root[data-piel="papel"] .chip { border-radius: 999px; transition: background .15s ease, border-color .15s ease, color .15s ease; }
+:root[data-piel="papel"] .nav a { border-radius: 0 7px 7px 0; transition: background .15s ease, color .15s ease; }
+/* 🔴 Aca habia `text-transform: none` en la cabecera de tabla. Quitaba las
+   mayusculas y con eso ESTRECHABA la tabla de 1.233 a 1.217 px: cambiaba el
+   ancho de las 21 columnas. Se saco por lo mismo que en la piel «Taller». */
+:root[data-piel="papel"] .aviso { border-radius: 7px; }

@@ -2409,36 +2409,110 @@ const Pruebas = (function () {
         });
       })();
 
-      /* 🔴 2 · LA SESION NO VIVE EN `localStorage`.
+      /* 🔴 «AGREGAR FOTOS» NO SE SALTA LOS PASOS (31-08-2026, Marco).
 
-         Estaba ahi, y `localStorage` sobrevive a cerrar el navegador: quien
-         prendiera despues ese computador entraba como la ultima persona que lo
-         uso, sin clave. En el meson de recepcion de un taller, donde el equipo
-         lo usan tres personas al dia, ese es el caso normal.
+         «Cuando uno esta en la recepcion y pincha ahi donde dice agregar fotos
+         te manda al estado descriptivo. Eso no puede pasar si es que no se
+         llenan los campos de antes.»
 
-         La prueba mira el ALMACENAMIENTO, no el codigo: da igual como se
-         escriba mientras la sesion no quede ahi. */
+         El encabezado del asistente promete «no se avanza con el paso
+         incompleto». Las pastillas numeradas lo cumplian; el boton de la barra
+         llamaba directo a `recEntrarAlFormulario('danos')` y aterrizaba en el
+         paso 4 con el RUT y el nombre en blanco.
+
+         Se prueba el EFECTO, no la funcion: con el borrador vacio se aprieta la
+         accion y se mira en que paso quedo. */
       (function () {
-        const CLAVE = Modelo.CLAVE_SESION;
+        if (typeof accionModulo !== 'function' || typeof rec !== 'function') {
+          push({ nombre: '🔴 «Agregar fotos» no se salta los pasos del ingreso',
+            intento: 'Buscar la accion', esperado: 'cargada',
+            paso: false, detalle: 'accionModulo o rec no estan (falta js/app)' });
+          return;
+        }
+        const vistaAntes = ui.vista;
+        const antes = JSON.parse(JSON.stringify(rec()));
+        ui.vista = 'recepcion';
+        const r = rec();
+        /* Borrador vacio: primer paso, sin datos del cliente. */
+        r.pantalla = 'nuevo'; r.paso = RECEPCION_PASOS[0].id; r.marcados = [];
+        /* Los campos del formulario viven en `r.campos`, no en `r.cliente`. La
+           primera version vaciaba el objeto equivocado, el paso 1 salia
+           completo y la prueba no medía nada. */
+        ['rut', 'nombre', 'telefono', 'direccion'].forEach((k) => { r.campos[k] = ''; });
+        let quedo = null, exploto = null;
+        try { accionModulo('fotos'); quedo = rec().paso; }
+        catch (e) { exploto = e && e.message; }
+        const falta = recFaltantesDe(RECEPCION_PASOS[0].id).length;
+        /* Se restaura lo que habia, que esta bateria no puede dejar basura. */
+        Object.keys(rec()).forEach((k) => { delete rec()[k]; });
+        Object.assign(rec(), antes);
+        ui.vista = vistaAntes;
+
+        push({
+          nombre: '🔴 «Agregar fotos» no se salta los pasos del ingreso',
+          intento: 'Con el borrador vacio, apretar «Agregar fotos» y mirar en que paso queda',
+          esperado: 'NO queda en «danos»: se queda donde falta algo y lo dice',
+          paso: !exploto && falta > 0 && quedo !== 'danos',
+          detalle: exploto ? 'Se cayo: ' + exploto
+            : (falta === 0 ? 'El primer paso no exigia nada: la prueba no midio nada'
+            : (quedo === 'danos'
+              ? 'Salto al paso 4 con ' + falta + ' campos obligatorios en blanco'
+              : 'Se quedo en «' + quedo + '» con ' + falta + ' campos por llenar'))
+        });
+      })();
+
+
+      /* 🔴 2 · LA SESION DEL EQUIPO VENCE Y SE PUEDE CERRAR (31-08-2026).
+
+         Hasta hoy esto comprobaba lo contrario: que la sesion NO quedara en
+         `localStorage`. Marco lo cambio — «si el no cerro sesion debiese poder
+         entrar si copia la url» — asi que ahora si queda, y lo que hay que
+         cuidar es otra cosa:
+
+           · que TENGA vencimiento, porque sin el volvemos al problema que
+             COD-1 arreglo: el meson de recepcion lo usan tres personas al dia
+             y el siguiente entraba como el anterior, para siempre;
+           · que «cerrar sesion» la borre DE VERDAD, de la pestaña y del
+             equipo. Esa fue la condicion.
+
+         La prueba mira el almacenamiento, no el codigo. */
+      (function () {
+        const CE = Modelo.CLAVE_EQUIPO;
         let previo = null;
-        try { previo = localStorage.getItem(CLAVE); } catch (e) { previo = null; }
-        try { localStorage.removeItem(CLAVE); } catch (e) { /* sin almacenamiento */ }
+        try { previo = localStorage.getItem(CE); } catch (e) { previo = null; }
 
         const p = db.persona.find((x) => x.usuario === 'gabriel.diaz@dyp.cl');
         const r = p ? Modelo.iniciar_sesion(p.usuario, Semilla.CLAVE_DEMO) : { ok: false, motivo: 'sin cuenta' };
-        let quedo = null;
-        try { quedo = localStorage.getItem(CLAVE); } catch (e) { quedo = null; }
-        try { if (previo !== null) localStorage.setItem(CLAVE, previo); } catch (e) { /* nada */ }
+
+        let guardada = null;
+        try { guardada = JSON.parse(localStorage.getItem(CE) || 'null'); } catch (e) { guardada = null; }
+        const tieneVence = !!guardada && typeof guardada.hasta === 'number' &&
+          guardada.hasta > new Date().getTime() &&
+          guardada.hasta <= new Date().getTime() + 13 * 60 * 60 * 1000;
+
+        /* Y vencida no sirve: se adelanta el reloj poniendola en el pasado. */
+        let vencidaSirve = null;
+        try {
+          localStorage.setItem(CE, JSON.stringify({ id: p.id, hasta: new Date().getTime() - 1000 }));
+          vencidaSirve = Modelo.sesionDelEquipo() !== null;
+        } catch (e) { vencidaSirve = null; }
+
+        Modelo.cerrar_sesion();
+        let quedoAlCerrar = null;
+        try { quedoAlCerrar = localStorage.getItem(CE); } catch (e) { quedoAlCerrar = null; }
+        try { if (previo !== null) localStorage.setItem(CE, previo); } catch (e) { /* nada */ }
 
         push({
-          nombre: '🔴 La sesion no queda guardada en el navegador entero',
-          intento: 'Entrar con una cuenta y mirar si el id quedo en localStorage',
-          esperado: 'No queda: la sesion vive en sessionStorage y muere con la pestaña',
-          paso: r.ok && quedo === null,
+          nombre: '🔴 La sesion del equipo vence y «cerrar sesion» la borra',
+          intento: 'Entrar, mirar el vencimiento, probar una vencida y despues cerrar sesion',
+          esperado: 'Queda guardada con vencimiento ≤ 12 h, una vencida no sirve, y al cerrar no queda nada',
+          paso: r.ok && tieneVence && vencidaSirve === false && quedoAlCerrar === null,
           detalle: !r.ok ? 'No dejo entrar: ' + r.motivo
-            : (quedo !== null
-              ? 'La sesion quedo en localStorage (' + quedo + '): sobrevive a cerrar el navegador'
-              : 'No quedo en localStorage')
+            : (!guardada ? 'No quedo la sesion del equipo: copiar la URL seguiria pidiendo clave'
+            : (!tieneVence ? 'Quedo SIN vencimiento util: ' + JSON.stringify(guardada)
+            : (vencidaSirve !== false ? 'Una sesion vencida todavia sirve'
+            : (quedoAlCerrar !== null ? 'Cerrar sesion no la borro del equipo'
+            : 'Vence en 12 h, la vencida no sirve y cerrar sesion la borra'))))
         });
       })();
 

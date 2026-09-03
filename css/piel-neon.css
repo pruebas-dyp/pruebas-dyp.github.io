@@ -1,0 +1,124 @@
+/* PIEL «NEON» — Automotora DyP
+   Caracter: la mas interactiva. Cian y violeta sobre azul casi negro, y todo lo
+   que se puede tocar responde: la fila se enciende al pasar el cursor, el boton
+   toma halo, la pestana activa lleva una linea de luz.
+
+   Cuidado deliberado: las animaciones son de 130-160 ms y solo sobre `color`,
+   `background`, `border-color` y `box-shadow` — ninguna toca `transform`,
+   `padding` ni tamano, asi que NADA cambia de lugar ni de medida. Es la misma
+   tabla de 17 columnas, encendida. */
+
+:root[data-piel="neon"],
+:root[data-piel="neon"][data-tema="oscuro"] {
+  --fondo: #05070f;
+  --superficie: #0c1020;
+  --superficie-2: #151b32;
+  --superficie-3: #090d1a;
+  --cabecera: #151b32;
+  --borde: #232b4a;
+  --borde-fuerte: #3a4670;
+  --texto: #c8d2e8;
+  --tinta: #f0f4ff;
+  --gris: #9aa7ca;
+  --gris-2: #8b99bd;
+  --zebra: rgba(34, 211, 238, .035);
+
+  --menu-bg: #070a16;
+  --menu-texto: #c2cfee;
+  --barra-bg: #0a0e1c;
+
+  --marca: #22d3ee;
+  --acento: #22d3ee;
+  --acento-solido: #0e7490;
+  --acento-solido-hover: #0b5f77;
+  --acento-hover: #06b6d4;
+  --acento-bg: rgba(34, 211, 238, .13);
+  --acento-borde: rgba(34, 211, 238, .45);
+  --acento-texto: #67e8f9;
+  --seleccion: rgba(34, 211, 238, .15);
+
+  --verde: #2ee6a8; --verde-bg: rgba(46, 230, 168, .13); --verde-borde: rgba(46, 230, 168, .34); --verde-texto: #6df0c4;
+  --ambar: #fbbf24; --ambar-bg: rgba(251, 191, 36, .13); --ambar-borde: rgba(251, 191, 36, .32); --ambar-texto: #fcd34d;
+  --rojo:  #fb7185; --rojo-bg:  rgba(251, 113, 133, .13); --rojo-borde:  rgba(251, 113, 133, .34); --rojo-texto:  #fda4af;
+  --violeta: #c084fc; --violeta-bg: rgba(192, 132, 252, .14); --violeta-borde: rgba(192, 132, 252, .36); --violeta-texto: #d8b4fe;
+  --alta: #f472b6; --alta-bg: rgba(244, 114, 182, .13);
+  --neutro-bg: rgba(154, 167, 202, .11); --neutro-borde: #2a3355;
+
+  --cinta-bg: rgba(192, 132, 252, .10); --cinta-borde: rgba(192, 132, 252, .30); --cinta-texto: #d8b4fe;
+  --aviso-bg: rgba(251, 191, 36, .08); --aviso-borde: rgba(251, 191, 36, .26); --aviso-texto: #fcd34d;
+  --info-bg: rgba(34, 211, 238, .10); --info-borde: rgba(34, 211, 238, .28); --info-texto: #a5f3fc;
+
+  --zona-fill: #151b32; --zona-stroke: #3a4670; --zona-hover: #1d2647; --rueda: #46538a;
+  --campo-bg: #080c18;
+  --sombra: 0 1px 3px rgba(0, 0, 0, .6);
+}
+
+:root[data-piel="neon"][data-tema="claro"] {
+  --fondo: #edf1f8;
+  --superficie: #ffffff;
+  --superficie-2: #f2f6fc;
+  --superficie-3: #f9fbfe;
+  --cabecera: #edf1f8;
+  --borde: #d4dded;
+  --borde-fuerte: #adbdd6;
+  --texto: #253148;
+  --tinta: #0a1224;
+  --gris: #52648a;
+  --gris-2: #506284;
+  --zebra: rgba(14, 116, 144, .035);
+
+  --menu-bg: #0f1830;
+  --menu-texto: #cfdcf2;
+  --barra-bg: #f2f6fc;
+
+  --marca: #0e7490;
+  --acento: #0e7490;
+  --acento-solido: #0e7490;
+  --acento-solido-hover: #0b5c73;
+  --acento-hover: #0b5c73;
+  --acento-bg: #e2f5f9;
+  --acento-borde: #a8dbe7;
+  --acento-texto: #0b5c73;
+  --seleccion: #d6eff5;
+
+  --verde: #0f7a58; --verde-bg: #e5f8f1; --verde-borde: #ace2d0; --verde-texto: #0b6146;
+  --ambar: #a86a06; --ambar-bg: #fdf4e5; --ambar-borde: #f0d7ab; --ambar-texto: #85520a;
+  --rojo:  #be3455; --rojo-bg:  #fdecef; --rojo-borde:  #f3c0cc; --rojo-texto:  #9d2743;
+  --violeta: #7c3aed; --violeta-bg: #f2ecfe; --violeta-borde: #d7c4fb; --violeta-texto: #6127c4;
+  --alta: #be3455; --alta-bg: rgba(190, 52, 85, .10);
+  --neutro-bg: #edf1f8; --neutro-borde: #d4dded;
+
+  --cinta-bg: #f2ecfe; --cinta-borde: #d7c4fb; --cinta-texto: #6127c4;
+  --aviso-bg: #fdf7ec; --aviso-borde: #f0deb8; --aviso-texto: #7a4a00;
+  --info-bg: #e2f5f9; --info-borde: #a8dbe7; --info-texto: #0b5c73;
+
+  --zona-fill: #e2e9f4; --zona-stroke: #adbdd6; --zona-hover: #ccdaee; --rueda: #8fa3c0;
+  --campo-bg: #ffffff;
+  --sombra: 0 1px 2px rgba(10, 18, 36, .09);
+}
+
+/* ── Lo que la hace «la interactiva» ─────────────────────────────────────── */
+:root[data-piel="neon"] .panel,
+:root[data-piel="neon"] .modal { border-radius: 6px; }
+:root[data-piel="neon"] .panel > .cab { border-radius: 6px 6px 0 0; }
+:root[data-piel="neon"] .hbtn,
+:root[data-piel="neon"] .btn,
+:root[data-piel="neon"] .chip {
+  border-radius: 5px;
+  transition: background .14s ease, border-color .14s ease, color .14s ease, box-shadow .16s ease;
+}
+:root[data-piel="neon"] .hbtn:hover,
+:root[data-piel="neon"] .chip:hover { box-shadow: 0 0 0 1px var(--acento-borde), 0 0 12px -4px var(--acento); }
+:root[data-piel="neon"] .btn:hover  { box-shadow: 0 0 14px -3px var(--acento); }
+:root[data-piel="neon"] .btn.primario:hover,
+:root[data-piel="neon"] .hbtn.primario:hover { box-shadow: 0 0 16px -2px var(--acento); }
+
+/* La fila se enciende al pasar por encima: es el gesto que mas se nota. */
+:root[data-piel="neon"] table.grid tbody tr.fila { transition: background .12s ease; }
+:root[data-piel="neon"] table.grid tbody tr.fila:hover { background: var(--acento-bg); }
+
+:root[data-piel="neon"] .nav a { transition: background .14s ease, color .14s ease, border-left-color .14s ease; }
+:root[data-piel="neon"] .nav a.activo { box-shadow: inset 2px 0 0 var(--acento); }
+:root[data-piel="neon"] .tabs button { transition: background .14s ease, color .14s ease; }
+:root[data-piel="neon"] .tabs button.activo { box-shadow: inset 0 -2px 0 var(--acento); }
+:root[data-piel="neon"] .barra-menu { border-bottom: 1px solid var(--acento-borde); }

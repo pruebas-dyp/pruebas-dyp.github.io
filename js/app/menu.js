@@ -199,11 +199,32 @@ function rotuloDeshacer() {
    nuestro entra a la lista y esta excepcion se puede borrar. */
 const MODULOS_NUESTROS = ['mitrabajo', 'porvalidar', 'repuestos', 'detenidos', 'expediente'];
 
+/* 🔴 LAS SUB-PANTALLAS HEREDAN SU MÓDULO (30-08-2026).
+
+   «Entregar Unidad» NO es un módulo: es una de las cuatro opciones de
+   Recepción. Pero la comprobación la trataba como módulo y buscaba «entrega»
+   en la lista de la cuenta — donde nunca estuvo, porque lo que se le da a
+   alguien es «recepcion».
+
+   Resultado: NADIE podía entregar un vehículo. Ni el jefe de taller, ni el
+   gerente general, ni el administrador. El aviso decía «la cuenta de Esteban
+   Calvo no tiene "Entrega" entre sus módulos» y mandaba a arreglarlo a
+   Personal, donde ese módulo no existe y no se puede agregar. Marco lo probó
+   con el cliente delante.
+
+   Se resuelve con el padre y no metiéndola en `MODULOS_NUESTROS`: esa lista se
+   salta la comprobación de módulos, y entonces entraría a entregar alguien que
+   no tiene Recepción. Lo que corresponde es que herede: si tienes Recepción,
+   tienes sus cuatro opciones. */
+const MODULO_PADRE = { entrega: 'recepcion' };
+
 function entraAlModulo(id) {
   const pide = PERMISO_DE_MODULO[id];
   const porRol = !pide || Modelo.puede(pide);
   if (MODULOS_NUESTROS.indexOf(id) >= 0) return porRol;
-  if (Modelo.modulosDe((Modelo.personaActual() || {}).id)) return Modelo.veModulo(id);
+  if (Modelo.modulosDe((Modelo.personaActual() || {}).id)) {
+    return Modelo.veModulo(MODULO_PADRE[id] || id) && porRol;
+  }
   return porRol;
 }
 
@@ -365,8 +386,8 @@ function pintarShell() {
        abajo. Es el único cartel de la pantalla que ya decía que esto es una
        demostración, así que es donde alguien las va a buscar. */
     '<button class="hbtn der" type="button" data-hacc="demostracion" ' +
-    'title="Las herramientas de la demostración: la guía, las pruebas y el calendario">' +
-    ico('base') + 'Datos de demostración</button>';
+    'title="La guía del modelo, las pruebas y el calendario">' +
+    ico('base') + 'Herramientas</button>';
 
   /* 🔴 ACÁ HABÍA UN `h.style.display = 'flex'` (28-08-2026, quitado).
 

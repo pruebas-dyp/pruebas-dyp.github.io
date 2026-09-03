@@ -98,9 +98,20 @@ function accionModulo(accion) {
 
     case 'fotos': {
       const r = rec();
-      // Las fotos viven dentro del formulario: si estamos en el menú, se entra.
+      /* 🔴 NO SE SALTA LA VALIDACIÓN (31-08-2026, Marco). Acá se llamaba a
+         `recEntrarAlFormulario('danos')` a secas, y eso aterrizaba en el paso 4
+         con el RUT, el nombre, el teléfono y la dirección en blanco — justo lo
+         que el encabezado del asistente promete que no pasa. Ahora entra por
+         `recIrAlPaso`, que es la misma puerta de las pastillas numeradas: si
+         falta algo, se queda, lo dice y marca los campos. */
+      if (r.pantalla === 'editar') {
+        /* Editar recepción tiene SU zona de fotos. Antes este botón botaba a
+           quien estaba editando al formulario de ingreso nuevo. */
+        const ze = document.getElementById('edrecfoto-zona');
+        if (ze) { ze.scrollIntoView({ block: 'center' }); return; }
+      }
       if (r.pantalla !== 'nuevo' || r.paso !== 'danos') {
-        recEntrarAlFormulario('danos'); guardarBorrador(); render();
+        if (!recIrAlPaso('danos')) return;   // rechazado: ya dijo qué falta
       }
       const z = document.getElementById('recfoto-zona');
       if (z) z.scrollIntoView({ block: 'center' });
@@ -327,7 +338,31 @@ function pintarBarraEstado(extra) {
         'El sistema sigue funcionando con los datos de este equipo y vuelve a intentar solo.'
       : 'Sala compartida: el celular y el computador ven el mismo estado. ' +
         'SOLO datos de demostración — acá no van datos de personas reales.';
+  /* 🔴 DE DÓNDE SALEN LOS DATOS, SIEMPRE A LA VISTA (30-08-2026).
+
+     Es la celda más importante de esta barra. Mientras el sistema mostró sólo
+     datos inventados daba lo mismo; ahora puede estar mostrando los autos del
+     taller o los de mentira, y las dos cosas se ven idénticas en pantalla.
+
+     Nadie tiene que adivinar cuál está viendo — y menos con un cliente al lado
+     preguntando por su auto. Cuando son de demostración lo dice con todas sus
+     letras y en amarillo; cuando son reales dice cuántas unidades activas hay,
+     que además es el número que se puede contrastar con su sistema. */
+  const nube = typeof rotuloNube === 'function'
+    ? rotuloNube() : { clase: 'ok', texto: 'Datos de demostración' };
+  const tituloNube = typeof Modelo.resumenNube === 'function' && Modelo.resumenNube()
+    ? (function () {
+        const r = Modelo.resumenNube();
+        return 'Los datos son los del taller, traídos de Firestore: ' +
+          r.ordenes + ' órdenes activas, ' + r.vehiculos + ' vehículos y ' +
+          r.personas + ' personas. Se reemplazaron las ' + r.ordenesAntes +
+          ' órdenes de demostración; quedan ' + r.demoQueQueda + '.';
+      })()
+    : 'Estos NO son datos del taller: son inventados para mostrar el sistema.';
+
   document.getElementById('estado-barra').innerHTML =
+    '<span class="celda nube-' + nube.clase + '" title="' + esc(tituloNube) + '">' +
+      ico('base') + esc(nube.texto) + '</span>' +
     '<span class="celda' + (sala.encendida && !sala.error ? ' sala-viva' : '') +
       '" title="' + esc(tituloSala) + '">' +
       ico('base') + esc(sala.rotulo) + '</span>' +

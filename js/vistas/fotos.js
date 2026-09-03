@@ -18,7 +18,12 @@ const CSS_FOTOS = `
 .fotos-rejilla{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .foto-tarjeta{width:132px;border:1px solid var(--borde);border-radius:4px;overflow:hidden;
   background:var(--superficie);position:relative}
-.foto-tarjeta img{width:100%;height:94px;object-fit:cover;display:block;background:var(--superficie-2)}
+/* Se puede apretar para verla en grande (Media.visor). El cursor y el realce
+   al pasar por encima lo dicen: una foto que se amplia sin avisar que se
+   amplia es una funcion que nadie encuentra. */
+.foto-tarjeta img{width:100%;height:94px;object-fit:cover;display:block;
+  background:var(--superficie-2);cursor:zoom-in;transition:opacity .12s}
+.foto-tarjeta img:hover{opacity:.82}
 .foto-tarjeta .pie-foto{padding:4px 5px;font-size:10px;color:var(--gris);line-height:1.35}
 .foto-tarjeta .pie-foto b{color:var(--tinta);display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .foto-tarjeta .quitar-foto{position:absolute;top:3px;right:3px;width:19px;height:19px;line-height:17px;

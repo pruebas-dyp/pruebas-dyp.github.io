@@ -50,11 +50,20 @@ function bodegaEstado() {
   return ui.bodega;
 }
 
+/* 🔴 DECIA «LAS CUATRO» Y SE VEÍAN DOS (30-08-2026).
+
+   El rótulo es de cuando BODEGA_PANTALLAS tenía cuatro entradas. El 16-08
+   se fueron Costos de Reparación y Valorizar TOT —el motivo está anotado
+   bajo la lista, arriba— y el texto se quedó contando mal.
+
+   Un cartel que promete el doble de lo que hay se lee como que falta algo
+   por cargar, y en un sistema recién migrado eso es justo lo que nadie
+   tiene que preguntarse. */
 function vBodegaMenu() {
   return `
   <div class="panel">
     <div class="cab"><div><h2>${ico('bodega', 'g')}Bodega - DyP</h2>
-      <div class="desc">Las cuatro del sistema actual, con sus mismos nombres</div></div></div>
+      <div class="desc">Las dos del sistema actual, con sus mismos nombres</div></div></div>
     <div class="cuerpo">
       <div class="opciones-rec">${BODEGA_PANTALLAS.map((x) =>
         '<button class="opcion-rec" data-bod-opcion="' + x.id + '">' +

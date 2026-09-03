@@ -1,0 +1,116 @@
+/* PIEL «TALLER» — Automotora DyP
+   Caracter: industrial, de planta. Negro y ambar de senaletica, esquinas
+   rectas, bordes marcados. Pensada para un monitor del taller, mirado de lejos
+   y con luz mala: por eso sube el contraste y baja el redondeo.
+
+   El ambar brillante se usa para BORDES, ICONOS y TEXTO. Para los rellenos con
+   texto blanco encima va un ambar quemado (#9a4f06): el ambar puro con blanco
+   encima da 2,1:1 y no pasa AA. */
+
+:root[data-piel="taller"],
+:root[data-piel="taller"][data-tema="oscuro"] {
+  --fondo: #0b0b0c;
+  --superficie: #141416;
+  --superficie-2: #1e1f22;
+  --superficie-3: #101012;
+  --cabecera: #1e1f22;
+  --borde: #303238;
+  --borde-fuerte: #4a4d55;
+  --texto: #d4d6da;
+  --tinta: #fafafb;
+  --gris: #9ca0a7;
+  --gris-2: #8b8f96;
+  --zebra: rgba(255, 255, 255, .028);
+
+  --menu-bg: #000000;
+  --menu-texto: #dcdee2;
+  --barra-bg: #141416;
+
+  --marca: #f5a524;
+  --acento: #f5a524;
+  --acento-solido: #9a4f06;
+  --acento-solido-hover: #7d3f05;
+  --acento-hover: #d98c14;
+  --acento-bg: rgba(245, 165, 36, .14);
+  --acento-borde: rgba(245, 165, 36, .48);
+  --acento-texto: #fbbf4f;
+  --seleccion: rgba(245, 165, 36, .13);
+
+  --verde: #4ade80; --verde-bg: rgba(74, 222, 128, .13); --verde-borde: rgba(74, 222, 128, .34); --verde-texto: #86efac;
+  --ambar: #f5a524; --ambar-bg: rgba(245, 165, 36, .14); --ambar-borde: rgba(245, 165, 36, .36); --ambar-texto: #fbbf4f;
+  --rojo:  #f4534b; --rojo-bg:  rgba(244, 83, 75, .14); --rojo-borde:  rgba(244, 83, 75, .36); --rojo-texto:  #fb8f89;
+  --violeta-texto: #cdbce8;
+  --alta: #d4738f; --alta-bg: rgba(212, 115, 143, .13);
+  --neutro-bg: rgba(156, 160, 167, .12); --neutro-borde: #3a3d44;
+
+  --cinta-bg: rgba(245, 165, 36, .10); --cinta-borde: rgba(245, 165, 36, .32); --cinta-texto: #fbbf4f;
+  --aviso-bg: rgba(245, 165, 36, .09); --aviso-borde: rgba(245, 165, 36, .28); --aviso-texto: #f7b444;
+  --info-bg: rgba(125, 211, 252, .09); --info-borde: rgba(125, 211, 252, .26); --info-texto: #bae6fd;
+
+  --zona-fill: #1e1f22; --zona-stroke: #4a4d55; --zona-hover: #2a2c31; --rueda: #55585f;
+  --campo-bg: #0d0d0f;
+  --sombra: 0 1px 0 rgba(0, 0, 0, .8);
+}
+
+:root[data-piel="taller"][data-tema="claro"] {
+  --fondo: #e5e5e2;
+  --superficie: #fbfbfa;
+  --superficie-2: #efefec;
+  --superficie-3: #f6f6f4;
+  --cabecera: #e5e5e2;
+  --borde: #c6c6c1;
+  --borde-fuerte: #9d9d97;
+  --texto: #26262a;
+  --tinta: #0c0c0e;
+  --gris: #5b5b5f;
+  --gris-2: #59595d;
+  --zebra: rgba(12, 12, 14, .03);
+
+  --menu-bg: #131315;
+  --menu-texto: #e4e4e2;
+  --barra-bg: #efefec;
+
+  --marca: #9a4f06;
+  --acento: #9a4f06;
+  --acento-solido: #9a4f06;
+  --acento-solido-hover: #7d3f05;
+  --acento-hover: #7d3f05;
+  --acento-bg: #fbf0dd;
+  --acento-borde: #e3c48c;
+  --acento-texto: #7d3f05;
+  --seleccion: #f7e7cc;
+
+  --verde: #15803d; --verde-bg: #e8f7ec; --verde-borde: #b2e0c0; --verde-texto: #11632f;
+  --ambar: #9a4f06; --ambar-bg: #fbf0dd; --ambar-borde: #e3c48c; --ambar-texto: #7d3f05;
+  --rojo:  #b91c1c; --rojo-bg:  #fdeaea; --rojo-borde:  #f0bcbc; --rojo-texto:  #991b1b;
+  --violeta: #6d28d9; --violeta-bg: #f1ebfd; --violeta-borde: #d5c4f7; --violeta-texto: #5b21b6;
+  --alta: #a84363; --alta-bg: rgba(168, 67, 99, .10);
+  --neutro-bg: #e5e5e2; --neutro-borde: #c6c6c1;
+
+  --cinta-bg: #fbf0dd; --cinta-borde: #e3c48c; --cinta-texto: #7d3f05;
+  --aviso-bg: #fcf5e8; --aviso-borde: #e9d4a8; --aviso-texto: #7d3f05;
+  --info-bg: #e9f3fb; --info-borde: #bcd8ee; --info-texto: #0d4a75;
+
+  --zona-fill: #e0e0dc; --zona-stroke: #9d9d97; --zona-hover: #cdcdc8; --rueda: #8a8a84;
+  --campo-bg: #ffffff;
+  --sombra: 0 1px 0 rgba(12, 12, 14, .12);
+}
+
+/* Forma: esquina recta en todo. Es lo que le da el aire de instrumento. */
+:root[data-piel="taller"] .panel,
+:root[data-piel="taller"] .modal,
+:root[data-piel="taller"] .panel > .cab,
+:root[data-piel="taller"] .hbtn,
+:root[data-piel="taller"] .btn,
+:root[data-piel="taller"] .chip { border-radius: 0; }
+
+/* La cabecera de tabla, mas marcada: es la linea que uno busca de lejos.
+   🔴 Aca habia tambien `letter-spacing: .7px` y se saco: ensanchaba la tabla de
+   1.233 a 1.253 px. Se veia bien, pero mover el ancho de las columnas es
+   cambiar el FORMATO del sistema, que es justo lo que no se toca. El borde mas
+   grueso da el mismo caracter y solo suma 1 px de alto. */
+:root[data-piel="taller"] table.grid th {
+  border-bottom-width: 2px;
+  border-bottom-color: var(--borde-fuerte);
+}
+:root[data-piel="taller"] .barra-menu { border-bottom: 2px solid var(--acento); }

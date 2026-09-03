@@ -9,6 +9,18 @@
 
    Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/app.js */
 
+/* 🔴 ESTO VA ARRIBA DEL TODO, Y NO ES CAPRICHO (30-08-2026).
+
+   La barra de estado dice de dónde salen los datos, y la pinta `render()`, que
+   este mismo archivo llama mientras se carga —bastante antes de la línea donde
+   naturalmente iría esta variable, allá abajo junto a `arrancarLaNube`—.
+
+   Con `let`, una variable declarada más abajo no vale `undefined`: acceder a
+   ella antes de su línea LANZA. Y como el que la lee es el pintado de la barra,
+   el error se comía la primera pintada entera y el sistema quedaba en blanco.
+   Costó exactamente un arranque en blanco descubrirlo. */
+let estadoNube = { fase: 'esperando', detalle: '', informe: null };
+
 /* ───────────── Etiqueta de datos ─────────────
    Pedido del cliente el 15-08-2026, en dos partes que son la misma cosa:
    pararse sobre la PATENTE y ver en qué etapa va, cuánto lleva presupuestado y
@@ -200,6 +212,46 @@ function marcarEtiquetas() {
   });
 }
 
+/* 🔴 UNA ORDEN VIEJA ABIERTA EN SU PROPIA PESTAÑA (30-08-2026).
+
+   Marco: «en el histórico cuando pincho doble click, no aparece nada». Y decía
+   «No existe la OT 19480».
+
+   El doble clic abre la orden en una PESTAÑA NUEVA, y una pestaña nueva es una
+   carga nueva del sistema: arranca con las 92 órdenes activas y nada más. La
+   19480 se entregó hace años y vive en Firestore, no en memoria. La pestaña de
+   origen sí la tenía —la había traído el Histórico— pero eso no viaja.
+
+   Peor todavía: el mensaje decía «puede que la orden no esté en esta
+   demostración», que con la data real del cliente es directamente falso. La
+   orden existe, y está a una consulta de distancia.
+
+   Así que se va a buscar. `Base.expediente` trae la orden completa —vehículo,
+   cliente, presupuestos, etapas, fotos, bitácora— y recién si tampoco está allá
+   se dice que no existe. */
+let buscandoEnLaNube = false;
+
+async function traerLaOrdenDeLaNube(numero) {
+  if (buscandoEnLaNube) return;
+  if (typeof Base === 'undefined' || !Base.conectada()) return;
+  buscandoEnLaNube = true;
+  try {
+    const r = await Base.buscarOrdenes({ numero_ot: numero });
+    if (r.ordenes.length) {
+      const t = await Base.expediente(r.ordenes[0].id);
+      if (t) {
+        Modelo.mezclarNube(t);
+        buscandoEnLaNube = false;
+        return render();
+      }
+    }
+  } catch (e) { /* sin nube: se queda el aviso de siempre */ }
+  buscandoEnLaNube = false;
+  /* No estaba. Se vuelve a pintar para que el aviso deje de decir «buscando». */
+  ui.nubeSinLaOrden = true;
+  render();
+}
+
 function modoRegistro(numero) {
   ui.registroOT = String(numero);
   document.body.classList.add('ventana-registro');
@@ -208,13 +260,36 @@ function modoRegistro(numero) {
 
   const o = buscarOT(numero);
 
+  /* 🔴 «NO EXISTE» APARECIA UN SEGUNDO Y DESPUES SE ARREGLABA SOLO
+     (30-08-2026, Marco).
+
+     Todo esto pregunta `Base.conectada()`, que es falso hasta que Firestore
+     contesta —unos segundos—. En una pestaña recien abierta con doble clic,
+     durante esos segundos la orden no esta en memoria Y la nube «no esta
+     conectada», asi que caia en el peor de los mensajes: «No existe la OT
+     23561». Despues llegaban los datos, se repintaba, y aparecia bien.
+
+     Un cartel que dice que algo no existe y a los dos segundos se desdice es
+     peor que uno que tarda: la primera vez el usuario ya cerro la pestaña.
+
+     `bajando` es verdad mientras la nube esta en camino, y con eso el aviso
+     dice que esta cargando en vez de negar la orden. */
+  const bajando = typeof Base !== 'undefined' && Base.usaLaNube && Base.usaLaNube() &&
+    Modelo.origenDeLosDatos() !== 'nube';
+
+  /* Antes de decir que no existe, se le pregunta a la nube. */
+  if (!o && !ui.nubeSinLaOrden && typeof Base !== 'undefined' && Base.conectada()) {
+    traerLaOrdenDeLaNube(numero);
+  }
+
   if (!o) {
     /* Dos motivos distintos para no poder abrirla, y hay que decir cuál es.
        "No existe" cuando alguien pega mal el número; "no es tuya" cuando la
        orden está pero el alcance del rol no la alcanza. Callarlo sería más
        cómodo y dejaría al pintor pensando que el sistema se rompió. */
     const ajena = Modelo.otFueraDeAlcance(numero);
-    document.title = (ajena ? 'OT fuera de tu alcance' : 'OT no encontrada') + ' · Automotora DyP';
+    document.title = (ajena ? 'OT fuera de tu alcance'
+      : (bajando ? 'Cargando la OT ' + numero : 'OT no encontrada')) + ' · Automotora DyP';
     document.getElementById('ruta').innerHTML =
       /* 🔴 CON SU ICONO (27-08-2026, Marco: «el volver al sistema me sacaste el
      emoticono y eso me gustaba, favor reingresarlo»). Al subirlo a la línea de
@@ -223,8 +298,10 @@ function modoRegistro(numero) {
     '<a class="volver-sistema" href="index.html">' + ico('chevron') +
     ico('torre') + 'Volver al sistema</a>' +
       '<span>Torre de control</span>';
-    document.getElementById('titulo').innerHTML = ico(ajena ? 'candado' : 'alerta', 'g') +
-      (ajena ? 'Esta orden no está asignada a ti' : 'Orden de trabajo no encontrada');
+    document.getElementById('titulo').innerHTML =
+      ico(ajena ? 'candado' : (bajando ? 'torre' : 'alerta'), 'g') +
+      (ajena ? 'Esta orden no está asignada a ti'
+        : (bajando ? 'Abriendo la orden de trabajo' : 'Orden de trabajo no encontrada'));
     document.getElementById('bajada').textContent = '';
     document.getElementById('tabs').innerHTML = '';
     document.getElementById('herramientas').innerHTML = '';
@@ -235,8 +312,15 @@ function modoRegistro(numero) {
           '<div class="texto">El rol <strong>' + esc(Modelo.rolActual().nombre || '—') +
           '</strong> solo abre las órdenes que tiene tomadas o a su cargo. ' +
           'Si tienes que trabajar este vehículo, el jefe de taller te asigna la etapa y aparece en <strong>Mi trabajo</strong>.</div>'
-        : '<div class="titulo">No existe la OT ' + esc(numero) + '</div>' +
-          '<div class="texto">Puede que el número esté mal escrito o que la orden no esté en esta demostración.</div>') +
+        : (bajando || buscandoEnLaNube ||
+           (!ui.nubeSinLaOrden && typeof Base !== 'undefined' && Base.conectada())
+            ? '<div class="titulo">Buscando la OT ' + esc(numero) + '…</div>' +
+              '<div class="texto">' + (bajando
+                ? 'Se están trayendo los datos del taller. Un momento.'
+                : 'Es una orden de años anteriores: se está trayendo de la base.') + '</div>'
+            : '<div class="titulo">No existe la OT ' + esc(numero) + '</div>' +
+              '<div class="texto">Se buscó en las ' + esc(String(numero).length ? 'órdenes del taller' : '') +
+              ' y no está. Puede que el número esté mal escrito.</div>')) +
       '</div></div></div>';
     document.getElementById('estado-barra').innerHTML =
       '<span class="celda"><span class="luz"></span>Conectado</span><span class="celda">Automotora DyP</span>';
@@ -283,8 +367,8 @@ function modoRegistro(numero) {
      módulos. */
   document.getElementById('herramientas').innerHTML =
     '<button class="hbtn der" type="button" data-demo-abrir="1" ' +
-    'title="Las herramientas de la demostración: la guía, las pruebas y el calendario">' +
-    ico('base') + 'Datos de demostración</button>';
+    'title="La guía del modelo, las pruebas y el calendario">' +
+    ico('base') + 'Herramientas</button>';
 
   document.querySelectorAll('#herramientas [data-demo-abrir]').forEach((b) =>
     b.addEventListener('click', dialogoDemostracion));
@@ -490,7 +574,20 @@ montarRol();
    dónde pintarlo. */
 setTimeout(() => {
   const porQue = Modelo.porQueSeResembro();
-  if (porQue) avisar({ ok: true, motivo: '' }, porQue, { persistente: true });
+  /* 🔴 CON LA NUBE ENCENDIDA ESTE AVISO ES MENTIRA (30-08-2026).
+
+     El cartel sale a los 900 ms; la nube tarda unos quince segundos. Asi que
+     siempre gana el cartel, y quedaba en pantalla «los datos de demostracion se
+     actualizaron... lo que hubiera en la sala se reemplazo» mientras la barra
+     de abajo decia «Datos reales - 92 unidades activas». A quien lo lee le
+     avisa que le pisaron su trabajo, y no le pisaron nada.
+
+     La demostracion que se resembro es andamio: existe los segundos que tarda
+     Firestore en contestar y despues la reemplazan las 92 del taller. Nada de
+     eso hay que contarlo. El aviso es de cuando el sistema trabajaba sin nube,
+     y ahi sigue sirviendo. */
+  const laNubeManda = typeof Base !== 'undefined' && Base.usaLaNube && Base.usaLaNube();
+  if (porQue && !laNubeManda) avisar({ ok: true, motivo: '' }, porQue, { persistente: true });
 }, 900);
 
 /* Sin sesión no se ve nada. Se retoma la de antes —un F5 no puede echar a la
@@ -914,8 +1011,194 @@ montarLateral();
   });
 })();
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   TRAER LA DATA DE VERDAD.
+
+   El sistema arranca con la semilla —catálogos, cuentas, y las órdenes de
+   demostración— y en cuanto Firestore contesta, la operación se reemplaza por
+   los doce años reales. Repinta y sigue.
+
+   🔴 POR QUÉ ARRANCA CON LA SEMILLA Y NO ESPERA A LA NUBE.
+
+   Porque el arranque del sistema es SÍNCRONO: `Modelo.iniciar()` corre mientras
+   se cargan los archivos y las vistas ya están pintando cuando esto se ejecuta.
+   Hacerlo esperar significaría volver asíncrono todo el arranque —y con él, las
+   17.000 líneas que leen `db` como un arreglo en memoria—.
+
+   Y porque conviene: si la red del taller está mala, el sistema igual abre. Lo
+   que se ve mientras tanto es la demostración, y para que eso NO se confunda
+   con datos del cliente, la barra de estado lo dice mientras dure.
+
+   En la práctica no se ve: la copia guardada contesta al instante y la primera
+   pintada ya trae los autos de verdad. La espera de verdad es sólo la primera
+   vez en cada equipo, o cuando la copia venció.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+function rotuloNube() {
+  /* 🔴 LA VERDAD LA TIENE EL MODELO, NO ESTA VARIABLE (30-08-2026).
+
+     `estadoNube` recuerda cómo salió el arranque, y eso es historia: no dice
+     qué hay en memoria AHORA. Después de «Reiniciar a datos de demostración»
+     seguía diciendo «Datos reales · 92 unidades activas» encima de 222 autos
+     inventados — el rótulo más peligroso que puede tener esta barra, porque es
+     el único lugar donde se distingue una cosa de la otra.
+
+     Se le pregunta al modelo, que es el que tiene los datos. */
+  if (typeof Modelo !== 'undefined' && Modelo.esReal && !Modelo.esReal()) {
+    return { clase: 'aviso', texto: 'DATOS DE DEMOSTRACIÓN · no son del taller' };
+  }
+  const f = estadoNube.fase;
+  if (f === 'lista') {
+    const i = estadoNube.informe || {};
+    /* 🔴 UN CARTEL VERDE MIENTE SI HAY ALGO SIN SUBIR (30-08-2026).
+
+       Decia «Datos reales · 92 unidades activas» y nada mas, y eso se leia como
+       «todo en orden». En el telefono habia una recepcion que no habia salido
+       nunca de ahi y el cartel seguia verde. Lo que no se ve, no existe: si algo
+       quedo pendiente tiene que decirlo el mismo lugar que dice que todo va
+       bien. */
+    let pend = 0;
+    /* 🔴 EL CONTEO MEMORIZADO, NO EL RECORRIDO (31-08-2026). Esto llamaba a
+       `Base.cambios()`, que hace un `JSON.stringify` por fila de la base. Con
+       el histórico cargado son más de cincuenta mil, y este rótulo se dibuja en
+       CADA repintado: mover un filtro de la Reportería costaba minutos. */
+    try { pend = (typeof Base !== 'undefined' && Base.cuantosPendientes)
+      ? Base.cuantosPendientes(Modelo.base()) : 0; } catch (e) { pend = 0; }
+    if (pend) return { clase: 'espera', texto: pend +
+      (pend === 1 ? ' cambio sin subir' : ' cambios sin subir') + ' · solo en este equipo' };
+    /* 🔴 Y SI LA COPIA LOCAL NO CABE, TAMBIÉN SE DICE (31-08-2026).
+
+       El navegador guarda hasta unos 5 MB por sitio y la base del taller anda
+       justo en ese borde. Cuando no cabía, el sistema soltaba la copia entera y
+       lo anotaba en la consola, donde no lo lee nadie: al recargar volvía la
+       pantalla de ingreso y desde afuera parecía que «el sistema echa a la
+       gente». El trabajo nunca estuvo en riesgo —va a la nube igual—, pero
+       nadie tenía cómo saberlo. */
+    const g = (typeof Modelo.problemaAlGuardar === 'function') ? Modelo.problemaAlGuardar() : null;
+    if (g && !g.guardo) return { clase: 'aviso',
+      texto: 'Este navegador no puede guardar la copia local · el trabajo sí va a la nube' };
+    if (g && g.guardo) return { clase: 'espera',
+      texto: 'Poco espacio en este navegador · la copia local va sin ' + g.solto };
+    return { clase: 'ok', texto: 'Datos reales · ' + (i.ordenes_activas || 0) + ' unidades activas' };
+  }
+  if (f === 'trayendo')  return { clase: 'espera', texto: 'Trayendo los datos del taller…' };
+  if (f === 'sin-nube')  return { clase: 'aviso', texto: 'DATOS DE DEMOSTRACIÓN · ' + estadoNube.detalle };
+  return { clase: 'espera', texto: 'Conectando…' };
+}
+
+async function arrancarLaNube() {
+  if (typeof Base === 'undefined' || !Base.activada()) {
+    estadoNube = { fase: 'sin-nube', detalle: 'la nube está apagada en esta versión', informe: null };
+    return;
+  }
+
+  /* 🔴 LO QUE ESTE EQUIPO NO ALCANZO A SUBIR SE RESCATA ANTES DE BAJAR NADA
+     (30-08-2026).
+
+     Se mira PRIMERO, con la huella que quedo guardada en el equipo, porque en
+     cuanto se adopte lo de la nube estas filas dejan de existir en memoria. Es
+     el caso del telefono: una recepcion hecha ahi, guardada en el aparato, que
+     nunca salio porque el navegador congelo la pagina al cambiar de aplicacion.
+
+     Se reponen mas abajo, DESPUES de tomar la huella nueva, para que queden
+     marcadas como distintas de la nube y el empujon las mande. */
+  /* 🔴 Y UN TOPE, PORQUE EQUIVOCARSE ACA CUESTA CARO (30-08-2026).
+
+     Un rescate son escrituras a Firestore. La primera version de esto —con un
+     error en la huella— dio 6.791 filas «pendientes» y las subió todas sin
+     preguntar. Lo que este equipo alcanza a escribir sin conexión es una
+     recepción, un presupuesto, unas etapas: decenas, no miles.
+
+     Sobre el tope no se sube nada y se dice en la consola. Vale más un rescate
+     que no ocurre y se nota, que uno que ocurre solo y escribe media base. */
+  const TOPE_RESCATE = 500;
+  let rescatadas = Base.pendienteDeAntes ? Base.pendienteDeAntes(Modelo.base()) : [];
+  if (rescatadas.length > TOPE_RESCATE) {
+    console.warn('El rescate encontró ' + rescatadas.length + ' filas sin subir, que son ' +
+      'demasiadas para ser trabajo de una sesión. NO se suben: revisar la huella guardada.');
+    rescatadas = [];
+  } else if (rescatadas.length) {
+    console.warn('Quedaron ' + rescatadas.length + ' filas sin subir de la sesión ' +
+      'anterior de este equipo. Se reponen y se mandan.');
+  }
+
+  /* Primero la copia guardada: contesta al instante y no cuesta una lectura.
+     Recién si no hay —o si venció— se le pregunta a Firestore. */
+  const guardadas = Base.leerCache();
+  if (guardadas) {
+    Modelo.adoptarNube(guardadas);
+    Base.tomarHuella(Modelo.base());
+    if (rescatadas.length && Modelo.reponerPendientes) Modelo.reponerPendientes(rescatadas);
+    estadoNube = { fase: 'lista', detalle: 'copia guardada', informe: Base.ultimoInforme() };
+    if (typeof render === 'function') render();
+  } else {
+    estadoNube = { fase: 'trayendo', detalle: '', informe: null };
+    if (typeof render === 'function') render();
+  }
+
+  try {
+    const tablas = await Base.conjuntoDeTrabajo();
+    const r = Modelo.adoptarNube(tablas);
+    if (!r.ok) throw new Error(r.motivo);
+    /* La huella se toma DESPUÉS de adoptar y con lo que quedó en el modelo, no
+       con lo que vino de la nube. Son casi lo mismo, pero no exactamente: el
+       modelo puede haber normalizado algo al entrar, y si la huella no es la
+       del modelo, la primera comparación diría que cambió todo y subiría 10.000
+       documentos que nadie tocó. */
+    Base.tomarHuella(Modelo.base());
+    Base.guardarCache(tablas);
+    /* Y ahora si: lo de este equipo vuelve encima de lo que trajo la nube y se
+       manda. El orden importa —huella primero, reponer despues— o quedaria
+       dado por sincronizado sin haberlo estado nunca. */
+    if (rescatadas.length && Modelo.reponerPendientes) {
+      const n = Modelo.reponerPendientes(rescatadas);
+      if (n) { Base.empujarYa(Modelo.base()); avisar({ ok: true, motivo: '' },
+        'Se subieron ' + n + (n === 1 ? ' cambio que había quedado' : ' cambios que habían quedado') +
+        ' en este equipo sin llegar a la nube.', { persistente: true }); }
+    }
+    estadoNube = { fase: 'lista', detalle: '', informe: Base.ultimoInforme() };
+    /* 🔴 Y ACÁ SE REINTENTA LA SESIÓN (31-08-2026).
+
+       Cuando el navegador no pudo guardar la copia local —Safari corta en 5 MB
+       y la base pesa más—, el sistema arranca con la semilla y no tiene las
+       cuentas de verdad, así que no puede reconocer a quien ya había entrado.
+       Recién ahora las tiene. Si esta pestaña traía un id y todavía no hay
+       sesión, se retoma sola: quien recargó ve el ingreso unos segundos y entra
+       sin teclear nada. */
+    if (!Modelo.haySesion()) {
+      if (Modelo.olvidarQueSeRepuso) Modelo.olvidarQueSeRepuso();
+      if (typeof sesionDeEstaPestana === 'function' && sesionDeEstaPestana()) {
+        document.querySelectorAll('.velo-ingreso').forEach((v) => v.remove());
+        pintarMenu();
+        ir(primerModuloPermitido());
+      }
+    }
+  } catch (e) {
+    /* Sin nube el sistema NO se cae: sigue con lo que tenga. Si ya había
+       adoptado la copia guardada, sigue con los datos reales; si no, con la
+       demostración — y la barra lo dice, que es lo que importa: nadie tiene que
+       confundir un auto inventado con uno del taller. */
+    if (estadoNube.fase !== 'lista') {
+      estadoNube = { fase: 'sin-nube', detalle: (e && e.message) || 'sin conexión', informe: null };
+    }
+  }
+  if (typeof render === 'function') render();
+}
+
 /* La sala compartida se enciende al final, cuando el modelo y las pantallas ya
    están en pie: al arrancar puede traer el estado de la sala y repintar, y para
    eso `render` tiene que existir. Si no hay internet, falla en silencio y el
    sistema queda como siempre estuvo, con los datos de este equipo. */
 if (typeof Sala !== 'undefined') Sala.iniciar();
+
+/* Y la data real, que va después de la sala a propósito: así la sala ya
+   decidió que no arranca, y no hay ninguna ventana en que pueda bajar su
+   documento de demostración encima de lo que traiga Firestore. */
+arrancarLaNube();
+
+/* Y el vaciado de salida: en el celular la pagina se congela al cambiar de
+   aplicacion y con ella muere el empujon que estaba esperando. Esto lo manda
+   antes, en cuanto la pantalla deja de verse. */
+if (typeof Base !== 'undefined' && Base.vigilarLaSalida) {
+  Base.vigilarLaSalida(() => Modelo.base());
+}

@@ -1,0 +1,89 @@
+/* Portada para elegir la presentacion del sistema.
+   Es una pagina aparte del sistema: no comparte estilos con el, a proposito.
+   Aca no hay densidad de ERP — hay una sola decision que tomar. */
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0; min-height: 100%;
+  background: #0e1116;
+  color: #ced5de;
+  font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 15px; line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+main { max-width: 780px; margin: 0 auto; padding: 48px 20px 40px; }
+
+header { margin-bottom: 30px; }
+header img { height: 40px; width: auto; display: block; margin-bottom: 20px; }
+header h1 {
+  margin: 0 0 10px; font-size: 25px; font-weight: 650; color: #f2f5f8;
+  letter-spacing: -.2px;
+}
+header p { margin: 0; color: #97a4b3; font-size: 14.5px; max-width: 60ch; }
+header p strong { color: #ced5de; font-weight: 600; }
+
+.ops { display: flex; flex-direction: column; gap: 9px; }
+
+.op {
+  display: flex; align-items: center; gap: 15px;
+  padding: 14px 16px;
+  background: #151a21; border: 1px solid #2a323d; border-radius: 8px;
+  text-decoration: none; color: inherit;
+  transition: border-color .15s ease, background .15s ease, transform .15s ease;
+}
+.op:hover { border-color: #4a5566; background: #1b222b; transform: translateY(-1px); }
+.op:focus-visible { outline: 2px solid #747ae7; outline-offset: 2px; }
+
+/* La muestra: tres barras con los colores reales de esa presentacion. */
+.mu {
+  flex: 0 0 auto; display: flex; gap: 3px;
+  padding: 5px; border-radius: 5px; background: #0e1116; border: 1px solid #2a323d;
+}
+.mu i { display: block; width: 11px; height: 30px; border-radius: 2px; }
+
+.tx { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.tx strong { font-size: 15px; font-weight: 650; color: #f2f5f8; }
+.tx strong em { font-style: normal; font-weight: 400; color: #97a4b3; font-size: 13px; }
+.tx span { font-size: 13.5px; color: #97a4b3; }
+
+/* Los colores de cada muestra, tomados de su propia hoja de piel. */
+.op[data-p="original"] .mu i:nth-child(1) { background: #0e1116; }
+.op[data-p="original"] .mu i:nth-child(2) { background: #292d78; }
+.op[data-p="original"] .mu i:nth-child(3) { background: #747ae7; }
+
+.op[data-p="cobalto"]  .mu i:nth-child(1) { background: #0a0f1a; }
+.op[data-p="cobalto"]  .mu i:nth-child(2) { background: #2563eb; }
+.op[data-p="cobalto"]  .mu i:nth-child(3) { background: #60a5fa; }
+
+.op[data-p="taller"]   .mu i:nth-child(1) { background: #0b0b0c; }
+.op[data-p="taller"]   .mu i:nth-child(2) { background: #9a4f06; }
+.op[data-p="taller"]   .mu i:nth-child(3) { background: #f5a524; }
+
+.op[data-p="neon"]     .mu i:nth-child(1) { background: #05070f; }
+.op[data-p="neon"]     .mu i:nth-child(2) { background: #c084fc; }
+.op[data-p="neon"]     .mu i:nth-child(3) { background: #22d3ee; }
+
+.op[data-p="papel"]    .mu i:nth-child(1) { background: #f4efe6; }
+.op[data-p="papel"]    .mu i:nth-child(2) { background: #9a4b26; }
+.op[data-p="papel"]    .mu i:nth-child(3) { background: #e0c3b1; }
+
+.op[data-p="terminal"] .mu i:nth-child(1) { background: #020604; }
+.op[data-p="terminal"] .mu i:nth-child(2) { background: #11683b; }
+.op[data-p="terminal"] .mu i:nth-child(3) { background: #35d07f; }
+
+footer {
+  margin-top: 30px; padding-top: 16px; border-top: 1px solid #2a323d;
+  font-size: 12.5px; color: #7d8a99;
+  display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+}
+footer .n { color: #7d8a99; }
+footer .m { color: #5f6b7a; }
+
+@media (max-width: 560px) {
+  main { padding: 30px 16px 30px; }
+  header h1 { font-size: 21px; }
+  .op { padding: 12px 13px; gap: 12px; }
+  .mu i { width: 9px; height: 26px; }
+}

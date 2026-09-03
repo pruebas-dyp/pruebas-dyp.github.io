@@ -203,7 +203,9 @@ const ESTADO_BARRA = {
   taller:    () => '<strong>' + Modelo.metricas().enTaller + '</strong> vehículos en taller',
   repuestos: () => '<strong>' + Modelo.metricas().repuestosPendientes + '</strong> repuestos pendientes',
   detenidos: () => '<strong>' + Modelo.metricas().conRepuestoPendiente + '</strong> vehículos esperando',
-  historico: () => '<strong>' + Modelo.historico({ todo: true }).length + '</strong> vehículos entregados',
+  /* Cuenta las filas, no arma las vistas: ver `cuantasEntregadas` en
+     modelo.js. Esta línea costaba 44 segundos por repintado. */
+  historico: () => '<strong>' + Modelo.cuantasEntregadas() + '</strong> vehículos entregados',
   recepcion: () => {
     const r = rec();
     // En el menú de opciones todavía no hay nada que contar.

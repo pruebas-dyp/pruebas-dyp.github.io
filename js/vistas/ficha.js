@@ -1,3 +1,17 @@
+/* 🔴 UN CERO Y UN «NO LO TENEMOS» SE VEN IGUAL, Y NO SON LO MISMO (30-08-2026).
+
+   El sistema viejo no marcaba daños sobre la silueta y dejó de llenar el
+   checklist del vehículo en 2019. Con la data migrada esas dos casillas salían
+   «0» y «Sin datos», y un cero al lado de «Daños marcados» se lee como **el
+   auto llegó sin daños** — que en una orden de desabolladura es al revés de la
+   verdad, y va en la pantalla que se mira cuando el cliente reclama.
+
+   Cuando la orden viene de la migración se dice que el dato no se registró. Las
+   órdenes nuevas siguen mostrando su número, que ahí sí significa cero. */
+const vieneDelSistemaAnterior = (o) => !!o.ventaGuardada;
+const sinRegistro = (texto) =>
+  '<span style="color:var(--gris-2);font-style:italic">' + texto + '</span>';
+
 /* LA FICHA DE LA ORDEN — el centro del sistema.
 
    Los 10 campos de la cabecera en sus dos bloques, y las 8 pantallas que cuelgan de ella.
@@ -502,7 +516,9 @@ function fichaResumen(o) {
         ${dato('Color', esc(o.color || '—'))}
         ${dato('Piezas marcadas', o.danos.length
           ? esc(fichaPiezasMarcadas(o.danos))
-          : '<span style="color:var(--gris-2)">ninguna</span>')}
+          : (vieneDelSistemaAnterior(o)
+              ? sinRegistro('el sistema anterior no las marcaba')
+              : '<span style="color:var(--gris-2)">ninguna</span>'))}
       </fieldset>
 
       <fieldset class="bloque"><legend>Cómo va</legend>
@@ -539,14 +555,20 @@ function fichaResumen(o) {
       ${dato('VIN', esc(o.vin || '—'))}
       ${dato('Kilometraje', fKm(o.recepcion && o.recepcion.km))}
       ${dato('Combustible', fComb(o.recepcion && o.recepcion.combustible))}
-      ${dato('Daños marcados', o.danos.length,
+      ${dato('Daños marcados',
+        (!o.danos.length && vieneDelSistemaAnterior(o))
+          ? sinRegistro('el sistema anterior no los marcaba')
+          : o.danos.length,
         'Las piezas marcadas en la silueta al recibir el vehículo. Son del vehículo, no de esta orden')}
       ${/* 🔶 EL INVENTARIO, DESGLOSADO (15-08-2026). Decía "24 de 28 ítems", que
            con cuatro estados no dice nada: mezclaba en un solo número lo que
            está, lo que no está, lo que llegó roto y lo que nadie alcanzó a
            mirar. **"Dañado" y "no presente" son reclamos distintos**, y el que
            quedó sin verificar no es ninguno de los dos. */''}
-      ${dato('Inventario', fichaInventario(o.inventario))}
+      ${dato('Inventario',
+        (!(o.inventario || []).length && vieneDelSistemaAnterior(o))
+          ? sinRegistro('no se registró en el sistema anterior')
+          : fichaInventario(o.inventario))}
     </fieldset>
 
     <fieldset class="bloque"><legend>Cliente y siniestro${Modelo.puede('ot.editar')
@@ -657,8 +679,30 @@ function fichaResumen(o) {
 
 /* ── Pestaña · Historial ───────────────────────────────────────────────── */
 
+/* 🔴 TODO EVENTO DE ETAPA DECIA «COMPLETADO» (30-08-2026).
+
+   `tipo: 'etapa'` lo escriben CUATRO cosas distintas —asignar, tomar, devolver
+   y terminar— y este mapa le ponia a las cuatro la misma etiqueta verde. En el
+   historial de una orden recien asignada salian siete «Completado» encima de
+   siete etapas que estaban en curso, y el panel de al lado decia lo contrario.
+
+   El que sabe cual de las cuatro fue es el `detalle`, que ya lo trae escrito.
+   `marcaDeEtapa` lo lee y devuelve la etiqueta que corresponde. */
+const MARCAS_ETAPA = [
+  [/^completado/i,               { txt: 'Terminada', clase: 'verde' }],
+  [/^terminado/i,                { txt: 'Terminada', clase: 'verde' }],
+  [/^asignada/i,                 { txt: 'Asignada',  clase: 'azul'  }],
+  [/^tomada/i,                   { txt: 'Tomada',    clase: 'azul'  }],
+  [/^devuelta/i,                 { txt: 'Devuelta',  clase: 'gris'  }]
+];
+const marcaDeEtapa = (detalle) => {
+  const d = String(detalle || '');
+  for (const [re, m] of MARCAS_ETAPA) if (re.test(d)) return m;
+  return { txt: 'Etapa', clase: 'gris' };
+};
+
 const TIPO_EVENTO = {
-  etapa:        { txt: 'Completado',   clase: 'verde' },
+  etapa:        { txt: 'Etapa',        clase: 'gris' },
   estado:       { txt: 'Cambio Estado', clase: 'azul' },
   modificacion: { txt: 'Modificación', clase: 'gris' },
   salida:       { txt: 'Salida',       clase: 'ambar' },
@@ -672,15 +716,33 @@ function fichaHistorial(o) {
     <div class="cab"><div><h2>${ico('reloj', 'g')}Historial <span class="patente">${esc(o.patente)}</span></h2>
       <div class="desc">Qué pasó, cuándo y quién. Al segundo, igual que el original</div></div>
       <span class="et gris">${plural(eventos.length, 'evento', 'eventos')}</span></div>
+    ${/* 🔴 CINCO COLUMNAS PARA TRES DATOS (30-08-2026, Marco: «el historial esta
+         muy amplio, debiese ser informacion mas clave y resumida»).
+
+         Habia Fecha · Etapa · Estado · Encargado · Usuario, y las dos ultimas
+         imprimian LO MISMO —`e.usuario` dos veces—: una columna entera de ancho
+         gastada en repetir el dato de al lado. Con eso el panel no cabia junto
+         a las etapas y habia que deslizarlo de lado para leerlo.
+
+         Quedan las tres que contestan la pregunta del panel —que paso, cuando y
+         quien—: la marca de tipo se pinta junto al texto, que es donde se lee
+         sin cruzar la tabla con el dedo. */''}
     <div class="grid-envoltorio"><table class="grid">
-      <thead><tr><th>Fecha</th><th>Etapa</th><th>Estado</th><th>Encargado</th><th>Usuario</th></tr></thead>
+      <thead><tr><th style="width:130px">Cuándo</th><th>Qué pasó</th>
+        <th style="width:30%">Quién</th></tr></thead>
       <tbody>${eventos.length ? eventos.map((e) => {
-        const t = TIPO_EVENTO[e.tipo] || { txt: e.tipo, clase: 'gris' };
+        const esEtapa = e.tipo === 'etapa';
+        const t = esEtapa ? marcaDeEtapa(e.detalle)
+                          : (TIPO_EVENTO[e.tipo] || { txt: e.tipo, clase: 'gris' });
+        /* En una etapa se dice QUE etapa y, si el detalle agrega algo que la
+           etiqueta no cubre —a quien se asigno—, tambien eso. */
+        const extra = esEtapa && /^(asignada|tomada) /i.test(String(e.detalle || ''))
+          ? ' · ' + String(e.detalle).replace(/^(asignada|tomada)\s*/i, '') : '';
+        const que = (esEtapa ? (e.etapa || '') + extra : e.detalle) || '—';
         return '<tr><td class="num">' + fFechaHora(e.fecha) + '</td>' +
-          '<td>' + esc(e.tipo === 'etapa' ? e.etapa : e.detalle) + '</td>' +
-          '<td><span class="et ' + t.clase + '">' + esc(t.txt) + '</span></td>' +
-          '<td>' + esc(e.usuario) + '</td><td>' + esc(e.usuario) + '</td></tr>';
-      }).join('') : '<tr><td colspan="5"><div class="vacio"><div class="titulo">Sin eventos todavía</div></div></td></tr>'}</tbody>
+          '<td><span class="et ' + t.clase + '">' + esc(t.txt) + '</span> ' + esc(que) + '</td>' +
+          '<td>' + esc(e.usuario) + '</td></tr>';
+      }).join('') : '<tr><td colspan="3"><div class="vacio"><div class="titulo">Sin eventos todavía</div></div></td></tr>'}</tbody>
     </table></div>
   </div>`;
 }
@@ -750,9 +812,10 @@ function fichaBitacora(o) {
       </div>
 
       <div class="grid-envoltorio" style="margin-top:12px"><table class="grid">
-        <thead><tr><th>Fecha</th><th>Destinatario</th><th>Asunto</th><th>Mensaje</th><th>Alerta</th><th></th></tr></thead>
+        <thead><tr><th>Fecha</th><th>De</th><th>Para</th><th>Asunto</th><th>Mensaje</th><th>Alerta</th><th></th></tr></thead>
         <tbody>${msjs.length ? msjs.map((m) =>
           '<tr><td class="num">' + fFechaHora(m.fecha) + '</td>' +
+          '<td>' + esc(m.autor) + '</td>' +
           '<td>' + esc(m.destinatario) + '</td>' +
           '<td><span class="et gris">' + esc(m.asunto) + '</span></td>' +
           '<td>' + esc(m.mensaje) + '</td>' +
@@ -761,7 +824,7 @@ function fichaBitacora(o) {
             : '<span class="cod">' + esc(String(m.asunto).charAt(0).toUpperCase()) + '</span>') + '</td>' +
           '<td>' + (m.apagada ? '' : '<button class="btn secundario" data-apagar="' + esc(m.id) + '">Apagar alerta</button>') +
           '</td></tr>').join('')
-          : '<tr><td colspan="6"><div class="vacio"><div class="titulo">Sin mensajes</div></div></td></tr>'}</tbody>
+          : '<tr><td colspan="7"><div class="vacio"><div class="titulo">Sin mensajes</div></div></td></tr>'}</tbody>
       </table></div>
     </div>
   </div>`;

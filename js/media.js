@@ -522,7 +522,100 @@ const Media = (function () {
       nube: porNube, sala: porSala };
   }
 
+  /* ── EL VISOR: UNA FOTO EN GRANDE ─────────────────────────────────────
+     30-08-2026, Marco: «si aprieto una foto, podemos hacer que venga en grande
+     a la pantalla».
+
+     Las miniaturas son de 160 px y lo que se mira en una foto de recepcion es
+     el detalle: un rayon, una abolladura, el numero de un chasis. A ese tamaño
+     no se ve, y la unica salida era bajar el archivo.
+
+     Va en `media.js` y no en la pantalla de fotos porque `data-media` es el
+     contrato de este modulo: asi funciona en recepcion, en avance, en el
+     historial y en cualquier galeria que se agregue despues, sin volver a
+     escribirlo. Se pasan las flechas y la rueda porque nadie mira UNA foto de
+     un auto: se miran las diez. */
+  const CSS_VISOR = `
+.visor-foto{position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,.92);
+  display:flex;align-items:center;justify-content:center;padding:48px 64px;
+  -webkit-user-select:none;user-select:none}
+.visor-foto img{max-width:100%;max-height:100%;object-fit:contain;
+  box-shadow:0 8px 50px rgba(0,0,0,.6);background:#111}
+.visor-foto .pie-visor{position:absolute;left:0;right:0;bottom:0;padding:14px 20px;
+  color:#e8e8ea;font-size:13px;text-align:center;background:linear-gradient(transparent,rgba(0,0,0,.75))}
+.visor-foto .pie-visor b{color:#fff}
+.visor-foto button{position:absolute;background:rgba(255,255,255,.12);color:#fff;border:0;
+  border-radius:4px;cursor:pointer;font-size:22px;line-height:1;padding:12px 15px}
+.visor-foto button:hover{background:rgba(255,255,255,.25)}
+.visor-foto .cerrar{top:16px;right:18px;font-size:20px}
+.visor-foto .ant{left:14px;top:50%;transform:translateY(-50%)}
+.visor-foto .sig{right:14px;top:50%;transform:translateY(-50%)}
+@media (max-width:700px){
+  .visor-foto{padding:12px}
+  .visor-foto .ant,.visor-foto .sig{padding:16px 12px}
+}`;
+
+  function visor(desde) {
+    /* La lista es la galeria que se esta mirando: las <img> hermanas dentro de
+       la misma rejilla. Si no hay rejilla, es esa foto sola. */
+    const rejilla = desde.closest('.fotos-rejilla') || desde.parentElement;
+    const imgs = [...(rejilla ? rejilla.querySelectorAll('img[data-media]') : [desde])];
+    let i = Math.max(0, imgs.indexOf(desde));
+
+    if (!document.getElementById('css-visor-foto')) {
+      const st = document.createElement('style');
+      st.id = 'css-visor-foto'; st.textContent = CSS_VISOR;
+      document.head.appendChild(st);
+    }
+    const velo = document.createElement('div');
+    velo.className = 'visor-foto';
+    velo.innerHTML = '<img alt=""><div class="pie-visor"></div>' +
+      '<button class="cerrar" title="Cerrar (Esc)">&times;</button>' +
+      (imgs.length > 1 ? '<button class="ant" title="Anterior">&#8249;</button>' +
+                         '<button class="sig" title="Siguiente">&#8250;</button>' : '');
+    const grande = velo.querySelector('img');
+    const pie = velo.querySelector('.pie-visor');
+
+    const mostrar = () => {
+      const m = imgs[i];
+      grande.src = m.src || '';
+      grande.alt = m.alt || '';
+      const fig = m.closest('figure');
+      const nom = fig ? (fig.querySelector('.pie-foto b') || {}).textContent : m.alt;
+      pie.innerHTML = '<b>' + (nom || '') + '</b>' +
+        (imgs.length > 1 ? ' · ' + (i + 1) + ' de ' + imgs.length : '');
+    };
+    const mover = (n) => { i = (i + n + imgs.length) % imgs.length; mostrar(); };
+    const cerrar = () => { velo.remove(); document.removeEventListener('keydown', teclas); };
+    function teclas(ev) {
+      if (ev.key === 'Escape') cerrar();
+      else if (ev.key === 'ArrowRight') mover(1);
+      else if (ev.key === 'ArrowLeft') mover(-1);
+    }
+
+    velo.addEventListener('click', (ev) => { if (ev.target === velo) cerrar(); });
+    velo.querySelector('.cerrar').addEventListener('click', cerrar);
+    const ant = velo.querySelector('.ant'), sig = velo.querySelector('.sig');
+    if (ant) ant.addEventListener('click', (ev) => { ev.stopPropagation(); mover(-1); });
+    if (sig) sig.addEventListener('click', (ev) => { ev.stopPropagation(); mover(1); });
+    document.addEventListener('keydown', teclas);
+
+    mostrar();
+    document.body.appendChild(velo);
+  }
+
+  /* Un solo oyente en el documento y no uno por foto: las galerias se repintan
+     en cada render y colgar oyentes ahi los multiplica sin que se note. */
+  document.addEventListener('click', (ev) => {
+    const img = ev.target.closest && ev.target.closest('img[data-media]');
+    if (!img || !img.src) return;
+    if (ev.target.closest('.visor-foto')) return;      // ya esta en grande
+    if (ev.target.closest('.velo-impreso')) return;    // el papel no se amplia
+    ev.preventDefault();
+    visor(img);
+  });
+
   return { guardar, guardarBlob, subir, obtener, url, eliminar, pintar, resumen, fPeso, vaciar, viajan,
-    empaquetar, bajarCarpeta,
+    empaquetar, bajarCarpeta, visor,
            ladoMax, objetivoBytes, comprimeSiempre };
 })();

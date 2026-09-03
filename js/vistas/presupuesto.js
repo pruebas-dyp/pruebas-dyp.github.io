@@ -637,7 +637,17 @@ function grillaPresupuesto(o, pr, editable, $) {
           (p.linea.proceso === x.codigo ? ' selected' : '') + ' title="' + esc(x.ayuda) + '">' +
           esc(x.nombre) + '</option>').join('')}
       </select>
-      <button class="btn" id="l-agregar">Enviar</button>
+      ${/* 🔴 DECIA «ENVIAR» Y NO ENVIA NADA (30-08-2026).
+
+           Este boton agrega una linea de mano de obra. Se llamaba «Enviar»
+           —heredado del formulario de su sistema— y mientras el de arriba
+           decia «Enviar a la compañía» se distinguian. Al acortar aquel a
+           «Enviar», quedaron DOS botones iguales en la misma pantalla: uno
+           agrega una fila y el otro manda el presupuesto y baja los repuestos
+           a bodega. Apretar el que no era no da error: hace la otra cosa.
+
+           Un boton se llama como lo que hace. */''}
+      <button class="btn" id="l-agregar">Agregar línea</button>
     </div>
     ${/* 🔴 MENOS TEXTO (27-08-2026, Marco: «la visual está buena, es solamente
          hacerla como que no tenga tanto texto y que sea más simple para ellos»).
@@ -728,12 +738,32 @@ function grillaPresupuesto(o, pr, editable, $) {
       (extra || '') + '>'
     : esc(l[nombre] === '' || l[nombre] == null ? '—' : l[nombre]));
 
+  /* 🔴 LO QUE SE ESCRIBE TIENE QUE VERSE (30-08-2026, Marco: «lo que uno digita
+     se vea, ya que la casilla se contrae... es como en el excel cuando uno
+     aprieta ajustar texto y te da espacio hacia abajo»).
+
+     La descripcion era un `<input>`, o sea UNA linea: «PARAGOLPE DELANTERO
+     ORIGINAL CON SENSORES» entraba entera pero solo se veia el pedazo del
+     ancho de la celda, y para releerla habia que barrer con el cursor. En un
+     presupuesto que despues se imprime y se manda, no poder leer lo que se
+     escribio es un error de verdad, no una incomodidad.
+
+     Un `<textarea>` de una fila que crece solo al escribir: parte el texto en
+     varias lineas y la fila se estira, como el ajustar texto del Excel. Se
+     guarda igual que antes —el manejador lee `.value` y escucha `change`, y un
+     textarea da las dos cosas— asi que no hay nada mas que cambiar. */
+  const areaLinea = (l, nombre, extra) => (editable
+    ? '<textarea rows="1" class="celda-larga" data-rep="' + esc(l.id) + '" ' +
+      'data-campo="' + nombre + '"' + (extra || '') + '>' +
+      esc(l[nombre] == null ? '' : l[nombre]) + '</textarea>'
+    : esc(l[nombre] === '' || l[nombre] == null ? '—' : l[nombre]));
+
   const filaRep = (l) => {
     const cobra = Reglas.esProveedorTaller(l.proveedor);
     return '<tr><td>' + campoLinea(l, 'codigo', 'text', '110px', ' placeholder="El de bodega"') + '</td>' +
       '<td class="num">' + campoLinea(l, 'cantidad', 'number', '70px', ' min="1"') + '</td>' +
       // Se escribe: esta tabla se llena a mano, no hereda de nadie.
-      '<td>' + campoLinea(l, 'descripcion', 'text', '100%', ' placeholder="La pieza, como se pide"') + '</td>' +
+      '<td>' + areaLinea(l, 'descripcion', ' placeholder="La pieza, como se pide"') + '</td>' +
       '<td>' + campoLinea(l, 'proveedor', 'text', '152px',
         ' placeholder="DYP, SURA, …" list="lista-proveedores"' +
         ' title="Quién pone la pieza. Sólo se le cobran al cliente las que pone el taller:' +
@@ -773,7 +803,7 @@ function grillaPresupuesto(o, pr, editable, $) {
   /* ── Bloque 3 · Externos (T.O.T.) ──────────────────────────────────── */
   const filaExt = (l) =>
     '<tr><td>' + campoLinea(l, 'codigo', 'text', '110px', '') + '</td>' +
-    '<td>' + campoLinea(l, 'descripcion', 'text', '100%', ' placeholder="El trabajo que hace el tercero"') + '</td>' +
+    '<td>' + areaLinea(l, 'descripcion', ' placeholder="El trabajo que hace el tercero"') + '</td>' +
     '<td>' + campoLinea(l, 'proveedor', 'text', '172px',
       ' placeholder="Quién lo hace" list="lista-proveedores"') + '</td>' +
     '<td class="num">' + campoLinea(l, 'precio_unitario', 'number', '120px', ' min="0" placeholder="0"') + '</td>' +
@@ -950,9 +980,19 @@ function vPresupuestoDetalle(o, pr) {
          un botón de guardar. */''}
     ${editable ? '<button class="btn secundario" id="presu-guardar">' + ico('documento') +
       'Guardar borrador</button>' : ''}
-    ${editable ? '<button class="btn" data-presu-estado="enviado">Enviar a la compañía</button>' : ''}
-    ${pr.estado === 'enviado' ? '<button class="btn" data-presu-estado="aprobado">Marcar aprobado</button>' +
-      '<button class="btn secundario" data-presu-estado="rechazado">Marcar rechazado</button>' : ''}
+    ${/* 🔴 «ENVIAR», Y CON ESO QUEDA (30-08-2026, Marco).
+
+         Decia «Enviar a la compañía» y despues aparecian «Marcar aprobado» y
+         «Marcar rechazado». Dos cosas mal: no todo presupuesto va a una
+         compañia —los particulares son casi la mitad— y la aprobacion era un
+         tramite que el taller no hace. Se enviaba, y el presupuesto se quedaba
+         esperando a que alguien apretara un boton mas; mientras tanto las
+         piezas no bajaban a bodega.
+
+         Ahora enviar cierra el ciclo y baja los repuestos. El estado
+         «aprobado» no se borro —86 ordenes suyas ya venian asi— pero ya no se
+         llega a el a mano desde aca. */''}
+    ${editable ? '<button class="btn" data-presu-estado="enviado">Enviar</button>' : ''}
     ${/* SIN botón «Pedir repuestos a bodega» (16-08-2026, Marco): «eso no
          debería estar ya que se pide por los repuestos y eso es
          automáticamente». Y tiene razón: las piezas salen del bloque
@@ -1196,6 +1236,16 @@ function pPresupuesto() {
       cambios[inp.dataset.campo] = inp.value;
       ejecutar(() => Modelo.actualizar_linea_presupuesto(inp.dataset.horas, cambios), null);
     });
+  });
+
+  /* La casilla se estira sola: al pintarla —para que una descripcion larga que
+     ya estaba guardada se vea entera de entrada— y en cada tecla. El truco de
+     bajar a `auto` antes de medir es necesario: sin eso `scrollHeight` nunca
+     decrece y la casilla solo sabria crecer. */
+  const estirar = (t) => { t.style.height = 'auto'; t.style.height = (t.scrollHeight + 2) + 'px'; };
+  document.querySelectorAll('textarea.celda-larga').forEach((t) => {
+    estirar(t);
+    t.addEventListener('input', () => estirar(t));
   });
 
   /* ── Los campos de Repuestos y Externos ─────────────────────────────── */

@@ -5,13 +5,97 @@
 
    Detalle y decisiones: 00 Documentacion/DECISIONES.md · js/vistas/reporteria.js */
 
+/* 🔴 LA REPORTERÍA ARRANCA CON UN PERÍODO, Y ANTES NO (31-08-2026).
+
+   Venía con las fechas en blanco, o sea «todo lo que haya en memoria». Y al
+   arrancar, en memoria están sólo las 92 órdenes vivas — que no son entregadas,
+   así que el informe quedaba hecho sobre el puñado que se entregó mientras
+   alguien probaba. Se veían dos meses en un gráfico de doce años y nada decía
+   que faltaba el resto.
+
+   Doce meses es lo que se mira en una reunión, y además acota lo que hay que
+   pedirle a la nube. Se puede cambiar en pantalla como siempre. */
+function repDoceMeses() {
+  /* ⚠️ `hoyEnChile()` devuelve TEXTO `AAAA-MM-DD`, no un Date — es lo que
+     explica el bloque de `aMedianoche` en reglas.js, el mismo que costó que las
+     92 órdenes mostraran un día menos. Los campos de fecha de esta pantalla
+     también son texto, así que se resta el año sobre los tres números y no se
+     construye ningún Date que pueda caer en la medianoche de Greenwich. */
+  const hoy = (Reglas.hoyEnChile ? Reglas.hoyEnChile() : '') || '';
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(hoy);
+  if (!m) return { desde: '', hasta: '' };
+  return { desde: (Number(m[1]) - 1) + '-' + m[2] + '-' + m[3], hasta: hoy };
+}
+
 function repEstado() {
-  ui.reporteria = ui.reporteria || {
-    desde: '', hasta: '', compania_id: '',
-    // La tabla dinámica: qué agrupa, qué abre y qué se suma.
-    filas: 'compania', columnas: '', medida: 'ordenes'
-  };
+  if (!ui.reporteria) {
+    const p = repDoceMeses();
+    ui.reporteria = {
+      desde: p.desde, hasta: p.hasta, compania_id: '',
+      // La tabla dinámica: qué agrupa, qué abre y qué se suma.
+      filas: 'compania', columnas: '', medida: 'ordenes'
+    };
+  }
   return ui.reporteria;
+}
+
+/* ═══ TRAER LO QUE EL PERÍODO NECESITA ══════════════════════════════════════
+
+   Dos cosas que la pantalla no tiene al abrirse:
+
+     1. LAS ÓRDENES ENTREGADAS. En memoria están las vivas. El histórico se baja
+        una vez por sesión, igual que con «Ver todos».
+     2. SUS ETAPAS. `ot_etapa` no la trae nadie —ver `etapasDe` en base.js— y sin
+        ella los dos gráficos que abren la reparación etapa por etapa salen en
+        blanco aunque el dato exista.
+
+   ⚠️ EL TOPE SE DICE. Si el período abarca más órdenes de las que tiene sentido
+   pedir, se avisa en pantalla. Un tope callado se lee como «esto es todo». */
+const REP_TOPE_ETAPAS = 3000;
+let repEstadoCarga = '';
+let repPeriodoCargado = null;
+let repHistoriaLista = false;
+let repCargando = false;
+let repDejadasFuera = 0;
+
+function repAvisoDeCarga() { return repEstadoCarga; }
+function repOrdenesSinEtapas() { return repDejadasFuera; }
+
+async function repTraerLoDelPeriodo() {
+  if (typeof Base === 'undefined' || !Base.conectada() || repCargando) return;
+  const r = repEstado();
+  const marca = r.desde + '|' + r.hasta + '|' + r.compania_id;
+  if (repPeriodoCargado === marca) return;
+  repCargando = true;
+  try {
+    if (!repHistoriaLista) {
+      repEstadoCarga = 'Trayendo las órdenes entregadas…';
+      if (typeof render === 'function') render();
+      const t = await Base.historicoCompleto((n) => {
+        repEstadoCarga = 'Trayendo las órdenes entregadas… ' + n.toLocaleString('es-CL');
+      });
+      Modelo.mezclarNube(t);
+      repHistoriaLista = true;
+    }
+    /* Ahora sí: las del período, que es sobre lo que se va a informar. */
+    const lista = repUniverso();
+    const sinEtapas = lista.filter((o) => !(o.etapasAsignadas || []).length);
+    repDejadasFuera = Math.max(0, sinEtapas.length - REP_TOPE_ETAPAS);
+    const pide = sinEtapas.slice(0, REP_TOPE_ETAPAS);
+    if (pide.length) {
+      repEstadoCarga = 'Trayendo las etapas de ' + pide.length.toLocaleString('es-CL') + ' órdenes…';
+      if (typeof render === 'function') render();
+      const ot_etapa = await Base.etapasDe(pide);
+      Modelo.mezclarNube({ ot_etapa });
+    }
+    repPeriodoCargado = marca;
+    repEstadoCarga = '';
+  } catch (e) {
+    repEstadoCarga = 'No se pudieron traer los datos del período: ' +
+      ((e && e.message) || 'sin conexión');
+  }
+  repCargando = false;
+  if (typeof render === 'function') render();
 }
 
 const REP_DIMENSIONES = [
@@ -71,15 +155,32 @@ const repMiles = (n) => Math.round(Number(n) || 0).toLocaleString('es-CL');
 /* El universo del panel: las órdenes ya entregadas, recortadas por el período
    y la compañía. Se usa el mismo `Modelo.historico` que el buscador para que
    los dos digan lo mismo. */
+let repCacheLlave = null;
+let repCacheLista = null;
+
 function repUniverso() {
   const r = repEstado();
-  const f = { todo: true };
+  /* La llave: la versión de los datos más lo que define el período. Si no
+     cambió ninguna, la lista es la misma y no hay nada que recalcular. */
+  const llave = (Modelo.versionMemo ? Modelo.versionMemo() : 0) + '|' +
+    r.desde + '|' + r.hasta + '|' + r.compania_id;
+  if (repCacheLlave === llave && repCacheLista) return repCacheLista;
+  /* Las fechas van al modelo, no sólo al filtro de acá abajo: allá recortan
+     ANTES de armar la vista de cada orden, que es la parte cara. El filtro de
+     abajo se queda igual — es el que decide de verdad, y no depende de que el
+     modelo entienda el período. */
+  const desde = r.desde
+    ? (function () { const [a, m, d] = r.desde.split('-').map(Number); return new Date(a, m - 1, d); })()
+    : null;
+  const hasta = r.hasta
+    ? (function () { const [a, m, d] = r.hasta.split('-').map(Number); return new Date(a, m - 1, d, 23, 59, 59); })()
+    : null;
+  const f = { todo: true, entregada_desde: desde, entregada_hasta: hasta };
   let lista = Modelo.historico(f);
-  if (r.desde) { const [a, m, d] = r.desde.split('-').map(Number); const x = new Date(a, m - 1, d);
-    lista = lista.filter((o) => o.fechaEntrega && o.fechaEntrega >= x); }
-  if (r.hasta) { const [a, m, d] = r.hasta.split('-').map(Number); const x = new Date(a, m - 1, d, 23, 59);
-    lista = lista.filter((o) => o.fechaEntrega && o.fechaEntrega <= x); }
+  if (desde) lista = lista.filter((o) => o.fechaEntrega && o.fechaEntrega >= desde);
+  if (hasta) lista = lista.filter((o) => o.fechaEntrega && o.fechaEntrega <= hasta);
   if (r.compania_id) lista = lista.filter((o) => o.companiaId === r.compania_id);
+  repCacheLlave = llave; repCacheLista = lista;
   return lista;
 }
 
@@ -536,8 +637,13 @@ function repDinamica(lista) {
     return (valor(b[1]) || 0) - (valor(a[1]) || 0);
   });
 
+  const todasLasFilas = orden(filas);
+  const todasLasCols = dimC ? orden(columnas) : [['—', null]];
   return { dimF, dimC, med, celdas, valor,
-    filasOrd: orden(filas).slice(0, 40), columnasOrd: dimC ? orden(columnas).slice(0, 12) : [['—', null]],
+    /* Cuántas HABÍA antes de cortar: la pantalla lo necesita para poder decir
+       que está cortada en vez de mostrar cuarenta filas como si fueran todas. */
+    cuantasFilas: todasLasFilas.length, cuantasColumnas: todasLasCols.length,
+    filasOrd: todasLasFilas.slice(0, 40), columnasOrd: dimC ? todasLasCols.slice(0, 12) : [['—', null]],
     totalGeneral: valor([...lista].reduce((acc, o) => {
       acc.s += med.valor(o); acc.n++; return acc;
     }, { s: 0, n: 0 })) };
@@ -620,15 +726,35 @@ function repAgregados(lista, meta) {
      ⚠️ Sólo entran las etapas CERRADAS. Una etapa abierta no tiene todavía un
      tiempo: contarla como si hubiera terminado hoy metería en el promedio un
      número que mañana es otro. Se dice cuántas quedaron fuera. */
+  /* 🔴 UNA ETAPA DURA DESDE QUE CERRO LA ANTERIOR (31-08-2026). El bloque de
+     arriba explica por que: en las 276 ordenes medidas, las 276 tenian todas
+     sus etapas asignadas el mismo dia, asi que `cierre − asignacion` era un
+     acumulado desde el ingreso y no lo que duro la etapa. */
+  const tramosDeLaOrden = (o) => {
+    const cerradas = (o.etapasAsignadas || [])
+      .filter((e) => e.finalizada && e.finalizadaAt)
+      .slice()
+      /* Por FECHA DE CIERRE, no por el orden del catalogo: la secuencia que
+         importa es la que ocurrio, no la que estaba prevista. */
+      .sort((a, b) => a.finalizadaAt - b.finalizadaAt);
+    let previo = o.fechaIngreso || (cerradas.length ? cerradas[0].asignadaAt : null);
+    return cerradas.map((e) => {
+      const desde = previo || e.asignadaAt || e.finalizadaAt;
+      previo = e.finalizadaAt;
+      return { e, dias: Math.max(0, (e.finalizadaAt - desde) / MS_DIA) };
+    });
+  };
+
   const porEtapa = (() => {
     const m = new Map();
     let abiertas = 0;
     lista.forEach((o) => {
       (o.etapasAsignadas || []).forEach((e) => {
-        if (!e.finalizada || !e.asignadaAt || !e.finalizadaAt) { abiertas++; return; }
-        const d = Math.max(0, Math.round((e.finalizadaAt - e.asignadaAt) / MS_DIA));
+        if (!e.finalizada || !e.finalizadaAt) abiertas++;
+      });
+      tramosDeLaOrden(o).forEach(({ e, dias }) => {
         const c = m.get(e.nombre) || { n: 0, dias: 0, orden: e.orden, color: e.color };
-        c.n++; c.dias += d; m.set(e.nombre, c);
+        c.n++; c.dias += dias; m.set(e.nombre, c);
       });
     });
     const filas = [...m.entries()]
@@ -737,11 +863,15 @@ function repAgregados(lista, meta) {
     const MS = 86400000;
     const m = new Map();
     lista.forEach((o) => {
-      (o.etapasAsignadas || []).forEach((e) => {
-        if (!e.finalizada || !e.terminadaPor || !e.asignadaAt || !e.terminadaAt) return;
+      /* 🔴 EL MISMO TRAMO QUE «DONDE SE VAN LOS DIAS», y por la misma razon.
+         Con `terminada − asignada` esto ordenaba a las personas por donde cae
+         su etapa en la ruta: quien hace Desarme salia primero por hacer
+         Desarme. Un ranking con nombre y apellido no se publica midiendo eso. */
+      tramosDeLaOrden(o).forEach(({ e, dias }) => {
+        if (!e.terminadaPor) return;
         const c = m.get(e.terminadaPor) || { n: 0, dias: 0, dev: 0, etapas: new Set() };
         c.n++;
-        c.dias += Math.max(0, (e.terminadaAt - e.asignadaAt) / MS);
+        c.dias += dias;
         /* Cuántas de las que cerró le habían sido devueltas antes. Es la
            contraparte de la velocidad y hace falta para no premiar al que va
            rápido rehaciendo: rápido y devuelto no es rápido. */

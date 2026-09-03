@@ -31,7 +31,7 @@ const ORDEN_TORRE = {
   color:      (o) => o.color || '',
   ingreso:    (o) => +o.fechaIngreso || 0,
   tipo:       (o) => o.origenIngresoNombre || '',
-  dias:       (o) => (o.fueraDeTaller ? 0 : Number(o.diasKpi) || 0),
+  dias:       (o) => Number(o.diasEstado) || 0,
   diastot:    (o) => Number(o.diasTotales) || 0,
   estado:     (o) => o.estadoNombre || '',
   etapa:      (o) => (o.etapa ? (etapaPorCodigo(o.etapa) || {}).nombre || '' : ''),
@@ -197,7 +197,7 @@ function vTorre() {
           ${thOrden('siniestro', 'N° Siniestro')}${thOrden('cliente', 'Cliente')}
           ${thOrden('compania', 'Compañia')}${thOrden('marca', 'Marca')}${thOrden('modelo', 'Modelo')}
           ${thOrden('color', 'Color')}${thOrden('ingreso', 'Fecha de Ingreso')}${thOrden('tipo', 'Tipo')}
-          ${thOrden('dias', 'Días', 'El reloj elegido en Configuración: ' + kpiNombre + '. En el original hay uno solo y se reinicia al regrabar el estado.')}
+          ${thOrden('dias', 'Días', 'Días desde el último cambio de estado — cuánto lleva atascado. Es el mismo número que muestra el sistema actual.')}
           ${thOrden('diastot', 'Días tot.', 'Días desde el ingreso. Nunca se reinicia.')}
           ${thOrden('estado', 'Estado')}${thOrden('etapa', 'Etapa')}${thOrden('encargado', 'Encargado')}
           ${thOrden('entrega', 'Fecha de Entrega')}
@@ -251,7 +251,15 @@ function filaTorre(o) {
      Ahora la OR se asigna al crear la OT y es un correlativo propio, así que
      hay exactamente una y se ve siempre — incluso en una orden que todavía no
      tiene presupuesto, que antes salía con un guión. */
-  const or = o.numeroOR;
+  /* 🔴 LA COLUMNA MUESTRA CUANTAS ORs TIENE, COMO LA DE ELLOS (30-08-2026).
+
+     Su Torre pone 1 en casi todas y 2 en la OT 23556, que tiene dos órdenes de
+     reparación. No es el número de la OR —que es 18462— sino cuántas hay.
+     Comprobado 9 de 9 contra su pantalla.
+
+     El número sigue disponible: va en el título de la celda y es lo que busca
+     el Histórico. */
+  const or = o.ors || (o.numeroOR ? 1 : 0);
 
   // Lo que bodega debe y la torre no decía: por qué este auto sigue afuera.
   const repPend = o.repuestos.filter((r) => !r.fechaBodega).length;
@@ -285,8 +293,14 @@ function filaTorre(o) {
     '<td>' + esc(o.color || '—') + '</td>' +
     '<td class="num">' + fFechaHora(o.fechaIngreso) + '</td>' +
     '<td>' + esc(o.origenIngresoNombre || '—') + '</td>' +
-    '<td class="num">' + (fuera ? '<span style="color:var(--gris)">0</span>'
-      : (sobreMeta ? '<strong style="color:var(--ambar)">' + o.diasKpi + '</strong>' : o.diasKpi)) + '</td>' +
+    /* Los días desde el último cambio de estado, que es lo que muestra su
+       Torre. El ámbar sigue saliendo de la meta de reparación: son dos cosas
+       —cuánto lleva atascado y si va sobre el objetivo— y la segunda es la que
+       hay que ver de un vistazo. */
+    '<td class="num">' + (sobreMeta
+      ? '<strong style="color:var(--ambar)" title="Sobre la meta de ' +
+        META_DIAS_REPARACION + ' días de reparación">' + o.diasEstado + '</strong>'
+      : o.diasEstado) + '</td>' +
     '<td class="num" style="color:var(--gris)">' + o.diasTotales + '</td>' +
     '<td><span class="et ' + esc(o.estadoClase) + '">' + esc(o.estadoNombre) + '</span></td>' +
     // "Pendiente" no es una etapa del maestro: es lo que muestra el listado
@@ -295,8 +309,15 @@ function filaTorre(o) {
       : '<span class="et gris">Pendiente</span>') + '</td>' +
     '<td>' + (o.asignado ? esc(o.asignado) : '<span class="et gris">Sin Asignar</span>') + '</td>' +
     '<td class="num">' + (o.fechaCompromiso ? fFechaHora(o.fechaCompromiso) : '—') + '</td>' +
-    '<td>' + chipsAlerta(o) + (pend ? ' <span class="et roja" title="' + pend +
-      ' repuestos por llegar">' + pend + '</span>' : '') + '</td>' +
+    /* 🔴 ACA COLGABA UN NUMERO QUE YA ESTABA DOS COLUMNAS A LA IZQUIERDA
+       (30-08-2026, Marco: «esos numeros sacalos porque no cuadran»).
+
+       Era el conteo de repuestos por llegar, el MISMO de la columna «Rep.
+       pend.»: 2 y 2, 4 y 4, 9 y 9, 12 y 12. Pegado al chip de la alerta se
+       leia como si calificara a la alerta —«alerta A, 8»— y no calzaba con
+       nada, porque no era de ahi. Los repuestos tienen su columna; la alerta
+       muestra alertas. */
+    '<td>' + chipsAlerta(o) + '</td>' +
     CELDA_LUPA(o.numeroOT) + '</tr>';
 
   /* 🔴 EL `colspan` SE CUENTA, NO SE ESCRIBE (26-08-2026). Estaba en 19 a mano,

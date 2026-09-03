@@ -77,7 +77,47 @@ const Sala = (function () {
     return filas && filas[0] ? filas[0] : null;
   }
 
+  /* ═══════════════════════════════════════════════════════════════════════
+     🔴 LA SALA NO SUBE DATOS DE PERSONAS DE VERDAD. NUNCA. (30-08-2026)
+
+     Este archivo manda el documento ENTERO a una tabla de Supabase, y lo hace
+     con una llave publicable que va escrita unas líneas más arriba, dentro del
+     JavaScript que se publica. Cualquiera que abra el código del sitio puede
+     leer esa fila.
+
+     Mientras el sistema mostraba datos de demostración eso estaba bien y así
+     quedó dicho arriba: «SÓLO datos de demostración: acá no entra el RUT, el
+     domicilio ni la fotografía de una persona real».
+
+     Desde hoy el sistema puede tener la data de verdad: 6.550 clientes con su
+     RUT y 6.602 con su domicilio. Si la sala se encendiera con eso cargado,
+     subiría los datos personales de seis mil personas a un proyecto de terceros
+     y quedarían legibles para quien tenga el link. Es la Ley 19.628, y no es
+     una posibilidad remota: la sala se enciende con un botón y se queda
+     encendida entre visitas — `dyp-sala-encendida` lo recuerda.
+
+     Por eso la guarda va en las TRES puertas y no en una sola:
+
+       · `encender` no enciende.
+       · `subir` no sube, aunque alguien la haya encendido antes de que
+         llegaran los datos —que es el caso real: el interruptor está guardado
+         del día anterior y la nube contesta unos segundos después de arrancar—.
+       · `iniciar` la apaga sola al arrancar si el interruptor venía encendido.
+
+     Cuando el sistema tenga cuentas de verdad y los aparatos compartan la base
+     directamente, esta sala sobra: para eso está Firestore, que ya tiene sus
+     reglas y su identidad. La sala era el puente mientras no la había.
+     ═══════════════════════════════════════════════════════════════════════ */
+  function datosReales() {
+    try { return typeof Modelo !== 'undefined' && Modelo.esReal && Modelo.esReal(); }
+    catch (e) { return true; }   // ante la duda, NO sube: el riesgo es de un solo lado
+  }
+
+  const MOTIVO_BLOQUEO = 'La sala compartida queda apagada: el sistema está trabajando ' +
+    'con los datos reales del cliente y esta sala no es un lugar para datos personales.';
+
   async function subir(version) {
+    if (datosReales()) { ultimoError = MOTIVO_BLOQUEO; apagar(); return false; }
     /* Se manda el MISMO texto que el modelo guarda en el navegador. No se
        vuelve a armar el estado acá: el modelo tiene su propia forma de
        escribir las fechas al guardar y de leerlas al cargar, y tocar eso en
@@ -345,6 +385,7 @@ const Sala = (function () {
 
   function encender() {
     if (encendida) return;
+    if (datosReales()) { ultimoError = MOTIVO_BLOQUEO; return; }
     encendida = true;
     try { localStorage.setItem(CLAVE_ON, '1'); } catch (e) { /* nada */ }
     /* Al entrar manda lo que ya está en la sala: si el celular y el
@@ -415,6 +456,20 @@ const Sala = (function () {
      ENCENDIDA: es lo que se pidió —probarlo entre el teléfono y el
      computador— y se apaga desde Archivo. */
   function iniciar() {
+    /* 🔴 CON LA NUBE ENCENDIDA, LA SALA NO ARRANCA (30-08-2026).
+
+       Y no es sólo por los datos personales —de eso ya se encargan las guardas
+       de `encender` y `subir`—: es que al encenderse la sala BAJA su documento
+       y lo aplica encima de lo que haya. Ese documento es la demostración. O
+       sea que la sala, arrancando sola como venía haciendo, borraba la data
+       real recién traída de Firestore unos segundos después de traerla.
+
+       Además ya no hace falta. La sala existía para que el celular y el
+       computador vieran lo mismo cuando cada uno tenía su copia en el
+       navegador. Ahora los dos leen de Firestore: ven lo mismo porque ES lo
+       mismo, no porque alguien lo esté copiando de un lado al otro. */
+    if (typeof Base !== 'undefined' && Base.activada()) { encendida = false; return; }
+
     let guardado;
     try { guardado = localStorage.getItem(CLAVE_ON); } catch (e) { guardado = null; }
     if (guardado === '0') { encendida = false; return; }

@@ -207,5 +207,9 @@ const Nube = (function () {
   const donde = () => ({ proyecto: PROYECTO, bucket: BUCKET, region: 'southamerica-west1' });
   const problema = () => ultimoError;
 
-  return { subir, bajar, probar, donde, problema, BUCKET, PROYECTO };
+  /* `token` sale afuera para que la BASE use la MISMA identidad que las fotos.
+     Son dos servicios distintos —Firestore y el bucket— del mismo proyecto, y
+     pedir dos identidades anonimas al mismo aparato seria pedir dos veces lo
+     mismo: el doble de llamadas y dos sesiones que vencen por separado. */
+  return { subir, bajar, probar, donde, problema, token, LLAVE, BUCKET, PROYECTO };
 })();

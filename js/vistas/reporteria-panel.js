@@ -37,6 +37,11 @@ function vReporteria() {
   }
 
   const r = repEstado();
+  /* Lo del período se pide acá, al dibujar: las órdenes entregadas y sus
+     etapas. No bloquea —la pantalla se pinta con lo que haya y se repinta
+     cuando llega— pero sin esto el informe habla de las pocas órdenes que
+     quedaron en memoria y no lo dice. Ver `repTraerLoDelPeriodo`. */
+  if (typeof repTraerLoDelPeriodo === 'function') repTraerLoDelPeriodo();
   const lista = repUniverso();
   const meta = Modelo.metricas().metaDias;
   const g = repAgregados(lista, meta);
@@ -88,6 +93,13 @@ function vReporteria() {
         <div class="campo"><label>&nbsp;</label>
           <button class="btn secundario" id="rep-limpiar">Todo el período</button></div>
       </div>
+      ${(typeof repAvisoDeCarga === 'function' && repAvisoDeCarga())
+        ? '<div class="nota" style="margin-top:10px">' + esc(repAvisoDeCarga()) + '</div>' : ''}
+      ${(typeof repOrdenesSinEtapas === 'function' && repOrdenesSinEtapas())
+        ? '<div class="nota ojo" style="margin-top:10px"><b>El período trae más órdenes de las que ' +
+          'se piden de una vez.</b> El desglose por etapa se calculó sobre las primeras ' +
+          repMiles(3000) + '; quedaron ' + repMiles(repOrdenesSinEtapas()) + ' fuera de ESE cálculo ' +
+          '—las demás cifras sí las incluyen—. Acota las fechas y entran todas.</div>' : ''}
     </div>
   </div>
 
@@ -143,9 +155,9 @@ function vReporteria() {
   <div class="panel destacado" style="margin-top:11px">
     <div class="cab"><div><h2>${ico('reloj', 'g')}Dónde se van los días</h2>
       <div class="desc">Los ${Math.round(g.promTotales)} días que dura una orden, abiertos etapa
-        por etapa. <strong>El sistema actual no puede mostrar esto</strong>: guarda la etapa en la
-        que está el auto, no cuándo entró y salió de cada una, así que no hay dos fechas que
-        restar</div></div>
+        por etapa. <strong>La pantalla que usan hoy no muestra esto</strong>: enseña la etapa en la
+        que está el auto, no cuánto duró cada una. El dato sí existía —quedó registrado cada vez
+        que alguien dio una etapa por completada— y se rescató entero al migrar</div></div>
       <span class="et ${peor && peor.v > 0 ? 'roja' : 'gris'}">${peor
         ? 'Se pierde más tiempo en ' + esc(peor.k) : 'Sin etapas cerradas'}</span></div>
     <div class="cuerpo">
@@ -155,7 +167,11 @@ function vReporteria() {
             rot: (Math.round(f.v * 10) / 10).toString().replace('.', ',') + ' días', color: f.color })),
             { destacar: false }) + '</div>' +
           '<div>' + repFormulas([
-            { que: 'Días de una etapa', exp: 'cierre − asignación, en calendario', num: '' },
+            { que: 'Días de una etapa', exp: 'su cierre − el cierre de la anterior, en calendario · la primera cuenta desde el ingreso',
+              num: porEtapa.filas.length > 1
+                ? esc(porEtapa.filas[1].k) + ': ' + repMiles(Math.round(porEtapa.filas[1].dias)) + ' d ÷ ' +
+                  repMiles(porEtapa.filas[1].n) + ' = ' + (Math.round(porEtapa.filas[1].v * 10) / 10).toString().replace('.', ',') + ' d'
+                : '' },
             peor ? { que: 'Promedio · ' + peor.k, exp: 'Σ días ÷ etapas cerradas',
               num: repMiles(Math.round(peor.dias)) + ' ÷ ' + repMiles(peor.n) + ' = ' +
                 (Math.round(peor.v * 10) / 10).toString().replace('.', ',') + ' d' } : null,
@@ -165,18 +181,21 @@ function vReporteria() {
               num: repMiles(porEtapa.cubiertas) + ' ÷ ' +
                 repMiles(porEtapa.cubiertas + porEtapa.abiertas) },
             { que: 'Auto donde el cliente', exp: 'se carga a la etapa que estaba abierta',
+              num: '' },
+            { que: 'Por qué no es «cierre − asignación»', exp: 'el taller asigna la ruta entera al '
+              + 'recibir el auto: medido así, cada etapa arrastraría el tiempo de las anteriores',
               num: '' }
           ]) +
           '<div class="nota-panel"><p class="dato-demo">Dato de demostración: los tiempos por etapa ' +
           'salen de la base sembrada. Con la base real de DyP se calcula igual.</p></div></div>' +
         '</div>'
-        : vacio('Ninguna orden del período tiene etapas cerradas')}
+        : vacio(repAvisoDeCarga() ? 'Trayendo las etapas del período…' : 'Ninguna orden entregada en este período tiene etapas cerradas')}
     </div>
   </div>
 
   <div class="panel destacado" style="margin-top:11px">
     <div class="cab"><div><h2>Días de reparación por mes</h2>
-      <div class="desc">La otra vista que el sistema actual no puede tener: al entregar pierde el
+      <div class="desc">La otra vista que la pantalla de hoy no tiene: al entregar pierde el
         contador. La franja verde de abajo es cumplir; todo lo que queda sobre la línea de la meta
         va en vino</div></div></div>
     <div class="cuerpo">${meses.length
@@ -192,6 +211,13 @@ function vReporteria() {
         ])
       : vacio('Sin entregas en el período')}</div>
   </div>
+
+  ${g.porPersona.length ? `<div class="nota ojo" style="margin-top:-4px">
+    <b>Este número depende mucho de qué etapa le toca a cada uno.</b> Desarme promedia
+    ${Math.round((porEtapa.filas.find((f) => /desarme/i.test(f.k)) || {}).v || 0)} días porque ahí el
+    auto espera el repuesto y la aprobación de la compañía; Pintura promedia menos de uno. Quien
+    cierra Desarme va a aparecer lento aunque trabaje rápido. Para comparar de verdad hay que
+    hacerlo <b>dentro de la misma etapa</b> — cada barra dice cuáles hace.</div>` : ''}
 
   <div class="rejilla-2" style="margin-top:11px">
     <div class="panel">
@@ -284,7 +310,9 @@ function vReporteria() {
       <div class="cuerpo">${svgBarras(distribucion.cajas,
         { compacto: true, marcaX: distribucion.marcaX, marcaRot: 'meta ' + meta + ' d' })}
         ${repFormulas([
-          { que: 'Cada barra', exp: 'órdenes cuya reparación cae en el tramo', num: '' },
+          { que: 'Cada barra', exp: 'órdenes cuya reparación cae en el tramo',
+            num: (() => { const m = (distribucion.cajas || []).slice().sort((a, b) => b.v - a.v)[0];
+              return m ? esc(m.k) + ': ' + repMiles(m.v) + ' de ' + repMiles(lista.length) + ' órdenes' : ''; })() },
           { que: 'Barra azul', exp: 'tramo dentro de la meta de ' + meta + ' d',
             num: repMiles(dentro) + ' ÷ ' + repMiles(lista.length) + ' = ' +
               pct(dentro, lista.length) + '%' },
@@ -330,9 +358,10 @@ function vReporteria() {
 
   <div class="panel destacado" style="margin-top:11px">
     <div class="cab"><div><h2>${ico('personal', 'g')}Quién demora menos</h2>
-      <div class="desc">Días promedio desde que se le asigna la etapa hasta que la termina, y
-        cuántas le devolvieron. <strong>El sistema actual no puede mostrar esto</strong>: no guarda
-        quién hizo cada etapa, ni cuándo se la dieron, ni si hubo que rehacerla</div></div>
+      <div class="desc">Días promedio de las etapas que cerró, contados desde que cerró la
+        anterior, y cuántas le devolvieron. <strong>La pantalla de hoy no muestra esto</strong>: quién cerró cada
+        etapa y cuándo se la asignaron sí quedó registrado y se rescató al migrar; la devolución
+        es nuestra y empieza a contar desde ahora</div></div>
       ${g.porPersona.length ? '<span class="et verde">' + esc(g.porPersona[0].k) + ' es el más rápido</span>' : ''}</div>
     <div class="cuerpo">
       ${g.porPersona.length
@@ -369,7 +398,7 @@ function vReporteria() {
                   Math.round(peor.tasa) + '%';
               })() }
           ])
-        : vacio('Todavía no hay etapas cerradas con encargado en el período')}
+        : vacio(repAvisoDeCarga() ? 'Trayendo las etapas del período…' : 'Ninguna etapa cerrada del período tiene encargado anotado')}
       <div class="nota-panel"><p class="dato-demo">Dato de demostración: los tiempos por persona
         salen de la base sembrada. Con la base real de DyP se calcula igual.</p></div>
     </div>
@@ -377,20 +406,51 @@ function vReporteria() {
 
   <div class="rejilla-2" style="margin-top:11px">
     <div class="panel">
-      <div class="cab"><div><h2>Venta por compañía</h2></div></div>
-      <div class="cuerpo">${svgBarrasH(ventaPorCompania, { destacar: true })}</div>
+      <div class="cab"><div><h2>Venta por compañía</h2>
+        <div class="desc">Cuánto facturaron entre todas las órdenes de cada una</div></div></div>
+      <div class="cuerpo">${svgBarrasH(ventaPorCompania, { destacar: true }) +
+        repFormulas([
+          { que: 'Cada barra', exp: 'suma de la venta de las órdenes de esa compañía',
+            num: ventaPorCompania.length ? esc(ventaPorCompania[0].k) + ' = ' + fMonto(ventaPorCompania[0].v) : '—' },
+          { que: 'Suman', exp: 'las ' + repMiles(ventaPorCompania.length) + ' barras dan la venta del período',
+            num: fMonto(venta) },
+          { que: 'Particular', exp: 'las órdenes sin compañía se agrupan ahí', num: '' }
+        ])}</div>
     </div>
     <div class="panel">
-      <div class="cab"><div><h2>Modelos más siniestrados</h2></div></div>
-      <div class="cuerpo">${svgBarrasH(top(dimDe('modelo'), 10), { destacar: true })}</div>
+      <div class="cab"><div><h2>Modelos más siniestrados</h2>
+        <div class="desc">Cuántas órdenes entregadas hubo de cada modelo</div></div></div>
+      <div class="cuerpo">${(() => { const todos = dimDe('modelo'); const t = top(todos, 10); return svgBarrasH(t, { destacar: true }) +
+        repFormulas([
+          { que: 'Cada barra', exp: 'órdenes entregadas de ese modelo en el período',
+            num: t.length ? esc(t[0].k) + ' = ' + repMiles(t[0].v) : '—' },
+          { que: 'Se muestran', exp: 'los diez primeros de ' + repMiles(todos.length) + ' modelos distintos',
+            num: t.length ? 'el resto queda fuera del dibujo' : '—' }
+        ]); })()}</div>
     </div>
     <div class="panel">
-      <div class="cab"><div><h2>Clientes con más vehículos</h2></div></div>
-      <div class="cuerpo">${svgBarrasH(top(dimDe('cliente'), 10), { destacar: true })}</div>
+      <div class="cab"><div><h2>Clientes con más vehículos</h2>
+        <div class="desc">Quién trajo más autos en el período</div></div></div>
+      <div class="cuerpo">${(() => { const todos = dimDe('cliente'); const t = top(todos, 10); return svgBarrasH(t, { destacar: true }) +
+        repFormulas([
+          { que: 'Cada barra', exp: 'órdenes entregadas a ese cliente en el período',
+            num: t.length ? esc(t[0].k) + ' = ' + repMiles(t[0].v) : '—' },
+          { que: 'Se muestran', exp: 'los diez primeros de ' + repMiles(todos.length) + ' clientes',
+            num: '' },
+          { que: 'Ojo', exp: 'cuenta ÓRDENES, no autos distintos: un auto que volvió dos veces son dos',
+            num: '' }
+        ]); })()}</div>
     </div>
     <div class="panel">
-      <div class="cab"><div><h2>Marcas</h2></div></div>
-      <div class="cuerpo">${svgBarrasH(top(dimDe('marca'), 10), { destacar: true })}</div>
+      <div class="cab"><div><h2>Marcas</h2>
+        <div class="desc">Cuántas órdenes entregadas hubo de cada marca</div></div></div>
+      <div class="cuerpo">${(() => { const todos = dimDe('marca'); const t = top(todos, 10); return svgBarrasH(t, { destacar: true }) +
+        repFormulas([
+          { que: 'Cada barra', exp: 'órdenes entregadas de esa marca en el período',
+            num: t.length ? esc(t[0].k) + ' = ' + repMiles(t[0].v) : '—' },
+          { que: 'Se muestran', exp: 'las diez primeras de ' + repMiles(todos.length) + ' marcas',
+            num: '' }
+        ]); })()}</div>
     </div>
   </div>
   `}
@@ -408,6 +468,27 @@ function vReporteria() {
           <span class="ayuda">${d.med.suma ? 'Se suma' : 'Se promedia'} dentro de cada celda</span></div>
       </div>
       ${repTablaDinamica(d)}
+      ${repFormulas([
+        { que: 'Cada celda', exp: (d.med.suma ? 'suma' : 'promedio') + ' de «' + esc(d.med.rot) +
+            '» de las órdenes que caen en esa fila' + (d.dimC ? ' y esa columna' : ''),
+          num: repMiles(lista.length) + ' órdenes repartidas en ' + repMiles(d.filasOrd.length) +
+            (d.filasOrd.length === 1 ? ' fila' : ' filas') +
+            (d.dimC ? ' × ' + repMiles(d.columnasOrd.length) + ' columnas' : '') },
+        { que: 'El total de abajo', exp: d.med.suma
+            ? 'suma todas las órdenes del período'
+            : 'promedia TODAS las órdenes del período, no promedia los promedios de arriba',
+          num: d.totalGeneral === null ? '—' : d.med.fmt(d.totalGeneral) },
+        { que: 'Una orden', exp: 'entra en una sola fila: la de su ' + esc(d.dimF.rot.toLowerCase()),
+          num: '' },
+        /* 🔴 El tope se DICE. `filasOrd` corta en 40 y `columnasOrd` en 12:
+           agrupando por cliente hay cientos, y una tabla de cuarenta filas con
+           un total al pie se lee como «esto es todo». */
+        (d.filasOrd.length >= 40 || (d.dimC && d.columnasOrd.length >= 12))
+          ? { que: '⚠️ La tabla está cortada',
+              exp: 'se dibujan hasta 40 filas y 12 columnas; el total del pie SÍ incluye todo',
+              num: 'se ven ' + repMiles(d.filasOrd.length) + ' de ' + repMiles(d.cuantasFilas || d.filasOrd.length) + ' filas' }
+          : null
+      ], { titulo: 'Cómo se llena la tabla' })}
     </div>
   </div>
 
